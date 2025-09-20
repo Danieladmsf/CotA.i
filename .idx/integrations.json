@@ -1,0 +1,6 @@
+{
+  "firebase_hosting": {
+    "deploymentHostingUrl": "https://cotao-online.web.app"
+  },
+  "cloud_run_deploy": {}
+}

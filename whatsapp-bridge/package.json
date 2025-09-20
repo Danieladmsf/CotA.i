@@ -1,0 +1,22 @@
+
+{
+  "name": "whatsapp-bridge",
+  "version": "1.0.0",
+  "description": "A bridge to connect a web application with WhatsApp using Firebase.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "firebase",
+    "bridge"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "qrcode": "^1.5.3",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}
