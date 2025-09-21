@@ -53,6 +53,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔥 AuthProvider: signInWithGoogle called');
     console.log('🔥 AuthProvider: Firebase initialized?', isFirebaseInitialized);
 
+    // Log current domain information
+    console.log('🌐 Domain Info: Current URL:', window.location.href);
+    console.log('🌐 Domain Info: Hostname:', window.location.hostname);
+    console.log('🌐 Domain Info: Origin:', window.location.origin);
+    console.log('🌐 Domain Info: Protocol:', window.location.protocol);
+
     if (!isFirebaseInitialized) {
       console.error('🔥 AuthProvider: Firebase not initialized, showing error toast');
       toast({ title: "Erro de Configuração", description: "A autenticação não está configurada.", variant: "destructive" });
@@ -65,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       console.log('🔥 AuthProvider: Starting Google sign in popup...');
+      console.log('🌐 Domain Info: Attempting login from:', window.location.origin);
       const result = await signInWithPopup(auth, provider);
       console.log('🔥 AuthProvider: Google sign in successful!', result.user.email);
       toast({ title: "Login bem-sucedido!", variant: "default" });
@@ -73,6 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("🔥 AuthProvider: Error signing in with Google:", error);
       console.error("🔥 AuthProvider: Error code:", error.code);
       console.error("🔥 AuthProvider: Error message:", error.message);
+      console.error("🌐 Domain Error: Failed domain was:", window.location.origin);
+
+      if (error.code === 'auth/unauthorized-domain') {
+        console.error('🌐 Domain Error: THIS DOMAIN NEEDS TO BE ADDED TO FIREBASE:');
+        console.error('🌐 Domain Error: Add this domain to Firebase:', window.location.hostname);
+        console.error('🌐 Domain Error: Full origin to add:', window.location.origin);
+      }
 
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({ title: "Falha no Login", description: error.message, variant: "destructive" });
