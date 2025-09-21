@@ -38,10 +38,11 @@ export async function startQuotation(
   }
 
   try {
-    const mainBatch = adminDb.batch();
+    const db = adminDb();
+    const mainBatch = db.batch();
 
     // 1. Find items to be included in the quotation
-    const itemsQuery = adminDb
+    const itemsQuery = db
       .collection(SHOPPING_LIST_ITEMS_COLLECTION)
       .where('listId', '==', listId)
       .where('status', '==', 'Pendente');
@@ -53,7 +54,7 @@ export async function startQuotation(
     }
 
     // 2. Create the new quotation document
-    const newQuotationRef = adminDb.collection(QUOTATIONS_COLLECTION).doc();
+    const newQuotationRef = db.collection(QUOTATIONS_COLLECTION).doc();
     mainBatch.set(newQuotationRef, {
       shoppingListDate: Timestamp.fromDate(shoppingListDate),
       listId: listId,
@@ -81,7 +82,7 @@ export async function startQuotation(
         supplierIds = supplierIds.slice(0, 30);
     }
     
-    const suppliersQuery = adminDb.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', supplierIds);
+    const suppliersQuery = db.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', supplierIds);
     const suppliersSnapshot = await suppliersQuery.get();
 
     for (const doc of suppliersSnapshot.docs) {
@@ -115,7 +116,8 @@ export async function closeQuotationAndItems(
   quotationId: string,
 ): Promise<{ success: boolean; updatedItemsCount?: number; error?: string }> {
     try {
-        const quotationRef = adminDb.collection(QUOTATIONS_COLLECTION).doc(quotationId);
+        const db = adminDb();
+        const quotationRef = db.collection(QUOTATIONS_COLLECTION).doc(quotationId);
         const quotationSnap = await quotationRef.get();
 
         if (!quotationSnap.exists) {
@@ -136,11 +138,11 @@ export async function closeQuotationAndItems(
              throw new Error("Quotation is missing a shopping list date.");
         }
         
-        const batch = adminDb.batch();
+        const batch = db.batch();
 
         batch.update(quotationRef, { status: "Fechada" });
 
-        const itemsQuery = adminDb.collection(SHOPPING_LIST_ITEMS_COLLECTION)
+        const itemsQuery = db.collection(SHOPPING_LIST_ITEMS_COLLECTION)
             .where("quotationId", "==", quotationId);
         
         const itemsSnapshot = await itemsQuery.get();
@@ -164,7 +166,7 @@ export async function closeQuotationAndItems(
                 const quotationName = quotationData.name || `Cotação de ${format(listDate, "dd/MM/yyyy", { locale: ptBR })}`;
                 
                 for (const supplierId of invitedSupplierIds) {
-                    const supplierDoc = await adminDb.collection(FORNECEDORES_COLLECTION).doc(supplierId).get();
+                    const supplierDoc = await db.collection(FORNECEDORES_COLLECTION).doc(supplierId).get();
                     if (supplierDoc.exists) {
                         const supplierData = supplierDoc.data() as Fornecedor;
                         if (supplierData.whatsapp) {
@@ -180,7 +182,7 @@ export async function closeQuotationAndItems(
 
         // --- Notify Buyer ---
         try {
-            const settingsDocRef = adminDb.collection('whatsapp_config').doc(quotationData.userId);
+            const settingsDocRef = db.collection('whatsapp_config').doc(quotationData.userId);
             const settingsDoc = await settingsDocRef.get();
             if (settingsDoc.exists) {
                 const settingsData = settingsDoc.data();

@@ -29,7 +29,8 @@ async function queueMessageForSending(phoneNumber: string, messageContent: strin
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     
-    await adminDb.collection(MESSAGES_COLLECTION).add(messageEntry);
+    const db = adminDb();
+    await db.collection(MESSAGES_COLLECTION).add(messageEntry);
 }
 
 

@@ -1,7 +1,24 @@
 
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { serviceAccountCredentials } from '../lib/services/serviceAccount.ts';
+
+// Firebase Admin credentials from environment variables
+const serviceAccountCredentials = {
+  type: "service_account",
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+};
+
+// Validate required environment variables
+if (!serviceAccountCredentials.project_id || !serviceAccountCredentials.private_key || !serviceAccountCredentials.client_email) {
+  console.error("\n\n❌ ERRO: Variáveis de ambiente do Firebase Admin não configuradas.");
+  console.error("Configure as seguintes variáveis:");
+  console.error("- FIREBASE_PROJECT_ID");
+  console.error("- FIREBASE_PRIVATE_KEY");
+  console.error("- FIREBASE_CLIENT_EMAIL\n\n");
+  process.exit(1);
+}
 
 // ==========================================================================================
 //  INSTRUÇÕES
