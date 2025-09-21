@@ -30,13 +30,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter();
 
   useEffect(() => {
+    console.log('🔥 AuthProvider: Initializing...');
+    console.log('🔥 AuthProvider: Firebase initialized?', isFirebaseInitialized);
+
     if (!isFirebaseInitialized) {
-      console.warn("Firebase credentials not found. Authentication is disabled.");
+      console.error("🔥 AuthProvider: Firebase credentials not found. Authentication is disabled.");
       setLoading(false);
       return;
     }
 
+    console.log('🔥 AuthProvider: Setting up auth state listener...');
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('🔥 AuthProvider: Auth state changed:', user ? `User logged in: ${user.email}` : 'User logged out');
       setUser(user);
       setLoading(false);
     });
@@ -45,22 +50,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
+    console.log('🔥 AuthProvider: signInWithGoogle called');
+    console.log('🔥 AuthProvider: Firebase initialized?', isFirebaseInitialized);
+
     if (!isFirebaseInitialized) {
+      console.error('🔥 AuthProvider: Firebase not initialized, showing error toast');
       toast({ title: "Erro de Configuração", description: "A autenticação não está configurada.", variant: "destructive" });
       return;
     }
-    
+
+    console.log('🔥 AuthProvider: Creating Google provider...');
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    
+
     try {
-      await signInWithPopup(auth, provider);
+      console.log('🔥 AuthProvider: Starting Google sign in popup...');
+      const result = await signInWithPopup(auth, provider);
+      console.log('🔥 AuthProvider: Google sign in successful!', result.user.email);
       toast({ title: "Login bem-sucedido!", variant: "default" });
       router.push('/'); // Redirect to home after login
     } catch (error: any) {
-      console.error("Error signing in with Google:", error);
+      console.error("🔥 AuthProvider: Error signing in with Google:", error);
+      console.error("🔥 AuthProvider: Error code:", error.code);
+      console.error("🔥 AuthProvider: Error message:", error.message);
+
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({ title: "Falha no Login", description: error.message, variant: "destructive" });
+      } else {
+        console.log('🔥 AuthProvider: Popup was closed by user');
       }
     }
   };

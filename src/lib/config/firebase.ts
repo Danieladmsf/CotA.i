@@ -19,17 +19,35 @@ let storage: FirebaseStorage;
 
 const isFirebaseInitialized = firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId;
 
+console.log('🔥 Firebase Config: Checking initialization...');
+console.log('🔥 Firebase Config: API Key present?', !!firebaseConfig.apiKey);
+console.log('🔥 Firebase Config: Auth Domain present?', !!firebaseConfig.authDomain);
+console.log('🔥 Firebase Config: Project ID present?', !!firebaseConfig.projectId);
+console.log('🔥 Firebase Config: Firebase initialized?', isFirebaseInitialized);
+
 if (isFirebaseInitialized) {
+  console.log('🔥 Firebase Config: Initializing Firebase...');
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
+    console.log('🔥 Firebase Config: Firebase app initialized successfully');
   } else {
     app = getApp();
+    console.log('🔥 Firebase Config: Using existing Firebase app');
   }
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+  console.log('🔥 Firebase Config: All Firebase services initialized');
 } else {
-  console.error("Firebase environment variables are not set. Firebase is not initialized.");
+  console.error("🔥 Firebase Config: Firebase environment variables are not set. Firebase is not initialized.");
+  console.error("🔥 Firebase Config: Missing variables:", {
+    apiKey: !firebaseConfig.apiKey,
+    authDomain: !firebaseConfig.authDomain,
+    projectId: !firebaseConfig.projectId,
+    storageBucket: !firebaseConfig.storageBucket,
+    messagingSenderId: !firebaseConfig.messagingSenderId,
+    appId: !firebaseConfig.appId
+  });
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;
