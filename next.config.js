@@ -19,7 +19,7 @@ const nextConfig = {
   },
   experimental: {
     // The double-asterisk wildcard `**` is required to match any number of subdomains.
-    allowedDevOrigins: ["**.¹.cloudworkstations.dev"],
+    allowedDevOrigins: ["**.¹.cloudworkstations.dev", "72.60.61.118:8080"],
   },
 };
 

@@ -32,13 +32,21 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
 
+  console.log('🔍 ProtectedLayout - State:', { user: !!user, loading, userEmail: user?.email });
+
+  // TEMPORÁRIO: Desabilitar autenticação para teste
+  const BYPASS_AUTH = false;
+
   useEffect(() => {
-    if (!loading && !user) {
+    console.log('🔄 ProtectedLayout - useEffect triggered:', { loading, user: !!user });
+    if (!BYPASS_AUTH && !loading && !user) {
+      console.log('🚀 Redirecting to /login');
       router.push('/login');
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (!BYPASS_AUTH && (loading || !user)) {
+    console.log('⏳ Showing loading screen or no user');
     return (
       <div className="flex w-full h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -72,8 +80,8 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
               <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold truncate">{user?.displayName}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              <p className="text-sm font-semibold truncate">{user?.displayName || 'Demo User'}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || 'demo@teste.com'}</p>
             </div>
           </div>
            <Button variant="outline" className="w-full justify-start mt-2" onClick={logout}>
@@ -93,6 +101,8 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
+
+  console.log('🌍 RootLayoutContent - Pathname:', pathname, 'isLoginPage:', isLoginPage);
 
   return (
     <html lang="pt-BR" className={`${inter.variable} ${poppins.variable} ${jetbrainsMono.variable}`}>
