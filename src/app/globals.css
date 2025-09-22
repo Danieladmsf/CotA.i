@@ -102,6 +102,10 @@
   * {
     @apply border-border;
   }
+  html {
+    font-size: 75%; /* Adjust base font size to reduce overall zoom */
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-inter);
@@ -344,6 +348,7 @@
     font-weight: 800;
     letter-spacing: -0.02em;
     line-height: 1.1;
+    font-size: 3rem; /* Reduced from typical larger sizes */
   }
   
   .text-title {
@@ -351,6 +356,7 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     line-height: 1.2;
+    font-size: 2rem; /* Reduced from typical larger sizes */
   }
   
   .text-body-large {
@@ -376,6 +382,8 @@
     font-family: var(--font-jetbrains);
     font-feature-settings: "liga" 0;
   }
+
+
 }
 
 /* Animações personalizadas */
@@ -470,11 +478,11 @@
   }
   
   .text-display {
-    font-size: 2.5rem;
+    font-size: 2rem; /* Further reduced */
   }
   
   .text-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem; /* Further reduced */
   }
   
   .text-body-large {
@@ -484,10 +492,36 @@
 
 @media (max-width: 480px) {
   .text-display {
-    font-size: 2rem;
+    font-size: 1.5rem; /* Further reduced */
   }
   
   .text-title {
-    font-size: 1.25rem;
+    font-size: 1rem; /* Further reduced */
+  }
+}
+
+.animate-pulse-glow-green {
+  animation: pulse-glow-green 2s infinite;
+}
+
+.animate-pulse-glow-red {
+  animation: pulse-glow-red 2s infinite;
+}
+
+@keyframes pulse-glow-green {
+  0%, 100% {
+    border-color: hsl(var(--success) / 0.5);
+  }
+  50% {
+    border-color: hsl(var(--success) / 1);
+  }
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% {
+    border-color: hsl(var(--destructive) / 0.5);
+  }
+  50% {
+    border-color: hsl(var(--destructive) / 1);
   }
 }

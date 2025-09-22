@@ -377,15 +377,65 @@ export default function FornecedoresPage() {
 
 
   const handleCopyLink = (link: string) => {
-    navigator.clipboard.writeText(link)
-      .then(() => {
+    // Check if the Clipboard API is supported
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link)
+        .then(() => {
+          toast({ title: "Link Copiado!", description: "O link foi copiado para a área de transferência." });
+          setIsLinkModalOpen(false);
+        })
+        .catch(err => {
+          fallbackCopyTextToClipboard(link);
+          console.error('Clipboard API failed, using fallback: ', err);
+        });
+    } else {
+      // Fallback for browsers that don't support the Clipboard API
+      fallbackCopyTextToClipboard(link);
+    }
+  };
+
+  const fallbackCopyTextToClipboard = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+
+    // Avoid scrolling to bottom
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
         toast({ title: "Link Copiado!", description: "O link foi copiado para a área de transferência." });
         setIsLinkModalOpen(false);
-      })
-      .catch(err => {
-        toast({ title: "Erro ao Copiar", description: "Não foi possível copiar o link.", variant: "destructive" });
-        console.error('Failed to copy: ', err);
+      } else {
+        toast({
+          title: "Use Ctrl+V para colar",
+          description: "Este navegador não suporta a API de clipboard. Use **Ctrl+V** para colar.",
+          variant: "default"
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Use Ctrl+V para colar",
+        description: "Este navegador não suporta a API de clipboard. Use **Ctrl+V** para colar.",
+        variant: "default"
       });
+      console.error('Fallback: Could not copy text: ', err);
+    } finally {
+      document.body.removeChild(textArea);
+    }
   };
 
   const handleOpenLinkInNewTab = (link: string) => {

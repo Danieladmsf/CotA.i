@@ -1,60 +1,43 @@
 
 import * as admin from 'firebase-admin';
 
-// Check if Firebase Admin is already initialized
-let isAdminInitialized = false;
-let adminDb: admin.firestore.Firestore | null = null;
-
-// Function to safely initialize Firebase Admin
-const initializeFirebaseAdmin = () => {
-  if (isAdminInitialized || admin.apps.length > 0) {
-    return;
+const getAdminDb = () => {
+  // If the app is already initialized, return the existing firestore instance
+  if (admin.apps.length > 0) {
+    // This assertion is safe because if apps.length > 0, an app is initialized.
+    return admin.firestore();
   }
 
   try {
-    // Check if we have the required environment variables
+    // If not initialized, initialize it now
     const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
     if (!projectId || !privateKey || !clientEmail) {
-      console.warn('Firebase Admin: Missing required environment variables. Admin features disabled.');
-      return;
+      throw new Error('Firebase Admin: Missing required environment variables.');
     }
 
-    const serviceAccountCredentials = {
-      type: "service_account",
-      project_id: projectId,
-      private_key: privateKey.replace(/\\n/g, '\n'), // Handle escaped newlines
-      client_email: clientEmail,
-    };
-
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountCredentials as admin.ServiceAccount),
+      credential: admin.credential.cert({
+        projectId: projectId,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+        clientEmail: clientEmail,
+      }),
       projectId: projectId,
     });
 
-    adminDb = admin.firestore();
-    isAdminInitialized = true;
-    console.log('Firebase Admin initialized successfully');
+    console.log('Firebase Admin initialized successfully on demand.');
+    return admin.firestore();
   } catch (error: any) {
     console.error('Firebase Admin Initialization Error:', error.message);
-    console.warn('Firebase Admin features will be disabled');
+    // Re-throw the error to make it clear that the DB is not available
+    throw new Error(`Firebase Admin could not be initialized: ${error.message}`);
   }
 };
 
-// Initialize on module load
-initializeFirebaseAdmin();
+// We can also export admin for other uses if needed
+const isAdminInitialized = admin.apps.length > 0;
 
-// Safe getter for adminDb
-const getAdminDb = () => {
-  if (!adminDb) {
-    throw new Error('Firebase Admin is not initialized. Please check your environment variables.');
-  }
-  return adminDb;
-};
-
-// Export the initialized admin instance and safe db getter
+// Export the safe db getter and other utilities
 export { getAdminDb as adminDb, admin, isAdminInitialized };
-
-    

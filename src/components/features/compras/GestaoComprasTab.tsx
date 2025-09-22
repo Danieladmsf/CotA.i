@@ -172,11 +172,11 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
     }).sort((a,b) => a.name.localeCompare(b.name));
   }, [shoppingListItems, activeQuotation, searchTerm, statusFilter]);
 
-  const getStatusBadgeVariant = (status: ShoppingListItem['status']): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: ShoppingListItem['status']): "default" | "secondary" | "destructive" | "outline" | "success" => {
     switch (status) {
       case 'Comprado': return 'default';
       case 'Pendente': return 'outline';
-      case 'Cotado': return 'secondary';
+      case 'Cotado': return 'success';
       case 'Recebido': return 'secondary';
       case 'Cancelado': return 'destructive';
       case 'Encerrado': return 'destructive';
@@ -277,7 +277,7 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
                     {itemsToDisplay.length > 0 ? (
                       itemsToDisplay.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell><Badge variant={getStatusBadgeVariant(item.status)}>{item.status}</Badge></TableCell>
+                          <TableCell><Badge variant={getStatusBadgeVariant(item.status)}>{item.status === 'Cotado' ? 'Cotando' : item.status}</Badge></TableCell>
                           <TableCell>{`${item.quantity} ${item.unit}`}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>{item.preferredBrands || "-"}</TableCell>

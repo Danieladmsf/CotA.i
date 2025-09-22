@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { db } from "@/lib/config/firebase";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import type { Quotation, Offer, ShoppingListItem, Fornecedor as SupplierType, UnitOfMeasure } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -60,6 +59,7 @@ const dayMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sab
 
 interface OfferWithUI extends Offer {
   uiId: string; 
+  isSuggestedBrand?: boolean;
 }
 
 interface BestOfferForBrandDisplay {
@@ -90,6 +90,7 @@ interface ProductToQuoteVM extends ShoppingListItem {
       myBrand: string; // The supplier's own brand that was outbid
   } | null;
   isLockedOut?: boolean;
+  acknowledgedDeliveryMismatches?: string[]; // NEW FIELD
 }
 
 
@@ -165,7 +166,7 @@ export default function SellerQuotationPage() {
   const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
   const [unseenAlerts, setUnseenAlerts] = useState<string[]>([]);
   const [expandedProductIds, setExpandedProductIds] = useState<string[]>([]);
-  const [overriddenProductIds, setOverriddenProductIds] = useState<string[]>([]);
+
   
   const [timeLeft, setTimeLeft] = useState("Calculando...");
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
@@ -204,6 +205,31 @@ export default function SellerQuotationPage() {
     }
     closingQuotationsRef.current.delete(quotationId);
   }, [toast]);
+
+  const handleAcknowledgeMismatch = async (productId: string) => {
+    if (!supplierId) {
+      toast({ title: "Erro", description: "ID do fornecedor ausente.", variant: "destructive" });
+      return;
+    }
+    try {
+      const itemRef = doc(db, SHOPPING_LIST_ITEMS_COLLECTION, productId);
+      await updateDoc(itemRef, {
+        acknowledgedDeliveryMismatches: arrayUnion(supplierId)
+      });
+      // Optimistically update local state
+      setProductsToQuote(prevProducts =>
+        prevProducts.map(p =>
+          p.id === productId
+            ? { ...p, acknowledgedDeliveryMismatches: [...(p.acknowledgedDeliveryMismatches || []), supplierId] }
+            : p
+        )
+      );
+      toast({ title: "Confirmação Salva", description: "Sua confirmação de entrega foi registrada." });
+    } catch (error: any) {
+      console.error("Error acknowledging delivery mismatch:", error);
+      toast({ title: "Erro ao Salvar Confirmação", description: error.message, variant: "destructive" });
+    }
+  };
 
 
   // Main listener for the quotation document itself
@@ -333,7 +359,7 @@ export default function SellerQuotationPage() {
       updateTimer(); 
       countdownIntervalRef.current = setInterval(updateTimer, 1000);
     } else {
-      setTimeLeft("Prazo n\xE3o definido");
+      setTimeLeft("Prazo não definido");
       setIsDeadlinePassed(false);
     }
 
@@ -353,121 +379,115 @@ export default function SellerQuotationPage() {
         const offersPath = `quotations/${quotationId}/products/${product.id}/offers`;
         const offersQuery = query(collection(db, offersPath));
 
-        return onSnapshot(offersQuery, async (offersSnapshot) => {
-            setProductsToQuote(currentProducts => {
-                const previousProductState = currentProducts.find(p => p.id === product.id);
-                const hadOffersBefore = !!previousProductState?.supplierOffers.some(o => o.id);
-
-                const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
-
-                const newSupplierIdsToFetch = new Set<string>();
-                offersData.forEach(offer => {
-                    if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
-                        newSupplierIdsToFetch.add(offer.supplierId);
-                    }
-                });
-
-                if (newSupplierIdsToFetch.size > 0) {
-                    const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
-                        try {
-                            const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
-                            if (supplierDoc.exists()) {
-                                supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
+                return onSnapshot(offersQuery, (offersSnapshot) => {
+                    const processSnapshot = async () => {
+                        const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
+        
+                        const newSupplierIdsToFetch = new Set<string>();
+                        offersData.forEach(offer => {
+                            if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
+                                newSupplierIdsToFetch.add(offer.supplierId);
                             }
-                        } catch (err) {
-                            console.error(`Error fetching supplier details for ID ${sid}:`, err);
-                        }
-                    });
-                    Promise.all(fetchPromises);
-                }
-                
-                const offersGroupedByBrand = new Map<string, Offer[]>();
-                offersData.forEach(offer => {
-                    if(offer.pricePerUnit > 0) {
-                        if (!offersGroupedByBrand.has(offer.brandOffered)) {
-                            offersGroupedByBrand.set(offer.brandOffered, []);
-                        }
-                        offersGroupedByBrand.get(offer.brandOffered)!.push(offer);
-                    }
-                });
-
-                const brandDisplays: BestOfferForBrandDisplay[] = [];
-                offersGroupedByBrand.forEach((offers, brandName) => {
-                    if (offers.length === 0) return;
-                    const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
-                    const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
-                    if (supplierDetails) {
-                        brandDisplays.push({
-                          brandName,
-                          pricePerUnit: bestOffer.pricePerUnit,
-                          supplierId: bestOffer.supplierId,
-                          supplierName: supplierDetails.empresa,
-                          supplierInitials: supplierDetails.empresa.substring(0, 2).toUpperCase(),
-                          supplierFotoUrl: supplierDetails.fotoUrl,
-                          supplierFotoHint: supplierDetails.fotoHint,
-                          vendedor: supplierDetails.vendedor,
-                          cnpj: supplierDetails.cnpj,
-                          packagingDescription: bestOffer.packagingDescription,
-                          unitsInPackaging: bestOffer.unitsInPackaging,
-                          totalPackagingPrice: bestOffer.totalPackagingPrice,
-                          isSelf: bestOffer.supplierId === supplierId,
-                          productUnit: product.unit,
                         });
-                    }
-                });
-                brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
-
-                const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
-                const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
-                
-                let counterProposalInfo: ProductToQuoteVM['counterProposalInfo'] = null;
-                let isLockedOut = false;
-                const myOffersWithPrice = myOffers.filter(o => o.pricePerUnit > 0);
-
-                if (myOffersWithPrice.length > 0) {
-                    const myBestOffer = myOffersWithPrice.reduce((prev, curr) => (prev.pricePerUnit < curr.pricePerUnit ? prev : curr));
-                    const myBestPrice = myBestOffer.pricePerUnit;
-
-                    if(lowestPriceOverall && myBestPrice > lowestPriceOverall) {
-                        const outbidOffer = offersData
-                            .filter(o => o.supplierId !== supplierId && o.pricePerUnit === lowestPriceOverall && o.updatedAt instanceof Timestamp)
-                            .sort((a, b) => (b.updatedAt as Timestamp).toMillis() - (a.updatedAt as Timestamp).toMillis())[0];
+        
+                        if (newSupplierIdsToFetch.size > 0) {
+                            const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
+                                try {
+                                    const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
+                                    if (supplierDoc.exists()) {
+                                        supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
+                                    }
+                                } catch (err) {
+                                    console.error(`Error fetching supplier details for ID ${sid}:`, err);
+                                }
+                            });
+                            await Promise.all(fetchPromises);
+                        }
                         
-                        const counterProposalMins = quotation.counterProposalTimeInMinutes ?? 15;
+                        const offersGroupedByBrand = new Map<string, Offer[]>();
+                        offersData.forEach(offer => {
+                            if(offer.pricePerUnit > 0) {
+                                if (!offersGroupedByBrand.has(offer.brandOffered)) {
+                                    offersGroupedByBrand.set(offer.brandOffered, []);
+                                }
+                                offersGroupedByBrand.get(offer.brandOffered)!.push(offer);
+                            }
+                        });
+        
+                        const brandDisplays: BestOfferForBrandDisplay[] = [];
+                        offersGroupedByBrand.forEach((offers, brandName) => {
+                            if (offers.length === 0) return;
+                            const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
+                            const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
+                            if (supplierDetails) {
+                                brandDisplays.push({
+                                  brandName,
+                                  pricePerUnit: bestOffer.pricePerUnit,
+                                  supplierId: bestOffer.supplierId,
+                                  supplierName: supplierDetails.empresa,
+                                  supplierInitials: supplierDetails.empresa.substring(0, 2).toUpperCase(),
+                                  supplierFotoUrl: supplierDetails.fotoUrl,
+                                  supplierFotoHint: supplierDetails.fotoHint,
+                                  vendedor: supplierDetails.vendedor,
+                                  cnpj: supplierDetails.cnpj,
+                                  packagingDescription: bestOffer.packagingDescription,
+                                  unitsInPackaging: bestOffer.unitsInPackaging,
+                                  totalPackagingPrice: bestOffer.totalPackagingPrice,
+                                  isSelf: bestOffer.supplierId === supplierId,
+                                  productUnit: product.unit,
+                                });
+                            }
+                        });
+                        brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
+        
+                        const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
+                        const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
                         
-                        if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
-                            const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
-
-                            if (new Date() < deadline) {
-                                counterProposalInfo = { 
-                                    deadline, 
-                                    winningBrand: outbidOffer.brandOffered,
-                                    myBrand: myBestOffer.brandOffered,
-                                };
-                            } else {
-                                isLockedOut = true;
+                        let counterProposalInfo: ProductToQuoteVM['counterProposalInfo'] = null;
+                        let isLockedOut = false;
+                        const myOffersWithPrice = myOffers.filter(o => o.pricePerUnit > 0);
+        
+                        if (myOffersWithPrice.length > 0) {
+                            const myBestOffer = myOffersWithPrice.reduce((prev, curr) => (prev.pricePerUnit < curr.pricePerUnit ? prev : curr));
+                            const myBestPrice = myBestOffer.pricePerUnit;
+        
+                            if(lowestPriceOverall && myBestPrice > lowestPriceOverall) {
+                                const outbidOffer = offersData
+                                    .filter(o => o.supplierId !== supplierId && o.pricePerUnit === lowestPriceOverall && o.updatedAt instanceof Timestamp)
+                                    .sort((a, b) => (b.updatedAt as Timestamp).toMillis() - (a.updatedAt as Timestamp).toMillis())[0];
+                                
+                                const counterProposalMins = quotation.counterProposalTimeInMinutes ?? 15;
+                                
+                                if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
+                                    const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
+        
+                                    if (new Date() < deadline) {
+                                        counterProposalInfo = { 
+                                            deadline, 
+                                            winningBrand: outbidOffer.brandOffered,
+                                            myBrand: myBestOffer.brandOffered,
+                                        };
+                                    } else {
+                                        isLockedOut = true;
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                
-                return currentProducts.map(p => {
-                    if (p.id === product.id) {
-                      const existingNewOffers = p.supplierOffers.filter(o => !o.id);
-                      const updatedOffers = [...myOffers, ...existingNewOffers].sort((a,b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
-                      return { ...p, supplierOffers: updatedOffers, bestOffersByBrand: brandDisplays, lowestPriceThisProductHas: lowestPriceOverall, counterProposalInfo, isLockedOut };
-                    }
-                    return p;
-                });
-            });
-        }, t=>{
-            toast({
-                title: "Erro em tempo real",
-                description: `Não foi possível atualizar ofertas para ${product.name}.`,
-                variant: "destructive"
-            });
-        });
-    });
+                        
+                        setProductsToQuote(currentProducts =>
+                            currentProducts.map(p => {
+                                if (p.id === product.id) {
+                                  const existingNewOffers = p.supplierOffers.filter(o => !o.id);
+                                  const updatedOffers = [...myOffers, ...existingNewOffers].sort((a,b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
+                                  return { ...p, supplierOffers: updatedOffers, bestOffersByBrand: brandDisplays, lowestPriceThisProductHas: lowestPriceOverall, counterProposalInfo, isLockedOut };
+                                }
+                                return p;
+                            })
+                        );
+                    };
+        
+                    processSnapshot();
+                });    });
 
     return () => {
         unsubscribers.forEach(unsub => unsub());
@@ -582,7 +602,7 @@ export default function SellerQuotationPage() {
     );
   };
 
-  const addOfferField = (productId: string, brandToPreFill?: string) => {
+  const addOfferField = (productId: string, brandToPreFill?: string, isSuggested?: boolean) => {
     if (!currentSupplierDetails) {
         toast({title: "Erro", description: "Dados do fornecedor não carregados.", variant: "destructive"});
         return;
@@ -608,6 +628,7 @@ export default function SellerQuotationPage() {
                 pricePerUnit: 0, 
                 updatedAt: serverTimestamp() as Timestamp, 
                 productId: productId,
+                isSuggestedBrand: isSuggested || false,
             };
             const updatedProduct = {
                 ...p,
@@ -649,7 +670,30 @@ export default function SellerQuotationPage() {
   };
 
   const handleSuggestedBrandClick = (productId: string, brandName: string) => {
-    addOfferField(productId, brandName);
+    const product = productsToQuote.find(p => p.id === productId);
+    if (!product) return;
+
+    const unsavedOfferIndex = product.supplierOffers.findIndex(o => !o.id);
+
+    if (unsavedOfferIndex !== -1) {
+        // There is an unsaved offer, so update it.
+        handleOfferChange(productId, product.supplierOffers[unsavedOfferIndex].uiId, 'brandOffered', brandName);
+    } else {
+        // There are no unsaved offers, so add a new one.
+        addOfferField(productId, brandName, true);
+    }
+  };
+
+  const handleOtherBrandClick = (productId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    if (!product) return;
+
+    const unsavedOfferIndex = product.supplierOffers.findIndex(o => !o.id);
+
+    if (unsavedOfferIndex === -1) {
+        // Only add a new field if there are no unsaved offers
+        addOfferField(productId, '', false);
+    }
   };
 
   const calculatePricePerUnit = (offer: OfferWithUI | Partial<OfferWithUI>): number | null => {
@@ -685,6 +729,31 @@ export default function SellerQuotationPage() {
     }
 
     const pricePerUnit = totalPackagingPrice / unitsInPackaging;
+
+    const bestCompetitorOffer = product.bestOffersByBrand.find(o => o.supplierId !== supplierId);
+
+    if (bestCompetitorOffer && pricePerUnit < bestCompetitorOffer.pricePerUnit && pricePerUnit > bestCompetitorOffer.pricePerUnit * 0.99) {
+        toast({
+            title: "Oferta Inválida",
+            description: `Sua oferta deve ser pelo menos 1% menor que a melhor oferta atual de ${formatCurrency(bestCompetitorOffer.pricePerUnit)}. O valor mínimo para cobrir esta oferta é de ${formatCurrency(bestCompetitorOffer.pricePerUnit * 0.99)}. `,
+            variant: "destructive",
+        });
+        return;
+    }
+
+    const isDuplicatePrice = product.bestOffersByBrand.some(
+        (offer) => offer.pricePerUnit === pricePerUnit && offer.supplierId !== supplierId
+    );
+
+    if (isDuplicatePrice) {
+        toast({
+            title: "Preço Duplicado",
+            description: "Este preço já foi ofertado por outro fornecedor. Por favor, insira um valor diferente.",
+            variant: "destructive",
+        });
+        return;
+    }
+
     const brandName = offerData.brandOffered.trim();
 
     const previousBestOffer = product.bestOffersByBrand.length > 0 ? product.bestOffersByBrand[0] : null;
@@ -830,7 +899,7 @@ export default function SellerQuotationPage() {
   if (!quotation || !currentSupplierDetails) {
     return (
       <div className="p-8 text-center text-destructive">
-        Cotação ou fornecedor n\xe3o encontrado. Verifique os IDs.
+        Cotação ou fornecedor não encontrado. Verifique os IDs.
       </div>
     );
   }
@@ -841,7 +910,7 @@ export default function SellerQuotationPage() {
         <Clock className="h-16 w-16 text-amber-500 mb-4" />
         <h1 className="text-3xl font-bold text-foreground">Cotação Pausada</h1>
         <p className="text-lg text-muted-foreground mt-2">O comprador pausou temporariamente esta cotação.</p>
-        <p className="text-muted-foreground">Novas ofertas n\xe3o podem ser enviadas no momento. Por favor, aguarde.</p>
+        <p className="text-muted-foreground">Novas ofertas não podem ser enviadas no momento. Por favor, aguarde.</p>
         <Button variant="outline" onClick={() => router.push(`/portal/${supplierId}`)} className="mt-8">
             <ChevronLeft className="mr-2 h-4 w-4"/> Voltar ao Portal
         </Button>
@@ -930,16 +999,25 @@ export default function SellerQuotationPage() {
           ) : productsToQuote.map((product, index) => {
               const hasUnseenAlert = unseenAlerts.includes(product.id);
               const isExpanded = expandedProductIds.includes(product.id);
-              const isDeliveryMismatch = product.hasSpecificDate && product.isDeliveryDayMismatch && !overriddenProductIds.includes(product.id);
+              const isDeliveryMismatch = product.hasSpecificDate && product.isDeliveryDayMismatch;
               const hasMyOffers = productsWithMyOffers.has(product.id);
               const isLockedOut = !!product.isLockedOut;
 
+              // New logic for pulsating border on main product card
+              const isMyOfferWinning = product.supplierOffers.some(offer => offer.supplierId === supplierId && offer.pricePerUnit === product.lowestPriceThisProductHas);
+              const isMyOfferLosing = product.supplierOffers.some(offer => offer.supplierId === supplierId) && !isMyOfferWinning;
+
               return (
-                <Card key={product.id} className={`overflow-hidden ${hasUnseenAlert ? 'border-destructive border-2 shadow-lg' : ''}`}>
-                  <CardHeader className="bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleProductExpansion(product.id)}>
+                <Card key={product.id} className={`border-2 ${
+                    hasUnseenAlert ? 'border-destructive shadow-lg' :
+                    !hasMyOffers ? 'border-muted-foreground/20' : 'border-transparent'
+                }
+                    ${isMyOfferWinning ? 'animate-pulse-glow-green' : ''}
+                    ${isMyOfferLosing ? 'animate-pulse-glow-red' : ''}
+                  `}>                  <CardHeader className="bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleProductExpansion(product.id)}>
                       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                           <div className="flex items-center gap-3 flex-grow">
-                              <Avatar className="h-12 w-12"><AvatarFallback className="bg-primary/20 text-primary font-semibold text-lg">{product.name.substring(0,1).toUpperCase()}</AvatarFallback></Avatar>
+
                               <div>
                                   <h3 className="text-lg font-semibold">{product.name}</h3>
                                   <p className="text-sm text-muted-foreground">
@@ -947,7 +1025,7 @@ export default function SellerQuotationPage() {
                                   </p>
                               </div>
                           </div>
-                          {!hasMyOffers && (
+                          {!hasMyOffers && isExpanded && (
                               <div className="flex items-center gap-2 p-3 rounded-md bg-accent/10 border border-accent/20 text-accent">
                                   <EyeOff className="h-5 w-5" />
                                   <div className="text-sm">
@@ -957,58 +1035,50 @@ export default function SellerQuotationPage() {
                               </div>
                           )}
                           {hasMyOffers && product.bestOffersByBrand && product.bestOffersByBrand.length > 0 && (
-                            <div className="flex flex-nowrap overflow-x-auto gap-3 pb-2 custom-scrollbar max-w-full">
+                            <div className="flex flex-row flex-wrap gap-2 p-1">
                                 {product.bestOffersByBrand.map(offer => {
-                                    let variantClasses = "bg-muted/50 border-border";
+                                    let variantClasses = "border-muted-foreground/20";
                                     let textPriceClass = "text-foreground";
-                                    let textBrandClass = "text-foreground";
                                     const isLowestOverall = product.lowestPriceThisProductHas !== null && offer.pricePerUnit === product.lowestPriceThisProductHas;
                                     
                                     if(isLowestOverall) {
-                                      variantClasses = "bg-green-500/10 border-green-500/40";
-                                      textPriceClass = "text-green-700 dark:text-green-400";
-                                      textBrandClass = "text-green-700 dark:text-green-500";
+                                      variantClasses = "border-green-500";
+                                      textPriceClass = "text-green-600 dark:text-green-400";
                                     } else if(offer.isSelf) {
-                                      variantClasses = "bg-primary/5 border-primary/30";
+                                      variantClasses = "border-primary";
                                       textPriceClass = "text-primary";
-                                      textBrandClass = "text-primary";
                                     }
 
                                     return (
-                                        <div key={offer.brandName + offer.supplierId} className={`p-3 rounded-md min-w-[250px] max-w-[290px] shrink-0 shadow-sm border ${variantClasses}`}>
-                                            <div className="flex items-start gap-2">
-                                                 <TooltipProvider>
-                                                      <Tooltip>
-                                                          <TooltipTrigger asChild>
-                                                              <Avatar className="h-10 w-10 shrink-0 cursor-pointer">
-                                                                <Image src={isValidImageUrl(offer.supplierFotoUrl) ? offer.supplierFotoUrl : 'https://placehold.co/40x40.png'} alt={offer.supplierName || 'Fornecedor'} width={40} height={40} className="object-cover w-full h-full rounded-full" data-ai-hint={offer.supplierFotoHint || 'logo company'} />
-                                                                <AvatarFallback className="text-sm bg-muted">{offer.supplierInitials}</AvatarFallback>
-                                                              </Avatar>
-                                                          </TooltipTrigger>
-                                                          <TooltipContent side="top" className="bg-background border text-foreground shadow-lg rounded-md text-xs p-2">
-                                                            <p className="font-semibold">{offer.vendedor}</p>
-                                                            <p>{offer.supplierName}</p>
-                                                          </TooltipContent>
-                                                      </Tooltip>
-                                                  </TooltipProvider>
-
-                                                <div className="flex-grow">
-                                                    <p className={`text-sm font-semibold ${textBrandClass}`} title={offer.brandName}>Marca: {offer.brandName}</p>
-                                                    <p className={`text-base font-bold ${textPriceClass} mt-0.5`}>{formatCurrency(offer.pricePerUnit)} / {abbreviateUnit(offer.productUnit)}</p>
-                                                    <div className="mt-1">
-                                                        {isLowestOverall && <Badge variant={offer.isSelf ? "default" : "outline"} className={`text-xs ${offer.isSelf ? 'bg-green-600 text-white' : 'border-green-600 text-green-700'}`}>Melhor Preço</Badge>}
-                                                        {!isLowestOverall && offer.isSelf && <Badge variant="default" className="text-xs">Sua Oferta</Badge>}
-                                                    </div>
+                                        <div key={offer.brandName + offer.supplierId} className={`flex items-center justify-between p-2 rounded-md bg-muted/20 border-l-4 min-w-[200px] flex-grow ${variantClasses}`}>
+                                            <div className="flex items-center gap-3">
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Avatar className="h-8 w-8 shrink-0 cursor-pointer">
+                                                              <Image src={isValidImageUrl(offer.supplierFotoUrl) ? offer.supplierUrl : 'https://placehold.co/40x40.png'} alt={offer.supplierName || 'Fornecedor'} width={40} height={40} className="object-cover w-full h-full rounded-full" data-ai-hint={offer.supplierFotoHint || 'logo company'} />
+                                                              <AvatarFallback className="text-xs bg-muted">{offer.supplierInitials}</AvatarFallback>
+                                                            </Avatar>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="bg-background border text-foreground shadow-lg rounded-md text-xs p-2">
+                                                          <p className="font-semibold">{offer.vendedor}</p>
+                                                          <p>{offer.supplierName}</p>
+                                                          <p className="text-muted-foreground">CNPJ: {offer.cnpj}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                                <div>
+                                                    <p className="text-sm font-semibold" title={offer.brandName}>{offer.brandName}</p>
+                                                    <p className="text-xs text-muted-foreground">por {offer.supplierName}</p>
                                                 </div>
                                             </div>
-                                             <Separator className="my-1.5" />
-                                             <div className="space-y-0.5 text-xs text-muted-foreground">
-                                                <p className="truncate" title={offer.vendedor}><User className="inline h-3 w-3 mr-1 flex-shrink-0" />{offer.vendedor}</p>
-                                                <p className="truncate" title={offer.cnpj}><Briefcase className="inline h-3 w-3 mr-1 flex-shrink-0" />{offer.cnpj}</p>
-                                                <p className="truncate" title={offer.packagingDescription}><Package className="inline h-3 w-3 mr-1 flex-shrink-0" />{offer.packagingDescription}</p>
-                                                <p><Hash className="inline h-3 w-3 mr-1 flex-shrink-0" />{offer.unitsInPackaging} Unid/Emb.</p>
-                                                <p><DollarSign className="inline h-3 w-3 mr-1 flex-shrink-0" />{formatCurrency(offer.totalPackagingPrice)} (Emb.)</p>
-                                             </div>
+                                            <div className="text-right">
+                                                <p className={`text-base font-bold ${textPriceClass}`}>{formatCurrency(offer.pricePerUnit)} / {abbreviateUnit(offer.productUnit)}</p>
+                                                <div className="mt-1">
+                                                  {isLowestOverall && <Badge variant={offer.isSelf ? "default" : "outline"} className={`text-xs ${offer.isSelf ? 'bg-green-600 text-white' : 'border-green-600 text-green-700'}`}>Melhor Preço</Badge>}
+                                                  {!isLowestOverall && offer.isSelf && <Badge variant="default" className="text-xs">Sua Oferta</Badge>}
+                                                </div>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -1021,15 +1091,15 @@ export default function SellerQuotationPage() {
                   </CardHeader>
                   {isExpanded && (
                       <div className="relative">
-                          {isDeliveryMismatch && (
+                          {isDeliveryMismatch && !product.acknowledgedDeliveryMismatches?.includes(supplierId) && (
                               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center rounded-b-lg">
                                  <AlertTriangle className="h-10 w-10 text-amber-500 mb-2" />
                                   <p className="font-semibold text-destructive-foreground">A entrega em {product.deliveryDate ? format(product.deliveryDate.toDate(), "eeee, dd/MM", { locale: ptBR }) : ''} está fora da sua grade.</p>
                                   <p className="text-sm text-muted-foreground mb-4">Sua grade de entrega: {currentSupplierDetails?.diasDeEntrega?.join(', ') || 'Nenhuma'}</p>
-                                  <Button onClick={() => setOverriddenProductIds(t => [...t, product.id])}>Cotar mesmo assim (Confirmo que posso entregar)</Button>
+                                  <Button onClick={() => handleAcknowledgeMismatch(product.id)}>Cotar mesmo assim (Confirmo que posso entregar)</Button>
                               </div>
                           )}
-                           <CardContent className={`p-4 space-y-4 ${isDeliveryMismatch ? 'opacity-40 pointer-events-none' : ''}`}>
+                           <CardContent className={`p-4 space-y-4 ${isDeliveryMismatch && !product.acknowledgedDeliveryMismatches?.includes(supplierId) ? 'opacity-40 pointer-events-none' : ''}`}>
                                {isLockedOut && (
                                     <Alert variant="destructive">
                                         <AlertTriangle className="h-4 w-4" />
@@ -1044,8 +1114,7 @@ export default function SellerQuotationPage() {
                                       <AlertTriangle className="h-4 w-4"/>
                                       <AlertTitle>Contraproposta Urgente!</AlertTitle>
                                       <AlertPrimitiveDescription className="flex items-center gap-2">
-                                          Sua oferta para &quot;{product.counterProposalInfo.myBrand}&quot; foi superada! Voc\xea tem 
-                                          <strong className="flex items-center gap-1.5 text-base">
+                                                                                    Sua oferta para &quot;{product.counterProposalInfo.myBrand}&quot; foi superada! Você tem                                           <strong className="flex items-center gap-1.5 text-base">
                                             <Clock className="h-4 w-4"/>
                                             <CountdownTimer deadline={product.counterProposalInfo.deadline} />
                                           </strong>
@@ -1063,17 +1132,13 @@ export default function SellerQuotationPage() {
                                       ))}
                                     </div>
                                   )}
-                                  <Badge variant="outline" onClick={() => !isLockedOut && addOfferField(product.id)} className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}>
+                                  <Badge variant="outline" onClick={() => !isLockedOut && handleOtherBrandClick(product.id)} className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}>
                                     <PlusCircle className="mr-1.5 h-3 w-3" /> Outra Marca
                                   </Badge>
                                   {product.notes && <p className="text-muted-foreground mt-2 sm:mt-0"><span className="font-medium">Obs. Comprador:</span> {product.notes}</p>}
                                </div>
 
-                               {product.supplierOffers.length === 0 && (
-                                <Button variant="outline" size="sm" onClick={() => addOfferField(product.id)} className="w-full sm:w-auto" disabled={isLockedOut}>
-                                  <PlusCircle className="mr-2 h-4 w-4"/>Adicionar Minha Primeira Oferta
-                                </Button>
-                               )}
+
                                
                                {product.supplierOffers.map((offer, offerIndex) => {
                                  const pricePerUnit = calculatePricePerUnit(offer);
@@ -1095,7 +1160,7 @@ export default function SellerQuotationPage() {
                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)] gap-2 items-end">
                                        <div>
                                          <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Sua Marca Ofertada *</label>
-                                         <Input id={`brand-${product.id}-${offer.uiId}`} ref={ref => { brandInputRefs.current[`${product.id}_${offer.uiId}`] = ref; }} value={offer.brandOffered} onChange={(e) => handleOfferChange(product.id, offer.uiId, 'brandOffered', e.target.value)} placeholder="Ex: Marca Top" disabled={isQuotationEnded || isLockedOut} />
+                                         <Input id={`brand-${product.id}-${offer.uiId}`} ref={ref => { brandInputRefs.current[`${product.id}_${offer.uiId}`] = ref; }} value={offer.brandOffered} onChange={(e) => handleOfferChange(product.id, offer.uiId, 'brandOffered', e.target.value)} placeholder="Ex: Marca Top" disabled={isQuotationEnded || isLockedOut || offer.isSuggestedBrand} className={offer.isSuggestedBrand ? 'input-disabled-with-value' : ''} />
                                        </div>
                                        <div>
                                          <label htmlFor={`packaging-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Descrição da Embalagem *</label>
@@ -1118,7 +1183,7 @@ export default function SellerQuotationPage() {
                                      </div>
                                      <div className="flex flex-col sm:flex-row gap-2 justify-between items-center">
                                        {isMyOfferOutbid ? (
-                                           <div className="flex items-center gap-1">
+                                           <div className="flex items-center gap-4">
                                                 <span className="text-xs text-muted-foreground mr-1">Cobrir oferta:</span>
                                                 {[1, 2, 3, 4, 5].map((p) => (
                                                     <Button

@@ -48,7 +48,7 @@ export default function ClientSidebarNavigation() {
                 children: (
                   <div className="text-center">
                     <div className="font-semibold">{item.label}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
+                    <div className="text-xs text-muted-foreground mt-3">{item.description}</div>
                   </div>
                 ), 
                 side: "right", 

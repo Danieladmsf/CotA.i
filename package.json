@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:tunnel": "./start-dev.sh",
     "build": "next build",
     "start": "next start",
     "deploy": "npm run build && firebase deploy --project cotao-online",

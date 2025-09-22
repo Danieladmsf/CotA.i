@@ -122,7 +122,8 @@ export default function WhatsAppAdminPage() {
           generatedAt: data.generatedAt,
           readyAt: data.connectedAt || data.readyAt, // Use 'connectedAt' if available
           disconnectedAt: data.disconnectedAt,
-          error: data.error,
+          // Clear error when successfully connected or authenticated
+          error: (data.status === 'connected' || data.status === 'authenticated') ? null : data.error,
         };
         setWaStatus(newStatus);
       } else {
@@ -251,7 +252,7 @@ export default function WhatsAppAdminPage() {
           );
       }
 
-      if (waStatus?.error) {
+      if (waStatus?.error && !waStatus?.qrDataUri) {
           return (
             <Alert variant="destructive">
                 <AlertTriangle className="h-5 w-5" />
@@ -266,6 +267,10 @@ export default function WhatsAppAdminPage() {
                         Este erro geralmente indica um problema com o ambiente de execução na sua máquina local. Verifique os logs do terminal da ponte para mais detalhes.
                     </p>
                 </AlertPrimitiveDescription>
+                <Button onClick={handleRequestConnection} className="mt-4 button-modern" disabled={isRequesting}>
+                    {isRequesting ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <Send className="mr-2 h-4 w-4" /> )}
+                    Solicitar Nova Conexão
+                </Button>
             </Alert>
           );
       }
@@ -298,7 +303,7 @@ export default function WhatsAppAdminPage() {
           );
       }
       
-      if (waStatus?.status === 'needs_qr' && waStatus.qrDataUri) {
+      if (waStatus?.qrDataUri) {
           const isExpired = isQrCodeExpired(waStatus.generatedAt);
           if (isExpired) {
             return (
@@ -321,6 +326,11 @@ export default function WhatsAppAdminPage() {
                     <CardTitle className="text-xl font-bold text-gradient">Ação Necessária: Autorize a Conexão</CardTitle>
                     <CardDescription className="text-muted-foreground text-base pt-2">
                         Para sua segurança, você precisa autorizar esta conexão. Abra o WhatsApp no seu celular, vá para <strong>Configurações &gt; Aparelhos conectados</strong> e aponte a câmera para a imagem abaixo.
+                        {waStatus?.error && (
+                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+                                <strong>Nota:</strong> Um novo QR Code foi gerado após o erro: {waStatus.error}
+                            </div>
+                        )}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center p-6">
