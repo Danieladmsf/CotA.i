@@ -1056,7 +1056,7 @@ export default function SellerQuotationPage() {
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <Avatar className="h-8 w-8 shrink-0 cursor-pointer">
-                                                              <Image src={isValidImageUrl(offer.supplierFotoUrl) ? offer.supplierUrl : 'https://placehold.co/40x40.png'} alt={offer.supplierName || 'Fornecedor'} width={40} height={40} className="object-cover w-full h-full rounded-full" data-ai-hint={offer.supplierFotoHint || 'logo company'} />
+                                                              <Image src={isValidImageUrl(offer.supplierFotoUrl) ? offer.supplierFotoUrl : 'https://placehold.co/40x40.png'} alt={offer.supplierName || 'Fornecedor'} width={40} height={40} className="object-cover w-full h-full rounded-full" data-ai-hint={offer.supplierFotoHint || 'logo company'} />
                                                               <AvatarFallback className="text-xs bg-muted">{offer.supplierInitials}</AvatarFallback>
                                                             </Avatar>
                                                         </TooltipTrigger>
