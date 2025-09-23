@@ -47,6 +47,8 @@ export interface ShoppingListItem {
   hasSpecificDate?: boolean; // True if the user explicitly set a date for this item
   quotationId?: string | null; // Links this item to a specific quotation
   userId: string; // To scope list items to a user
+  categoryId?: string; // Denormalized from Supply
+  categoryName?: string; // Denormalized from Supply
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
 }

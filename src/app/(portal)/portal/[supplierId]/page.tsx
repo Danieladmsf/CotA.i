@@ -6,14 +6,15 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Loader2, Building, Clock, FileText } from 'lucide-react';
+import { ArrowRight, Loader2, Building, Clock, FileText, Settings } from 'lucide-react';
 import { db } from '@/lib/config/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
 import type { Quotation, Fornecedor } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
+import AddFornecedorModal, { FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
@@ -48,14 +49,13 @@ const getQuotationCardStyle = (status: Quotation['status']) => {
 export default function SupplierPortalPage() {
   const router = useRouter();
   const params = useParams();
-  // LÓGICA DO PORTAL: O ID do fornecedor é capturado diretamente da URL.
-  // Este ID é a "chave" que garante o isolamento dos dados.
   const supplierId = params.supplierId as string;
   const { toast } = useToast();
 
   const [supplier, setSupplier] = useState<Fornecedor | null>(null);
   const [openQuotations, setOpenQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!supplierId) {
@@ -68,7 +68,6 @@ export default function SupplierPortalPage() {
       return;
     }
 
-    // Carrega os dados do fornecedor para garantir que o ID é válido
     const supplierDocRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
     const unsubSupplier = onSnapshot(supplierDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -92,9 +91,6 @@ export default function SupplierPortalPage() {
       setSupplier(null);
     });
 
-    // LÓGICA DE ISOLAMENTO: A busca por cotações é filtrada para incluir apenas aquelas
-    // onde o ID do fornecedor (da URL) está presente no array `supplierIds`.
-    // Isso impede que um fornecedor veja cotações para as quais não foi convidado.
     const quotationsQuery = query(
         collection(db, "quotations"), 
         where("supplierIds", "array-contains", supplierId),
@@ -121,6 +117,26 @@ export default function SupplierPortalPage() {
     };
   }, [supplierId, toast]);
 
+  const handleUpdateSupplier = async (data: FornecedorFormValues) => {
+    if (!supplierId) return;
+    try {
+      const supplierRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
+      await updateDoc(supplierRef, data);
+      toast({
+        title: "Sucesso",
+        description: "Seus dados foram atualizados.",
+        variant: "default",
+      });
+      setIsModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
@@ -142,63 +158,76 @@ export default function SupplierPortalPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 min-h-screen bg-background">
-      <header className="mb-8 text-center md:text-left">
-        <h1 className="text-3xl md:text-4xl font-bold text-primary mb-2">Portal do Fornecedor</h1>
-        <p className="text-xl text-foreground">Bem-vindo(a), {supplier.empresa}!</p>
-        <p className="text-md text-muted-foreground">Aqui você pode visualizar e responder às cotações abertas.</p>
-      </header>
+    <>
+      <div className="container mx-auto p-4 md:p-6 lg:p-8 min-h-screen bg-background">
+        <header className="mb-8 text-center md:text-left">
+          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-2">Portal do Fornecedor</h1>
+          <div className="flex items-center justify-center md:justify-start gap-2">
+            <p className="text-xl text-foreground">Bem-vindo(a), {supplier.empresa}!</p>
+            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)}>
+              <Settings className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
+            </Button>
+          </div>
+          <p className="text-md text-muted-foreground">Aqui você pode visualizar e responder às cotações abertas.</p>
+        </header>
 
-      {openQuotations.length === 0 ? (
-        <Card className="shadow-lg text-center">
-          <CardHeader>
-            <CardTitle>Nenhuma Cotação Encontrada</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Nenhuma cotação foi encontrada para você no momento. Cotações em que você for convidado aparecerão aqui.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-foreground">Cotações Recentes ({openQuotations.length})</h2>
-          {openQuotations.map((quotation) => {
-            const style = getQuotationCardStyle(quotation.status);
-            return(
-                <Card key={quotation.id} className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
-                    <CardHeader className={`p-0 ${style.headerClass}`}>
-                        <div className="p-6">
-                            <CardTitle className="text-xl flex items-center justify-between">
-                                <span>
-                                    Cotação para Entrega em: {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
-                                </span>
-                                <Badge variant="outline" className={style.badgeClass}>{quotation.status}</Badge>
-                            </CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-3">
-                        <div className="flex items-center text-muted-foreground">
-                            <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <span>Prazo final para envio: <span className="font-semibold text-foreground">{format(quotation.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></span>
-                        </div>
-                        <div className="flex items-center text-muted-foreground text-sm">
-                            <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">Ref ID: {quotation.id}</span>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/50 p-4 border-t">
-                        <Button asChild className="w-full md:w-auto ml-auto" variant={quotation.status === 'Aberta' ? 'default' : 'secondary'}>
-                            {/* O link para a página de cotação também inclui o `supplierId` e `quotationId`, 
-                                mantendo o contexto seguro e isolado. */}
-                            <Link href={`/portal/${supplierId}/cotar/${quotation.id}`}>
-                                {quotation.status === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-            )
-          })}
-        </div>
+        {openQuotations.length === 0 ? (
+          <Card className="shadow-lg text-center">
+            <CardHeader>
+              <CardTitle>Nenhuma Cotação Encontrada</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Nenhuma cotação foi encontrada para você no momento. Cotações em que você for convidado aparecerão aqui.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-foreground">Cotações Recentes ({openQuotations.length})</h2>
+            {openQuotations.map((quotation) => {
+              const style = getQuotationCardStyle(quotation.status);
+              return(
+                  <Card key={quotation.id} className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                      <CardHeader className={`p-0 ${style.headerClass}`}>
+                          <div className="p-6">
+                              <CardTitle className="text-xl flex items-center justify-between">
+                                  <span>
+                                      Cotação para Entrega em: {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
+                                  </span>
+                                  <Badge variant="outline" className={style.badgeClass}>{quotation.status}</Badge>
+                              </CardTitle>
+                          </div>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-3">
+                          <div className="flex items-center text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span>Prazo final para envio: <span className="font-semibold text-foreground">{format(quotation.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></span>
+                          </div>
+                          <div className="flex items-center text-muted-foreground text-sm">
+                              <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span className="truncate">Ref ID: {quotation.id}</span>
+                          </div>
+                      </CardContent>
+                      <CardFooter className="bg-muted/50 p-4 border-t">
+                          <Button asChild className="w-full md:w-auto ml-auto" variant={quotation.status === 'Aberta' ? 'default' : 'secondary'}>
+                              <Link href={`/portal/${supplierId}/cotar/${quotation.id}`}>
+                                  {quotation.status === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
+                              </Link>
+                          </Button>
+                      </CardFooter>
+                  </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      {isModalOpen && (
+        <AddFornecedorModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleUpdateSupplier}
+          fornecedor={supplier}
+        />
       )}
-    </div>
+    </>
   );
 }

@@ -76,6 +76,7 @@ interface DisplayQuotationDetails {
   status: Quotation['status'];
   shoppingListItems: ShoppingListItem[];
   offersByProduct: Map<string, Map<string, Offer>>; 
+  userId: string;
 }
 
 
@@ -106,10 +107,14 @@ export default function ComprasCotacaoClient() {
         console.log(`[CotacaoClient] Auto-close for ${quotationId} already in progress. Skipping.`);
         return;
     }
+    if (!activeQuotationDetails?.userId) {
+        console.error("[CotacaoClient] Cannot close quotation without a userId.");
+        return;
+    }
     console.log(`[CotacaoClient] Deadline passed for quotation ${quotationId}. Triggering auto-close action from cotacao page.`);
     closingQuotationsRef.current.add(quotationId);
 
-    const result = await closeQuotationAndItems(quotationId);
+    const result = await closeQuotationAndItems(quotationId, activeQuotationDetails.userId);
     
     if (result.success && (result.updatedItemsCount ?? 0) > 0) {
       toast({
@@ -125,7 +130,7 @@ export default function ComprasCotacaoClient() {
     });
     }
     closingQuotationsRef.current.delete(quotationId);
-  }, [toast]);
+  }, [toast, activeQuotationDetails]);
 
 
   useEffect(() => {
@@ -241,6 +246,7 @@ export default function ComprasCotacaoClient() {
           status: quotationData.status,
           shoppingListItems: items,
           offersByProduct: initialOffersByProduct,
+          userId: quotationData.userId,
       });
 
       listenersToUnsubscribe.filter(unsub => unsub !== unsubQuotationDoc).forEach(unsub => unsub()); 

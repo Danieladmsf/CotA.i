@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { isFirebaseInitialized, debugFirebaseConfig } from '@/lib/config/firebase';
+import { isFirebaseInitialized } from '@/lib/config/firebase';
 
 export default function AuthDebug() {
   const { user, loading, signInWithGoogle, logout } = useAuth();
@@ -52,9 +52,9 @@ export default function AuthDebug() {
               🚪 Logout
             </Button>
           )}
-          <Button onClick={debugFirebaseConfig} variant="ghost" size="sm">
+          {/* <Button onClick={debugFirebaseConfig} variant="ghost" size="sm">
             🔍 Debug
-          </Button>
+          </Button> */}
         </div>
 
         <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">

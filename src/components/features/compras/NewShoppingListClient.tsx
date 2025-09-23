@@ -35,6 +35,7 @@ interface NewListItem {
   deliveryDate?: Timestamp; // Optional for UI
   hasSpecificDate?: boolean; // Tracks if the user explicitly set a date for this item
   quotationId?: string;
+  categoryId?: string;
 }
 
 const SUPPLIES_COLLECTION = 'supplies';
@@ -252,6 +253,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
       deliveryDate: undefined,
       hasSpecificDate: false,
       status: 'Pendente',
+      categoryId: supply.categoryId,
     };
 
     setCurrentListItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
@@ -321,6 +323,8 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
       
       const finalDeliveryDate = dataToSaveWithoutDocId.deliveryDate || listMainDateTimestamp;
 
+      const category = categories.find(c => c.id === item.categoryId);
+
       const dataToSave: Omit<ShoppingListItem, 'id' | 'createdAt' | 'updatedAt'> & { updatedAt: any, createdAt?: any } = {
         listId: listId,
         supplyId: dataToSaveWithoutDocId.supplyId,
@@ -336,6 +340,8 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
         quotationId: item.quotationId || null,
         userId: user.uid,
         updatedAt: serverTimestamp(),
+        categoryId: item.categoryId,
+        categoryName: category ? category.name : DEFAULT_IMPORT_CATEGORY_NAME,
       };
 
       if (shoppingListItemDocId) {

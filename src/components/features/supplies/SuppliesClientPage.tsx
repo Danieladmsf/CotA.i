@@ -98,7 +98,6 @@ export default function SuppliesClientPage() {
       setAllSupplies(fetchedSupplies);
       setIsLoadingSupplies(false);
     }, (error) => {
-      console.error("Error fetching supplies:", error);
       toast({ title: "Erro ao carregar insumos", description: error.message, variant: "destructive" });
       setIsLoadingSupplies(false);
     });
@@ -148,7 +147,6 @@ export default function SuppliesClientPage() {
       await refreshCategories();
       setActiveTab(newCategoryRef.id);
     } catch (error: any) {
-      console.error("Error adding category:", error);
       let description = "Não foi possível adicionar a categoria. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";
@@ -185,7 +183,7 @@ export default function SuppliesClientPage() {
     batch.update(categoryRef, { name: data.name.trim(), name_lowercase: newNormalizedName });
 
     try {
-        const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("categoryId", "==", editingCategory.id));
+        const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("userId", "==", user.uid), where("categoryId", "==", editingCategory.id));
         const suppliesSnapshot = await getDocs(suppliesQuery);
         
         suppliesSnapshot.forEach(supplyDoc => {
@@ -200,7 +198,6 @@ export default function SuppliesClientPage() {
         categoryForm.reset();
         await refreshCategories();
     } catch (error: any) {
-      console.error("Error updating category and supplies:", error);
       let description = "Não foi possível atualizar a categoria. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";
@@ -210,9 +207,9 @@ export default function SuppliesClientPage() {
   };
   
   const handleDeleteCategory = async () => {
-    if (!categoryToDelete) return;
+    if (!categoryToDelete || !user) return;
 
-    const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("categoryId", "==", categoryToDelete.id));
+    const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("userId", "==", user.uid), where("categoryId", "==", categoryToDelete.id));
     const suppliesSnapshot = await getDocs(suppliesQuery);
 
     if (!suppliesSnapshot.empty) {
@@ -228,7 +225,6 @@ export default function SuppliesClientPage() {
       await refreshCategories();
       setActiveTab("all"); 
     } catch (error: any) {
-      console.error("Error deleting category:", error);
       toast({ title: "Erro ao remover categoria", description: error.message, variant: "destructive" });
     }
   };
@@ -324,10 +320,9 @@ export default function SuppliesClientPage() {
         } else {
             toast({ title: "Nenhum Insumo Importado", description: `Verifique seu arquivo. ${skippedItemsLog.length} itens foram ignorados.`, variant: "destructive" });
         }
-        if (skippedItemsLog.length > 0) console.warn("Insumos não importados:", skippedItemsLog);
+        if (skippedItemsLog.length > 0) { /* Some items were skipped, but we won't log them to the console. */ }
 
       } catch (err: any) {
-        console.error("Error importing data:", err);
         let description = `Não foi possível processar o arquivo: ${err.message}`;
         if (err.message && (err.message.includes('network') || err.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
             description = "Falha na importação. Verifique sua conexão ou desative bloqueadores de anúncio e tente novamente.";
@@ -388,7 +383,6 @@ export default function SuppliesClientPage() {
       toast({ title: "Insumo Removido", description: `"${supplyToDelete.name}" foi removido com sucesso.` });
       setSupplyToDelete(null);
     } catch (error: any) {
-      console.error("Error deleting supply:", error);
       toast({ title: "Erro ao remover insumo", description: error.message, variant: "destructive" });
     }
   };
@@ -435,7 +429,6 @@ export default function SuppliesClientPage() {
       setIsSupplyModalOpen(false);
       setEditingSupply(null);
     } catch (error: any) {
-      console.error("Error saving supply:", error);
       let description = "Não foi possível salvar o insumo. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";

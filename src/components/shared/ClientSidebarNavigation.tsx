@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/compras', label: 'Lista de Compras', icon: ShoppingBag, exact: false, description: 'Gerencie suas listas de compras' },
+  { href: '/compras', label: 'Programar compra', icon: ShoppingBag, exact: false, description: 'Gerencie suas listas de compras' },
   { href: '/insumos', label: 'Insumos', icon: Package2, description: 'Controle seus produtos e materiais' },
   { href: '/fornecedores', label: 'Fornecedores', icon: Building2, description: 'Gerencie seus parceiros comerciais' },
   { href: '/cotacao', label: 'Cotação', icon: FileBarChart, description: 'Compare preços e condições' },
