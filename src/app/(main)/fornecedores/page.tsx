@@ -105,7 +105,6 @@ export default function FornecedoresPage() {
       setFornecedores(fetchedFornecedores);
       setIsLoadingFornecedores(false);
     }, (error) => {
-      console.error("Error fetching fornecedores: ", error);
       toast({ title: "Erro ao Carregar Fornecedores", description: error.message, variant: "destructive" });
       setIsLoadingFornecedores(false);
     });
@@ -161,7 +160,6 @@ export default function FornecedoresPage() {
             const existingSnapshot = await getDocs(q);
             if (!existingSnapshot.empty) {
               skippedCount++;
-              console.log(`Fornecedor com CNPJ ${cnpj} já existe. Pulando.`);
               continue;
             }
             
@@ -211,7 +209,6 @@ export default function FornecedoresPage() {
               description: `Ocorreu um erro ao salvar os fornecedores: ${error.message}`,
               variant: "destructive",
             });
-            console.error("Error committing batch:", error);
           } finally {
             setIsLoadingFornecedores(false);
              if(event.target) event.target.value = ""; 
@@ -223,7 +220,6 @@ export default function FornecedoresPage() {
             description: `Ocorreu um erro ao ler o arquivo CSV/TXT: ${error.message}`,
             variant: "destructive",
           });
-          console.error("Error parsing CSV/TXT:", error);
           setIsLoadingFornecedores(false);
           if(event.target) event.target.value = "";
         },
@@ -274,7 +270,6 @@ export default function FornecedoresPage() {
         fotoUrl = await getDownloadURL(fileRef);
         fotoHint = "custom logo";
       } catch (error: any) {
-        console.error('Error uploading image:', error);
         let errorMessage = "Erro ao fazer upload da imagem.";
         if (error.code === 'storage/unauthorized') {
           errorMessage = "Acesso negado. Verifique se você está logado.";
@@ -386,7 +381,6 @@ export default function FornecedoresPage() {
         })
         .catch(err => {
           fallbackCopyTextToClipboard(link);
-          console.error('Clipboard API failed, using fallback: ', err);
         });
     } else {
       // Fallback for browsers that don't support the Clipboard API
@@ -432,7 +426,6 @@ export default function FornecedoresPage() {
         description: "Este navegador não suporta a API de clipboard. Use **Ctrl+V** para colar.",
         variant: "default"
       });
-      console.error('Fallback: Could not copy text: ', err);
     } finally {
       document.body.removeChild(textArea);
     }
@@ -479,7 +472,6 @@ export default function FornecedoresPage() {
         toast({ title: "Convite criado!", description: "A linha de cadastro pendente foi adicionada à tabela." });
 
     } catch (error: any) {
-        console.error("Error creating invite:", error);
         toast({ title: "Erro ao criar convite", description: error.message, variant: "destructive" });
     } finally {
         setIsSubmittingInvite(false);

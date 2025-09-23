@@ -96,7 +96,6 @@ export default function WhatsAppChatPage() {
             
             setLoading(false);
         }, (error) => {
-            console.error("Error fetching chat messages:", error);
             toast({ title: "Erro ao carregar mensagens", description: error.message, variant: "destructive" });
             setLoading(false);
         });

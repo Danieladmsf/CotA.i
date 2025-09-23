@@ -62,18 +62,11 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
       where("userId", "==", user.uid),
       orderBy("empresa")
     );
-    
-    console.log("SelecionarFornecedoresTab: Executing Firestore query for suppliers...");
 
     getDocs(q).then(snapshot => {
       const fetchedSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Fornecedor));
       setAllSuppliers(fetchedSuppliers);
-      console.log(`SelecionarFornecedoresTab: Successfully fetched ${fetchedSuppliers.length} suppliers.`);
     }).catch(error => {
-      console.error("!!! FIRESTORE QUERY FAILED in SelecionarFornecedoresTab !!!");
-      console.error("Query Details: collection='fornecedores', where('status', '==', 'ativo'), where('userId', '==', user.uid), orderBy('empresa')");
-      console.error("Full Error Object:", error);
-      
       let description = error.message;
       if (error.code === 'failed-precondition') {
           description = "A consulta ao banco de dados falhou. Isso geralmente significa que um índice composto é necessário. Verifique o console do desenvolvedor (F12) para obter um link para criar o índice. O erro completo foi logado no console.";
@@ -156,7 +149,6 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
       onQuotationStarted();
 
     } catch (error: any) {
-      console.error("Error starting quotation:", error);
       toast({ title: "Erro ao iniciar cotação", description: error.message, variant: "destructive" });
     } finally {
       setIsStartingQuotation(false);

@@ -47,6 +47,7 @@ import { db } from '@/lib/config/firebase';
 import { collection, query, getDocs, orderBy, where, Timestamp, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import type { Supply, Offer, Quotation, Fornecedor, ShoppingListItem, UnitOfMeasure } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 const QUOTATIONS_COLLECTION = 'quotations';
@@ -97,6 +98,7 @@ export default function PriceAnalysisClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({ 
     from: subDays(new Date(), 30), 
@@ -119,10 +121,14 @@ export default function PriceAnalysisClient() {
   const closingQuotationsRef = useRef(new Set<string>());
 
   const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
+    if (!user) {
+      console.error("Cannot auto-close quotation, user not authenticated.");
+      return;
+    }
     if (closingQuotationsRef.current.has(quotationId)) return;
     closingQuotationsRef.current.add(quotationId);
     
-    const result = await closeQuotationAndItems(quotationId);
+    const result = await closeQuotationAndItems(quotationId, user.uid);
     if (result.success && (result.updatedItemsCount ?? 0) > 0) {
       toast({
         title: "Cotação Encerrada Automaticamente",
@@ -132,13 +138,19 @@ export default function PriceAnalysisClient() {
       toast({ title: "Erro ao fechar cotação", description: result.error, variant: "destructive" });
     }
     closingQuotationsRef.current.delete(quotationId);
-  }, [toast]);
+  }, [toast, user]);
   
   // Fetch quotations list
   useEffect(() => {
+    if (!user) {
+      setQuotations([]);
+      setLoadingQuotations(false);
+      return;
+    }
     setLoadingQuotations(true);
     const q = query(
       collection(db, QUOTATIONS_COLLECTION),
+      where("userId", "==", user.uid),
       where('createdAt', '>=', Timestamp.fromDate(dateRange?.from || subDays(new Date(), 30))),
       where('createdAt', '<=', Timestamp.fromDate(dateRange?.to || new Date())),
       orderBy('createdAt', 'desc')
@@ -166,7 +178,7 @@ export default function PriceAnalysisClient() {
     });
 
     return () => unsubscribe();
-  }, [dateRange, toast, router, selectedQuotationId]);
+  }, [dateRange, toast, router, selectedQuotationId, user]);
   
   // Set selected quotation from URL or first in list
   useEffect(() => {

@@ -30,18 +30,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter();
 
   useEffect(() => {
-    console.log('🔥 AuthProvider: Initializing...');
-    console.log('🔥 AuthProvider: Firebase initialized?', isFirebaseInitialized);
-
     if (!isFirebaseInitialized) {
-      console.error("🔥 AuthProvider: Firebase credentials not found. Authentication is disabled.");
       setLoading(false);
       return;
     }
 
-    console.log('🔥 AuthProvider: Setting up auth state listener...');
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('🔥 AuthProvider: Auth state changed:', user ? `User logged in: ${user.email}` : 'User logged out');
       setUser(user);
       setLoading(false);
     });
@@ -50,48 +44,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
-    console.log('🔥 AuthProvider: signInWithGoogle called');
-    console.log('🔥 AuthProvider: Firebase initialized?', isFirebaseInitialized);
-
-    // Log current domain information
-    console.log('🌐 Domain Info: Current URL:', window.location.href);
-    console.log('🌐 Domain Info: Hostname:', window.location.hostname);
-    console.log('🌐 Domain Info: Origin:', window.location.origin);
-    console.log('🌐 Domain Info: Protocol:', window.location.protocol);
-
     if (!isFirebaseInitialized) {
-      console.error('🔥 AuthProvider: Firebase not initialized, showing error toast');
       toast({ title: "Erro de Configuração", description: "A autenticação não está configurada.", variant: "destructive" });
       return;
     }
 
-    console.log('🔥 AuthProvider: Creating Google provider...');
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      console.log('🔥 AuthProvider: Starting Google sign in popup...');
-      console.log('🌐 Domain Info: Attempting login from:', window.location.origin);
       const result = await signInWithPopup(auth, provider);
-      console.log('🔥 AuthProvider: Google sign in successful!', result.user.email);
       toast({ title: "Login bem-sucedido!", variant: "default" });
       router.push('/'); // Redirect to home after login
     } catch (error: any) {
-      console.error("🔥 AuthProvider: Error signing in with Google:", error);
-      console.error("🔥 AuthProvider: Error code:", error.code);
-      console.error("🔥 AuthProvider: Error message:", error.message);
-      console.error("🌐 Domain Error: Failed domain was:", window.location.origin);
-
-      if (error.code === 'auth/unauthorized-domain') {
-        console.error('🌐 Domain Error: THIS DOMAIN NEEDS TO BE ADDED TO FIREBASE:');
-        console.error('🌐 Domain Error: Add this domain to Firebase:', window.location.hostname);
-        console.error('🌐 Domain Error: Full origin to add:', window.location.origin);
-      }
-
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({ title: "Falha no Login", description: error.message, variant: "destructive" });
-      } else {
-        console.log('🔥 AuthProvider: Popup was closed by user');
       }
     }
   };
@@ -102,7 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signOut(auth);
       router.push('/login'); // Redirect to login after logout
     } catch (error: any) {
-      console.error('Error signing out:', error);
       toast({ title: "Falha no Logout", description: error.message, variant: "destructive" });
     }
   };

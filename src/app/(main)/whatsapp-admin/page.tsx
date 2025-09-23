@@ -133,7 +133,6 @@ export default function WhatsAppAdminPage() {
       
       setIsLoadingStatus(false);
     }, (error) => {
-      console.error("Error fetching WhatsApp status:", error);
       toast({ title: "Erro de Conexão", description: "Não foi possível obter o status do WhatsApp.", variant: "destructive" });
       setIsLoadingStatus(false);
     });
@@ -204,7 +203,6 @@ export default function WhatsAppAdminPage() {
         }, REQUEST_TIMEOUT_MS);
 
     } catch (error) {
-        console.error("Error creating session request:", error);
         toast({ title: "Erro ao Solicitar", description: "Não foi possível enviar a solicitação.", variant: "destructive" });
         setIsRequesting(false);
     }

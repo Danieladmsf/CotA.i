@@ -59,6 +59,7 @@ import type { Quotation, Offer, ShoppingListItem, Fornecedor, UnitOfMeasure } fr
 import { format, startOfDay, endOfDay, intervalToDuration, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
@@ -124,6 +125,7 @@ export default function CotacaoClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
 
   // States existentes (mantidos para compatibilidade)
   const [allFetchedQuotations, setAllFetchedQuotations] = useState<Quotation[]>([]);
@@ -148,22 +150,22 @@ export default function CotacaoClient() {
   
   // Lógica existente mantida (handleAutoCloseQuotation e useEffects)
   const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
+    if (!user) {
+      return;
+    }
     if (closingQuotationsRef.current.has(quotationId)) {
-        console.log(`[CotacaoClient] Auto-close for ${quotationId} already in progress. Skipping.`);
         return;
     }
-    console.log(`[CotacaoClient] Deadline passed for quotation ${quotationId}. Triggering auto-close action from cotacao page.`);
     closingQuotationsRef.current.add(quotationId);
 
-    const result = await closeQuotationAndItems(quotationId);
+    const result = await closeQuotationAndItems(quotationId, user.uid);
     
     if (result.success && (result.updatedItemsCount ?? 0) > 0) {
       toast({
         title: "Cotação Encerrada Automaticamente",
-        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como 'Encerrado'.`,
+        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como \'Encerrado\'.`,
       });
     } else if (!result.success) {
-      console.error("CotacaoClient: Failed to auto-close quotation:", result.error);
      toast({
       title: "Erro ao fechar cotação",
       description: result.error || "Não foi possível atualizar o status da cotação e dos itens.",
@@ -171,13 +173,25 @@ export default function CotacaoClient() {
     });
     }
     closingQuotationsRef.current.delete(quotationId);
-  }, [toast]);
+  }, [toast, user]);
 
   // UseEffects existentes mantidos...
   useEffect(() => {
+    if (authLoading) {
+      setIsLoadingAllQuotations(true);
+      return;
+    }
+
+    if (!user) {
+      setIsLoadingAllQuotations(false);
+      setAllFetchedQuotations([]);
+      return;
+    }
+
     setIsLoadingAllQuotations(true);
     const q = query(
       collection(db, FIREBASE_COLLECTIONS.QUOTATIONS),
+      where("userId", "==", user.uid),
       orderBy("shoppingListDate", "desc"),
       orderBy("createdAt", "desc")
     );
@@ -186,12 +200,11 @@ export default function CotacaoClient() {
       setAllFetchedQuotations(fetchedQuotations);
       setIsLoadingAllQuotations(false);
     }, (error) => {
-      console.error("Error fetching all quotations:", error);
       toast({title: "Erro ao buscar cotações", description: error.message, variant: "destructive"});
       setIsLoadingAllQuotations(false);
     });
     return () => unsubscribe();
-  }, [toast]);
+  }, [user, authLoading, toast]);
 
   useEffect(() => {
     if (isLoadingAllQuotations) return;
@@ -328,7 +341,7 @@ export default function CotacaoClient() {
                 if (docSnap.exists()) {
                   supplierDataCacheRef.current.set(sid, { id: sid, ...docSnap.data() } as Fornecedor);
                 }
-              }).catch(err => console.error(`Failed to fetch supplier ${sid}:`, err))
+              }).catch(err => { /* silently ignore fetch error for individual suppliers */ })
             );
             await Promise.all(supplierFetchPromises);
           }
@@ -344,7 +357,6 @@ export default function CotacaoClient() {
       }
       setIsLoadingSelectedQuotationData(false); 
     }, (error) => {
-      console.error("Error listening to quotation document:", error);
       toast({title: "Erro ao carregar dados da cotação", description: error.message, variant: "destructive"})
       setActiveQuotationDetails(null);
       setIsLoadingSelectedQuotationData(false);

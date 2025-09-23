@@ -44,6 +44,7 @@ export async function startQuotation(
     // 1. Find items to be included in the quotation
     const itemsQuery = db
       .collection(SHOPPING_LIST_ITEMS_COLLECTION)
+      .where('userId', '==', userId)
       .where('listId', '==', listId)
       .where('status', '==', 'Pendente');
     const itemsSnapshot = await itemsQuery.get();
@@ -78,7 +79,6 @@ export async function startQuotation(
 
     // 5. Fetch selected suppliers and send invitations
     if (supplierIds.length > 30) {
-        console.warn("Aviso: A consulta de fornecedores excede o limite de 30 IDs da consulta 'in'. Apenas os primeiros 30 serão convidados.");
         supplierIds = supplierIds.slice(0, 30);
     }
     
@@ -91,7 +91,6 @@ export async function startQuotation(
           // Use the new centralized notification action
           await sendQuotationInvitation(supplier, formattedDeadline, userId);
       } catch (invitationError: any) {
-          console.error(`Erro ao gerar convite para ${supplier.empresa}:`, invitationError);
           // Do not throw, just log the error and continue with the next supplier.
       }
     }
@@ -99,7 +98,6 @@ export async function startQuotation(
     return { success: true };
 
   } catch (error: any) {
-    console.error('Erro detalhado ao iniciar cotação:', error);
     // This is where the error is caught and sent back to the client.
     const errorMessage = error.message || 'Ocorreu um erro desconhecido ao iniciar a cotação.';
     return { success: false, error: errorMessage };
@@ -114,7 +112,11 @@ export async function startQuotation(
  */
 export async function closeQuotationAndItems(
   quotationId: string,
+  userId: string
 ): Promise<{ success: boolean; updatedItemsCount?: number; error?: string }> {
+    if (!userId) {
+        return { success: false, error: "User not authenticated." };
+    }
     try {
         const db = adminDb();
         const quotationRef = db.collection(QUOTATIONS_COLLECTION).doc(quotationId);
@@ -129,8 +131,8 @@ export async function closeQuotationAndItems(
             return { success: true, updatedItemsCount: 0 };
         }
 
-        if (!quotationData.userId) { // Check for userId
-            throw new Error("Quotation is missing a userId.");
+        if (quotationData.userId !== userId) {
+            throw new Error("Unauthorized access to quotation.");
         }
         
         const listDate = quotationData.shoppingListDate?.toDate();
@@ -177,7 +179,7 @@ export async function closeQuotationAndItems(
                 }
             }
         } catch (notificationError: any) {
-            console.error("Failed to send closure notifications to suppliers:", notificationError);
+            // silently ignore
         }
 
         // --- Notify Buyer ---
@@ -195,13 +197,12 @@ export async function closeQuotationAndItems(
                 }
             }
         } catch (buyerNotificationError: any) {
-            console.error("Failed to send closure notification to buyer:", buyerNotificationError);
+            // silently ignore
         }
 
         return { success: true, updatedItemsCount };
 
     } catch (error: any) {
-        console.error("Error in closeQuotationAndItems:", error);
         return { success: false, error: error.message };
     }
 }
