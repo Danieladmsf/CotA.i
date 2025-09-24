@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  // Disable optimization for development with tunnels
-  swcMinify: false,
-  experimental: {
-    esmExternals: false
-  },
+  reactStrictMode: false,
+  // Enable SWC minifier for better performance
+  swcMinify: true,
+  // Remove problematic experimental settings
   images: {
     remotePatterns: [
       {

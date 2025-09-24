@@ -197,6 +197,7 @@ export default function SellerQuotationPage() {
   const [offerToStop, setOfferToStop] = useState<{productId: string, offerUiId: string, productName: string} | null>(null);
   const [stoppedQuotingProducts, setStoppedQuotingProducts] = useState<Set<string>>(new Set());
   const [editingOffers, setEditingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
+  const [savingOffers, setSavingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
 
   
@@ -536,34 +537,27 @@ export default function SellerQuotationPage() {
                         setProductsToQuote(currentProducts => {
                             const updatedProducts = currentProducts.map(p => {
                                 if (p.id === product.id) {
-                                  // Get offers without Firestore ID (newly created locally)
-                                  const existingNewOffers = p.supplierOffers.filter(o => !o.id);
+                                  // Get local offers that are not yet saved to Firestore
+                                  const localUnsavedOffers = p.supplierOffers.filter(o => !o.id);
 
-                                  // Remove local offers that match Firestore offers by brand and packaging
-                                  const filteredNewOffers = existingNewOffers.filter(localOffer => {
-                                    // Check if this local offer matches any Firestore offer
-                                    const hasMatchInFirestore = myOffers.some(firestoreOffer =>
-                                      firestoreOffer.brandOffered === localOffer.brandOffered &&
-                                      firestoreOffer.packagingDescription === localOffer.packagingDescription &&
-                                      firestoreOffer.unitsInPackaging === localOffer.unitsInPackaging &&
-                                      firestoreOffer.totalPackagingPrice === localOffer.totalPackagingPrice
-                                    );
-                                    return !hasMatchInFirestore; // Keep only if no match in Firestore
+                                  // From the unsaved local offers, filter out any that now exist in Firestore.
+                                  // This prevents duplicates when a local offer is saved and then appears in the `myOffers` list from Firestore.
+                                  const trulyLocalOffers = localUnsavedOffers.filter(localOffer => {
+                                      const hasMatchInFirestore = myOffers.some(firestoreOffer =>
+                                          firestoreOffer.brandOffered === localOffer.brandOffered &&
+                                          firestoreOffer.supplierId === localOffer.supplierId &&
+                                          Number(firestoreOffer.totalPackagingPrice) === Number(localOffer.totalPackagingPrice) &&
+                                          Number(firestoreOffer.unitsInPackaging) === Number(localOffer.unitsInPackaging) &&
+                                          firestoreOffer.packagingDescription === localOffer.packagingDescription
+                                      );
+                                      // Keep the local offer only if it does NOT have a match in Firestore
+                                      return !hasMatchInFirestore;
                                   });
 
-                                  const updatedOffers = [...myOffers, ...filteredNewOffers].sort((a,b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
+                                  // The new list of offers is the one from Firestore plus any truly local ones that haven't been saved.
+                                  const updatedOffers = [...myOffers, ...trulyLocalOffers].sort((a, b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
 
-                                  console.log(`[OFFER-DEBUG] Firestore listener update for ${p.name}:`, {
-                                    beforeUpdate: p.supplierOffers.length,
-                                    myOffersFromFirestore: myOffers.length,
-                                    existingNewOffers: existingNewOffers.length,
-                                    filteredNewOffers: filteredNewOffers.length,
-                                    afterUpdate: updatedOffers.length,
-                                    myOffers: myOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id })),
-                                    existingNew: existingNewOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id })),
-                                    filteredNew: filteredNewOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id })),
-                                    final: updatedOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-                                  });
+
 
                                   return { ...p, supplierOffers: updatedOffers, bestOffersByBrand: brandDisplays, lowestPriceThisProductHas: lowestPriceOverall, counterProposalInfo, isLockedOut };
                                 }
@@ -1182,6 +1176,9 @@ export default function SellerQuotationPage() {
     
     const savingKey = `${productId}_${offerUiId}`;
     setIsSaving(prev => ({ ...prev, [savingKey]: true }));
+    // Adiciona a oferta à lista de ofertas sendo salvas
+    setSavingOffers(prev => new Set(prev).add(savingKey));
+    
     try {
       if (offerData.id) {
         console.log(`[OFFER-DEBUG] Updating existing offer in Firestore with ID: ${offerData.id}`);
@@ -1210,18 +1207,7 @@ export default function SellerQuotationPage() {
         const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
         console.log(`[OFFER-DEBUG] Successfully created new offer with ID: ${newOfferDocRef.id}`);
 
-        console.log(`[OFFER-DEBUG] Updating local state to add Firestore ID to offer`);
-        setProductsToQuote(prevProducts => {
-          const updatedProducts = prevProducts.map(p => p.id === productId ? {
-              ...p,
-              supplierOffers: p.supplierOffers.map(o => o.uiId === offerUiId ? {...o, id: newOfferDocRef.id } : o)
-          } : p);
-          const updatedProduct = updatedProducts.find(p => p.id === productId);
-          console.log(`[OFFER-DEBUG] After adding Firestore ID - ${updatedProduct?.name} has ${updatedProduct?.supplierOffers.length} offers:`,
-            updatedProduct?.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-          );
-          return updatedProducts;
-        });
+
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
       }
 
@@ -1233,6 +1219,12 @@ export default function SellerQuotationPage() {
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
     } finally {
       setIsSaving(prev => ({ ...prev, [savingKey]: false }));
+      // Remove a oferta da lista de ofertas sendo salvas
+      setSavingOffers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(savingKey);
+        return newSet;
+      });
     }
   };
   
@@ -1575,18 +1567,7 @@ export default function SellerQuotationPage() {
                                          offer.isSuggestedBrand
                                        );
 
-                                       // Debug log for field state (reduced frequency)
-                                       const logKey = `field-${product.id}-${offer.uiId}-${offer.brandOffered}-${offer.isSuggestedBrand}`;
-                                       if (!lastClickRef.current || lastClickRef.current.action !== logKey || Date.now() - lastClickRef.current.timestamp > 2000) {
-                                         console.log(`[FIELD-DEBUG] ${product.name} offer ${offer.uiId} field state:`, {
-                                           brandOffered: offer.brandOffered,
-                                           isSuggestedBrand: offer.isSuggestedBrand,
-                                           isOfferDisabled,
-                                           isBrandFieldDisabled,
-                                           hasId: !!offer.id,
-                                           isInEditMode: isInEditMode(product.id, offer.uiId)
-                                         });
-                                       }
+                                       // Debug logging removed to improve performance
 
 
                                        const isButtonDisabled = Boolean(
@@ -1606,7 +1587,7 @@ export default function SellerQuotationPage() {
                                        }
       
                                        return (
-                                         <div key={offer.uiId} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
+                                         <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)] gap-2 items-end">
                                              <div>
                                                <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Sua Marca Ofertada *</label>
@@ -1708,7 +1689,7 @@ export default function SellerQuotationPage() {
                                                      }
                                                    }
                                                  }}
-                                                 disabled={isButtonDisabled}
+                                                 disabled={isButtonDisabled || savingOffers.has(savingKey)}
                                                  className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
                                                >
                                                   {isSaving[savingKey] && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
