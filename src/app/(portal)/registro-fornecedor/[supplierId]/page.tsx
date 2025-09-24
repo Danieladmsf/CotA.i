@@ -106,10 +106,15 @@ export default function CompleteSupplierRegistrationPage() {
         return;
     }
 
+    const file = data.fotoFile; // Keep the file reference
+    if (data.fotoFile) {
+      delete (data as Partial<FornecedorFormValues>).fotoFile; // Explicitly delete the property
+    }
+
     let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
     let fotoHint = supplier.fotoHint || 'generic logo';
 
-    if (data.fotoFile) {
+    if (file) {
         toast({ title: "Enviando logo...", description: "Aguarde um momento." });
         try {
             const file = data.fotoFile;

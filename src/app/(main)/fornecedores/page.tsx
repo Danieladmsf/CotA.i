@@ -260,7 +260,12 @@ export default function FornecedoresPage() {
     let fotoUrl = editingFornecedor?.fotoUrl ?? "https://placehold.co/40x40.png";
     let fotoHint = editingFornecedor?.fotoHint ?? "generic logo";
 
+    const file = data.fotoFile; // Keep the file reference
     if (data.fotoFile) {
+      delete (data as Partial<FornecedorFormValues>).fotoFile; // Explicitly delete the property
+    }
+
+    if (file) {
       const file = data.fotoFile;
       try {
         toast({ title: "Fazendo upload da imagem...", description: "Aguarde um momento." });
@@ -281,14 +286,12 @@ export default function FornecedoresPage() {
       }
     }
 
-    const { fotoFile, ...restOfData } = data;
-
     const fornecedorData = {
-      ...restOfData,
       empresa: data.empresa.trim(),
       cnpj: cleanedCnpj,
       vendedor: data.vendedor.trim(),
       whatsapp: data.whatsapp.trim().replace(/[^\d]/g, ""),
+      diasDeEntrega: data.diasDeEntrega,
       fotoUrl,
       fotoHint,
       userId: user.uid,
