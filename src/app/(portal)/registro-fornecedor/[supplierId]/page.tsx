@@ -106,30 +106,27 @@ export default function CompleteSupplierRegistrationPage() {
         return;
     }
 
-    const file = data.fotoFile; // Keep the file reference
-    if (data.fotoFile) {
-      delete (data as Partial<FornecedorFormValues>).fotoFile; // Explicitly delete the property
-    }
+    const { fotoFile, ...dataForFirestore } = data;
 
     let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
     let fotoHint = supplier.fotoHint || 'generic logo';
 
-    if (file) {
+    if (fotoFile) {
         toast({ title: "Enviando logo...", description: "Aguarde um momento." });
         try {
-            const file = data.fotoFile;
-            const response = await fetch(`/api/upload?filename=${file.name}`, {
+            const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
               method: 'POST',
-              body: file,
+              body: fotoFile,
             });
             const newBlob = await response.json();
+            if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
             fotoUrl = newBlob.url;
             fotoHint = "custom logo";
         } catch (uploadError: any) {
             console.error("FALHA NO UPLOAD DA LOGO:", uploadError);
             toast({
                 title: "Aviso: Falha no Upload da Logo",
-                description: "O cadastro continuará com a imagem padrão.",
+                description: uploadError.message || "O cadastro continuará com a imagem padrão.",
                 variant: "destructive",
                 duration: 9000,
             });
@@ -137,15 +134,15 @@ export default function CompleteSupplierRegistrationPage() {
     }
     
     try {
-        const cleanedCnpj = data.cnpj.replace(/[^\d]/g, "");
-        const cleanedWhatsapp = data.whatsapp.replace(/[^\d]/g, "");
+        const cleanedCnpj = dataForFirestore.cnpj.replace(/[^\d]/g, "");
+        const cleanedWhatsapp = dataForFirestore.whatsapp.replace(/[^\d]/g, "");
 
         const dataToUpdate = {
-            empresa: data.empresa.trim(),
+            empresa: dataForFirestore.empresa.trim(),
             cnpj: cleanedCnpj,
-            vendedor: data.vendedor.trim(),
+            vendedor: dataForFirestore.vendedor.trim(),
             whatsapp: cleanedWhatsapp,
-            diasDeEntrega: data.diasDeEntrega,
+            diasDeEntrega: dataForFirestore.diasDeEntrega,
             fotoUrl,
             fotoHint,
             status: 'ativo' as const,

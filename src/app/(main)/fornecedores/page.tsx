@@ -260,38 +260,35 @@ export default function FornecedoresPage() {
     let fotoUrl = editingFornecedor?.fotoUrl ?? "https://placehold.co/40x40.png";
     let fotoHint = editingFornecedor?.fotoHint ?? "generic logo";
 
-    const file = data.fotoFile; // Keep the file reference
-    if (data.fotoFile) {
-      delete (data as Partial<FornecedorFormValues>).fotoFile; // Explicitly delete the property
-    }
+    const { fotoFile, ...dataForFirestore } = data;
 
-    if (file) {
-      const file = data.fotoFile;
+    if (fotoFile) {
       try {
         toast({ title: "Fazendo upload da imagem...", description: "Aguarde um momento." });
-        const response = await fetch(`/api/upload?filename=${file.name}`, {
+        const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
           method: 'POST',
-          body: file,
+          body: fotoFile,
         });
         const newBlob = await response.json();
+        if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
         fotoUrl = newBlob.url;
         fotoHint = "custom logo";
       } catch (error: any) {
         toast({
           title: "Erro no Upload",
-          description: "Não foi possível fazer o upload da imagem.",
+          description: error.message || "Não foi possível fazer o upload da imagem.",
           variant: "destructive",
         });
-        throw error; // Optionally re-throw or handle as needed
+        // Continua a execução para salvar os outros dados mesmo se o upload falhar
       }
     }
 
     const fornecedorData = {
-      empresa: data.empresa.trim(),
+      empresa: dataForFirestore.empresa.trim(),
       cnpj: cleanedCnpj,
-      vendedor: data.vendedor.trim(),
-      whatsapp: data.whatsapp.trim().replace(/[^\d]/g, ""),
-      diasDeEntrega: data.diasDeEntrega,
+      vendedor: dataForFirestore.vendedor.trim(),
+      whatsapp: dataForFirestore.whatsapp.trim().replace(/[^\d]/g, ""),
+      diasDeEntrega: dataForFirestore.diasDeEntrega,
       fotoUrl,
       fotoHint,
       userId: user.uid,
