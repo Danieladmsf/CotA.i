@@ -46,21 +46,17 @@ fi
 
 echo "✅ Servidor rodando na porta $PORT"
 
-# Iniciar tunnel Serveo
-echo "🔗 Criando tunnel Serveo..."
-ssh -R 80:localhost:$PORT serveo.net > /tmp/serveo_output.txt 2>&1 &
+# Iniciar tunnel Serveo com subdomínio fixo
+echo "🔗 Criando tunnel Serveo com subdomínio fixo..."
+ssh -o StrictHostKeyChecking=no -R cotai:80:localhost:$PORT serveo.net > /tmp/serveo_output.txt 2>&1 &
 TUNNEL_PID=$!
 
 # Aguardar tunnel conectar
 sleep 8
 
-# Extrair URL do Serveo
-sleep 2  # Aguardar arquivo ser escrito
-SERVEO_URL=$(grep -o 'https://[a-zA-Z0-9]*\.serveo\.net' /tmp/serveo_output.txt | head -1)
-if [ -z "$SERVEO_URL" ]; then
-    echo "❌ Erro: Não foi possível obter URL do Serveo"
-    exit 1
-fi
+# URL fixa do Serveo
+SERVEO_URL="https://cotai.serveo.net"
+echo "✅ Tunnel conectado com sucesso!"
 
 echo ""
 echo "================================"

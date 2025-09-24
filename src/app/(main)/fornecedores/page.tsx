@@ -42,9 +42,9 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { db, storage } from '@/lib/config/firebase';
+import { db } from '@/lib/config/firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+
 import type { Fornecedor } from '@/types';
 import AddFornecedorModal, { type FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
 import { sendPortalLink } from "@/actions/notificationActions";
@@ -262,35 +262,33 @@ export default function FornecedoresPage() {
 
     if (data.fotoFile) {
       const file = data.fotoFile;
-      const filePath = `fornecedores_logos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const fileRef = storageRef(storage, filePath);
       try {
         toast({ title: "Fazendo upload da imagem...", description: "Aguarde um momento." });
-        await uploadBytes(fileRef, file);
-        fotoUrl = await getDownloadURL(fileRef);
+        const response = await fetch(`/api/upload?filename=${file.name}`, {
+          method: 'POST',
+          body: file,
+        });
+        const newBlob = await response.json();
+        fotoUrl = newBlob.url;
         fotoHint = "custom logo";
       } catch (error: any) {
-        let errorMessage = "Erro ao fazer upload da imagem.";
-        if (error.code === 'storage/unauthorized') {
-          errorMessage = "Acesso negado. Verifique se você está logado.";
-        } else if (error.code === 'storage/unknown') {
-          errorMessage = "Erro desconhecido no storage. Tente novamente.";
-        }
         toast({
           title: "Erro no Upload",
-          description: errorMessage,
+          description: "Não foi possível fazer o upload da imagem.",
           variant: "destructive",
         });
-        throw error;
+        throw error; // Optionally re-throw or handle as needed
       }
     }
 
+    const { fotoFile, ...restOfData } = data;
+
     const fornecedorData = {
+      ...restOfData,
       empresa: data.empresa.trim(),
       cnpj: cleanedCnpj,
       vendedor: data.vendedor.trim(),
       whatsapp: data.whatsapp.trim().replace(/[^\d]/g, ""),
-      diasDeEntrega: data.diasDeEntrega,
       fotoUrl,
       fotoHint,
       userId: user.uid,

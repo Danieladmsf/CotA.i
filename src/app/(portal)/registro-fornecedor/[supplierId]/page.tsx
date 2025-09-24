@@ -10,9 +10,9 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { db, storage } from '@/lib/config/firebase';
+import { db } from '@/lib/config/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+
 import type { Fornecedor } from '@/types';
 import { Loader2, Send, Building, User, Phone, UploadCloud, AlertTriangle, CalendarDays } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -113,20 +113,18 @@ export default function CompleteSupplierRegistrationPage() {
         toast({ title: "Enviando logo...", description: "Aguarde um momento." });
         try {
             const file = data.fotoFile;
-            const filePath = `fornecedores_logos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-            const fileRef = storageRef(storage, filePath);
-            await uploadBytes(fileRef, file);
-            fotoUrl = await getDownloadURL(fileRef);
+            const response = await fetch(`/api/upload?filename=${file.name}`, {
+              method: 'POST',
+              body: file,
+            });
+            const newBlob = await response.json();
+            fotoUrl = newBlob.url;
             fotoHint = "custom logo";
         } catch (uploadError: any) {
-            console.error("FALHA NO UPLOAD DA LOGO (REGRAS DE SEGURANÇA):", uploadError);
-            let description = "O cadastro continuará com a imagem padrão.";
-            if (uploadError.code === 'storage/unauthorized') {
-                description = "Você não tem permissão para enviar arquivos. Verifique as Regras de Segurança do Firebase Storage. O cadastro continuará com a imagem padrão.";
-            }
+            console.error("FALHA NO UPLOAD DA LOGO:", uploadError);
             toast({
                 title: "Aviso: Falha no Upload da Logo",
-                description: description,
+                description: "O cadastro continuará com a imagem padrão.",
                 variant: "destructive",
                 duration: 9000,
             });
