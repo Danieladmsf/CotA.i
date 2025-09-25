@@ -14,6 +14,14 @@ const getAdminDb = () => {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
+    // Debug logs to identify missing variables
+    console.log('Firebase Admin Debug:', {
+      projectId: projectId ? '✓ Present' : '✗ Missing',
+      privateKey: privateKey ? '✓ Present' : '✗ Missing',
+      clientEmail: clientEmail ? '✓ Present' : '✗ Missing',
+      nodeEnv: process.env.NODE_ENV
+    });
+
     if (!projectId || !privateKey || !clientEmail) {
       throw new Error('Firebase Admin: Missing required environment variables.');
     }
