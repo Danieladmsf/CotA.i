@@ -338,9 +338,6 @@
   }
   
   /* Ensure DialogContent itself doesn't move */
-  [role="dialog"][data-state="open"] {
-    transform: none !important;
-  }
   
   /* Typography improvements */
   .text-display {

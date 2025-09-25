@@ -74,6 +74,7 @@ export default function FornecedoresPage() {
   const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null);
   
   const [isSendingLink, setIsSendingLink] = useState(false);
+  const [viewImage, setViewImage] = useState<string | null>(null);
 
   const [baseUrl, setBaseUrl] = useState("");
 
@@ -263,17 +264,51 @@ export default function FornecedoresPage() {
     const { fotoFile, ...dataForFirestore } = data;
 
     if (fotoFile) {
+      console.log('🖼️ [FORNECEDORES] Iniciando upload de foto:', {
+          fileName: fotoFile.name,
+          fileSize: fotoFile.size,
+          fileType: fotoFile.type
+      });
+
       try {
         toast({ title: "Fazendo upload da imagem...", description: "Aguarde um momento." });
-        const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
+
+        const uploadUrl = `/api/upload?filename=${fotoFile.name}`;
+        console.log('📡 [FORNECEDORES] Fazendo request para:', uploadUrl);
+
+        const response = await fetch(uploadUrl, {
           method: 'POST',
           body: fotoFile,
         });
+
+        console.log('📥 [FORNECEDORES] Response recebido:', {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            contentType: response.headers.get('content-type')
+        });
+
         const newBlob = await response.json();
-        if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
+        console.log('📄 [FORNECEDORES] Response JSON:', newBlob);
+
+        if (!response.ok) {
+            console.error('❌ [FORNECEDORES] Response não OK:', newBlob);
+            throw new Error(newBlob.message || 'Falha no upload da imagem.');
+        }
+
+        console.log('✅ [FORNECEDORES] Upload realizado com sucesso:', {
+            url: newBlob.url,
+            originalFileName: fotoFile.name
+        });
+
         fotoUrl = newBlob.url;
         fotoHint = "custom logo";
       } catch (error: any) {
+        console.error("❌ [FORNECEDORES] FALHA NO UPLOAD DA LOGO:", {
+            message: error.message,
+            stack: error.stack,
+            fileName: fotoFile.name
+        });
         toast({
           title: "Erro no Upload",
           description: error.message || "Não foi possível fazer o upload da imagem.",
@@ -282,6 +317,15 @@ export default function FornecedoresPage() {
         // Continua a execução para salvar os outros dados mesmo se o upload falhar
       }
     }
+
+    // Debug: verificar se dataForFirestore contém fotoFile
+    console.log('🔍 [FORNECEDORES DEBUG] Dados após desestruturação:', {
+        hasFotoFile: !!fotoFile,
+        fotoFileName: fotoFile?.name,
+        dataForFirestoreKeys: Object.keys(dataForFirestore),
+        hasFotoFileInDataForFirestore: 'fotoFile' in dataForFirestore,
+        dataForFirestoreContainsFile: Object.values(dataForFirestore).some(value => value instanceof File)
+    });
 
     const fornecedorData = {
       empresa: dataForFirestore.empresa.trim(),
@@ -295,8 +339,19 @@ export default function FornecedoresPage() {
       updatedAt: serverTimestamp(),
     };
 
+    // Debug: verificar dados que vão para o Firebase
+    console.log('🔥 [FORNECEDORES FIREBASE] Dados que serão enviados:', {
+        fornecedorDataKeys: Object.keys(fornecedorData),
+        hasFileObject: Object.values(fornecedorData).some(value => value instanceof File),
+        fornecedorData: JSON.stringify(fornecedorData, (key, value) => {
+            if (value instanceof File) return `[FILE: ${value.name}]`;
+            return value;
+        })
+    });
+
     try {
       if (editingFornecedor) {
+        console.log('🔄 [FORNECEDORES] Atualizando fornecedor existente:', editingFornecedor.id);
         await updateDoc(doc(db, FORNECEDORES_COLLECTION, editingFornecedor.id), fornecedorData);
         toast({ title: "Fornecedor Atualizado!", description: `O fornecedor ${data.empresa} foi atualizado.` });
       } else {
@@ -348,8 +403,11 @@ export default function FornecedoresPage() {
   };
 
   const handleOpenLinkModal = (fornecedor: Fornecedor) => {
+    console.log('Opening link modal for:', fornecedor);
+    console.log('isLinkModalOpen state before setting:', isLinkModalOpen);
     setSelectedSupplierForLink(fornecedor);
     setIsLinkModalOpen(true);
+    console.log('isLinkModalOpen state after setting:', true);
   };
 
   const handleSendLinkViaWhatsApp = async (supplier: Fornecedor, link: string) => {
@@ -626,12 +684,14 @@ export default function FornecedoresPage() {
                     return (
                       <TableRow key={fornecedor.id} className={`table-row-modern ${isPending ? "bg-muted/30 opacity-70" : ""}`}>
                         <TableCell className="pl-4 md:pl-6">
-                          <Avatar className="h-10 w-10 scale-hover">
-                            <Image src={imageUrl} alt={fornecedor.empresa} width={40} height={40} className="object-cover" data-ai-hint={fornecedor.fotoHint} />
-                            <AvatarFallback>
-                              {fornecedor.empresa.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                          <button onClick={() => setViewImage(imageUrl)} className="rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            <Avatar className="h-10 w-10 scale-hover">
+                              <Image src={imageUrl} alt={fornecedor.empresa} width={40} height={40} className="object-cover" data-ai-hint={fornecedor.fotoHint} />
+                              <AvatarFallback>
+                                {fornecedor.empresa.substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          </button>
                         </TableCell>
                         <TableCell className="font-medium">
                           {fornecedor.empresa}
@@ -692,7 +752,8 @@ export default function FornecedoresPage() {
 
       {isLinkModalOpen && selectedSupplierForLink && (
         <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
-          <DialogContent className="card-professional modern-shadow-xl">
+          <DialogContent>
+            <div className="card-professional modern-shadow-xl">
             <DialogHeader className="fade-in">
               <DialogTitle className="text-gradient">Link de Acesso ao Portal</DialogTitle>
               <DialogDescription>
@@ -736,12 +797,14 @@ export default function FornecedoresPage() {
                 Abrir Link
               </Button>
             </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
       <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
-          <DialogContent className="card-professional modern-shadow-xl">
+          <DialogContent>
+            <div className="card-professional modern-shadow-xl">
               <DialogHeader className="fade-in">
                   <DialogTitle className="text-gradient">Convidar Novo Fornecedor</DialogTitle>
                   <DialogDescription>
@@ -765,11 +828,13 @@ export default function FornecedoresPage() {
                       Gerar Link de Convite
                   </Button>
               </DialogFooter>
+            </div>
           </DialogContent>
       </Dialog>
       
       <Dialog open={!!generatedLinkInfo} onOpenChange={() => setGeneratedLinkInfo(null)}>
-        <DialogContent className="sm:max-w-md card-professional modern-shadow-xl">
+        <DialogContent>
+          <div className="sm:max-w-md card-professional modern-shadow-xl">
             <DialogHeader className="bounce-in">
               <DialogTitle className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-5 w-5 pulse-glow" />
@@ -795,8 +860,17 @@ export default function FornecedoresPage() {
                   Fechar
               </Button>
             </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
+        <DialogContent>
+          <div className="max-w-3xl p-0">
+            <img src={viewImage || ''} alt="Visualização Ampliada" className="w-full h-auto rounded-lg" />
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </main>
   );
 }
