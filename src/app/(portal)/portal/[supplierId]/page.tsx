@@ -97,8 +97,28 @@ export default function SupplierPortalPage() {
         where("status", "in", ["Aberta", "Pausada", "Fechada", "Concluída"]), 
         orderBy("deadline", "desc")
     );
-    const unsubQuotations = onSnapshot(quotationsQuery, (querySnapshot) => {
+    const unsubQuotations = onSnapshot(quotationsQuery, async (querySnapshot) => {
       const fetchedQuotations = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
+      
+      // Check for expired quotations and update their status
+      const currentTime = new Date();
+      const quotationsToUpdate = fetchedQuotations.filter(quotation => 
+        quotation.status === 'Aberta' && 
+        quotation.deadline && 
+        quotation.deadline.toDate() <= currentTime
+      );
+
+      // Close expired quotations
+      for (const expiredQuotation of quotationsToUpdate) {
+        try {
+          console.log(`[Portal] Auto-closing expired quotation ${expiredQuotation.id}`);
+          const quotationRef = doc(db, "quotations", expiredQuotation.id);
+          await updateDoc(quotationRef, { status: "Fechada" });
+        } catch (error) {
+          console.error(`Failed to close expired quotation ${expiredQuotation.id}:`, error);
+        }
+      }
+
       setOpenQuotations(fetchedQuotations);
       setIsLoading(false);
     }, (error) => {
@@ -185,6 +205,10 @@ export default function SupplierPortalPage() {
             <h2 className="text-2xl font-semibold text-foreground">Cotações Recentes ({openQuotations.length})</h2>
             {openQuotations.map((quotation) => {
               const style = getQuotationCardStyle(quotation.status);
+              const now = new Date();
+              const isExpired = quotation.deadline && quotation.deadline.toDate() <= now;
+              const actualStatus = (quotation.status === 'Aberta' && isExpired) ? 'Fechada' : quotation.status;
+              
               return(
                   <Card key={quotation.id} className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
                       <CardHeader className={`p-0 ${style.headerClass}`}>
@@ -193,7 +217,14 @@ export default function SupplierPortalPage() {
                                   <span>
                                       Cotação para Entrega em: {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
                                   </span>
-                                  <Badge variant="outline" className={style.badgeClass}>{quotation.status}</Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className={style.badgeClass}>{actualStatus}</Badge>
+                                    {isExpired && quotation.status === 'Aberta' && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Expirada
+                                      </Badge>
+                                    )}
+                                  </div>
                               </CardTitle>
                           </div>
                       </CardHeader>
@@ -201,6 +232,11 @@ export default function SupplierPortalPage() {
                           <div className="flex items-center text-muted-foreground">
                               <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
                               <span>Prazo final para envio: <span className="font-semibold text-foreground">{format(quotation.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></span>
+                              {isExpired && (
+                                <Badge variant="outline" className="ml-2 text-xs text-destructive border-destructive">
+                                  Expirado
+                                </Badge>
+                              )}
                           </div>
                           <div className="flex items-center text-muted-foreground text-sm">
                               <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -208,9 +244,9 @@ export default function SupplierPortalPage() {
                           </div>
                       </CardContent>
                       <CardFooter className="bg-muted/50 p-4 border-t">
-                          <Button asChild className="w-full md:w-auto ml-auto" variant={quotation.status === 'Aberta' ? 'default' : 'secondary'}>
+                          <Button asChild className="w-full md:w-auto ml-auto" variant={actualStatus === 'Aberta' ? 'default' : 'secondary'}>
                               <Link href={`/portal/${supplierId}/cotar/${quotation.id}`}>
-                                  {quotation.status === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
+                                  {actualStatus === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
                               </Link>
                           </Button>
                       </CardFooter>

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:external": "./dev-external.sh",
     "dev:tunnel": "./start-dev.sh",
     "build": "next build",
     "start": "next start",

@@ -2,16 +2,17 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShoppingCart, ListPlus, Users, Loader2 } from "lucide-react";
 import { parseISO, isValid, format } from 'date-fns';
 
-// Lazy load heavy components
-const GestaoComprasTab = lazy(() => import("@/components/features/compras/GestaoComprasTab"));
-const NewShoppingListClient = lazy(() => import("@/components/features/compras/NewShoppingListClient"));
-const SelecionarFornecedoresTab = lazy(() => import("@/components/features/compras/SelecionarFornecedoresTab"));
+// Import components directly to avoid chunk loading issues
+// These will be included in the main bundle but eliminate chunk loading errors
+import GestaoComprasTab from "@/components/features/compras/GestaoComprasTab";
+import NewShoppingListClient from "@/components/features/compras/NewShoppingListClient";
+import SelecionarFornecedoresTab from "@/components/features/compras/SelecionarFornecedoresTab";
 
 export default function ComprasPageClient() {
   const router = useRouter();
@@ -146,37 +147,19 @@ export default function ComprasPageClient() {
           </TabsList>
 
           <TabsContent value="criar-editar" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="criar-editar-tab">
-            <Suspense fallback={
-              <div className="flex w-full items-center justify-center p-8 min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }>
-              <NewShoppingListClient selectedDate={currentDate} onDateChange={handleDateChangeForList} onListSaved={handleListSaved} />
-            </Suspense>
+            <NewShoppingListClient selectedDate={currentDate} onDateChange={handleDateChangeForList} onListSaved={handleListSaved} />
           </TabsContent>
 
           <TabsContent value="iniciar-cotacao" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="iniciar-cotacao-tab">
-            <Suspense fallback={
-              <div className="flex w-full items-center justify-center p-8 min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }>
-              <SelecionarFornecedoresTab
-                shoppingListDate={listDateForQuotation}
-                listId={listIdForQuotation}
-                onQuotationStarted={handleQuotationStarted}
-              />
-            </Suspense>
+            <SelecionarFornecedoresTab
+              shoppingListDate={listDateForQuotation}
+              listId={listIdForQuotation}
+              onQuotationStarted={handleQuotationStarted}
+            />
           </TabsContent>
 
           <TabsContent value="gestao" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="gestao-tab">
-            <Suspense fallback={
-              <div className="flex w-full items-center justify-center p-8 min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }>
-              <GestaoComprasTab selectedDate={currentDate} onDateChange={setCurrentDate} />
-            </Suspense>
+            <GestaoComprasTab selectedDate={currentDate} onDateChange={setCurrentDate} />
           </TabsContent>
 
         </Tabs>

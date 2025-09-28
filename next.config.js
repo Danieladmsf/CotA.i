@@ -3,7 +3,6 @@ const nextConfig = {
   reactStrictMode: false,
   // Enable SWC minifier for better performance
   swcMinify: true,
-  // Remove problematic experimental settings
   images: {
     remotePatterns: [
       {
@@ -18,10 +17,31 @@ const nextConfig = {
         port: '',
         pathname: '**',
       },
+      {
+        protocol: 'https',
+        hostname: 'bhpy0qvpkgnuumnn.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '**',
+      },
     ],
   },
-  // The double-asterisk wildcard `**` is required to match any number of subdomains.
-  allowedDevOrigins: ["**.¹.cloudworkstations.dev", "72.60.61.118:8080", "**.serveo.net", "sandra-optimal-magistratically.ngrok-free.app"],
+  // Allowed origins for external access
+  allowedDevOrigins: [
+    "**.¹.cloudworkstations.dev", 
+    "72.60.61.118:8080", 
+    "72.60.61.118:3000", 
+    "72.60.61.118:3001", 
+    "72-60-61-118.nip.io:3000", 
+    "72-60-61-118.nip.io:3001", 
+    "**.serveo.net", 
+    "sandra-optimal-magistratically.ngrok-free.app"
+  ],
 };
 
 module.exports = nextConfig;
