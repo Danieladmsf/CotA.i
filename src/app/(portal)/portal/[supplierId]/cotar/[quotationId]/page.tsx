@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { db } from "@/lib/config/firebase";
 import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc, updateDoc, arrayUnion } from "firebase/firestore";
-import type { Quotation, Offer, ShoppingListItem, Fornecedor as SupplierType, UnitOfMeasure } from '@/types';
+import type { Quotation, Offer, ShoppingListItem, Fornecedor as SupplierType, UnitOfMeasure, PendingBrandRequest } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription as AlertPrimitiveDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Info,
   Settings2,
@@ -55,6 +57,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
 const SHOPPING_LIST_ITEMS_COLLECTION = "shopping_list_items";
+const PENDING_BRAND_REQUESTS_COLLECTION = "pending_brand_requests";
+
+// Utility function to handle preferredBrands as both string and array
+const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
+  if (!preferredBrands) return [];
+  if (Array.isArray(preferredBrands)) return preferredBrands;
+  return preferredBrands.split(',').map(b => b.trim());
+};
 
 
 const dayMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -95,6 +105,7 @@ interface ProductToQuoteVM extends ShoppingListItem {
   isLockedOut?: boolean;
   acknowledgedDeliveryMismatches?: string[]; // NEW FIELD
   categoryName?: string;
+  pendingBrandRequests?: PendingBrandRequest[]; // Nova propriedade para solicitações pendentes
 }
 
 
@@ -200,6 +211,21 @@ export default function SellerQuotationPage() {
   const [savingOffers, setSavingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
 
+  // Estados para o modal de nova marca
+  const [newBrandModal, setNewBrandModal] = useState({
+    isOpen: false,
+    productId: '',
+    productName: ''
+  });
+  const [newBrandForm, setNewBrandForm] = useState({
+    brandName: '',
+    packagingDescription: '',
+    unitsInPackaging: 0,
+    totalPackagingPrice: 0,
+    imageFile: null as File | null
+  });
+  const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
+
   
   const [timeLeft, setTimeLeft] = useState("Calculando...");
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
@@ -293,6 +319,158 @@ export default function SellerQuotationPage() {
     }
   };
 
+  // Funções para modal de nova marca
+  const openNewBrandModal = (productId: string, productName: string) => {
+    setNewBrandModal({
+      isOpen: true,
+      productId,
+      productName
+    });
+    setNewBrandForm({
+      brandName: '',
+      packagingDescription: '',
+      unitsInPackaging: 0,
+      totalPackagingPrice: 0,
+      imageFile: null
+    });
+  };
+
+  const closeNewBrandModal = () => {
+    setNewBrandModal({
+      isOpen: false,
+      productId: '',
+      productName: ''
+    });
+    setNewBrandForm({
+      brandName: '',
+      packagingDescription: '',
+      unitsInPackaging: 0,
+      totalPackagingPrice: 0,
+      imageFile: null
+    });
+  };
+
+  const handleNewBrandFormChange = (field: keyof typeof newBrandForm, value: any) => {
+    setNewBrandForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const uploadImageToVercelBlob = async (file: File): Promise<string> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Use filename as query parameter as expected by the API
+      const filename = `brand-images/${Date.now()}-${file.name}`;
+      const response = await fetch(`/api/upload?filename=${encodeURIComponent(filename)}`, {
+        method: 'POST',
+        body: file, // Send file directly, not FormData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Falha no upload da imagem');
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      throw new Error('Falha no upload da imagem: ' + error.message);
+    }
+  };
+
+  const submitNewBrandRequest = async () => {
+    if (!quotation || !currentSupplierDetails || !newBrandModal.productId) {
+      toast({ title: "Erro", description: "Dados insuficientes para enviar solicitação.", variant: "destructive" });
+      return;
+    }
+
+    if (!newBrandForm.brandName.trim() || !newBrandForm.packagingDescription.trim() || 
+        newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0) {
+      toast({ title: "Erro", description: "Todos os campos são obrigatórios.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingNewBrand(true);
+
+    try {
+      let imageUrl = '';
+      if (newBrandForm.imageFile) {
+        try {
+          imageUrl = await uploadImageToVercelBlob(newBrandForm.imageFile);
+        } catch (error: any) {
+          console.warn('Image upload failed, continuing without image:', error);
+          // Continue without image if upload fails
+        }
+      }
+
+      const pricePerUnit = newBrandForm.totalPackagingPrice / newBrandForm.unitsInPackaging;
+
+      const brandRequestData = {
+        quotationId: quotation.id,
+        productId: newBrandModal.productId,
+        supplierId: supplierId,
+        supplierName: currentSupplierDetails.empresa,
+        supplierInitials: currentSupplierDetails.vendedor.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+        brandName: newBrandForm.brandName.trim(),
+        packagingDescription: newBrandForm.packagingDescription.trim(),
+        unitsInPackaging: newBrandForm.unitsInPackaging,
+        totalPackagingPrice: newBrandForm.totalPackagingPrice,
+        pricePerUnit: pricePerUnit,
+        imageUrl: imageUrl,
+        imageFileName: newBrandForm.imageFile?.name || '',
+        userId: quotation.userId,
+      };
+
+      // Try to create via API route (bypasses Firestore rules)
+      const response = await fetch('/api/brand-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(brandRequestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao enviar solicitação');
+      }
+
+      const result = await response.json();
+      
+      toast({ 
+        title: "Solicitação Enviada!", 
+        description: "Sua nova marca foi enviada para aprovação do comprador.",
+        variant: "default"
+      });
+
+      closeNewBrandModal();
+
+    } catch (error: any) {
+      console.error("Error submitting brand request:", error);
+      
+      // Check if it's a permission error
+      if (error.code === 'permission-denied') {
+        toast({ 
+          title: "Erro de Permissão", 
+          description: "As regras do Firestore precisam ser atualizadas para permitir solicitações de marca. Entre em contato com o administrador.", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Erro ao Enviar Solicitação", 
+          description: error.message || "Erro desconhecido. Tente novamente.", 
+          variant: "destructive" 
+        });
+      }
+    } finally {
+      setIsSubmittingNewBrand(false);
+    }
+  };
+
 
   // Main listener for the quotation document itself
   useEffect(() => {
@@ -363,6 +541,7 @@ export default function SellerQuotationPage() {
             isDeliveryDayMismatch: isMismatch,
             counterProposalInfo: null,
             isLockedOut: false,
+            pendingBrandRequests: [] // Inicializar como array vazio
           } as ProductToQuoteVM;
         }).sort((a,b) => a.name.localeCompare(b.name));
         
@@ -430,6 +609,77 @@ export default function SellerQuotationPage() {
       }
     };
   }, [quotation, handleAutoCloseQuotation]); 
+
+
+  // Effect to listen for pending brand requests
+  useEffect(() => {
+    if (!quotationId || !supplierId) return;
+
+    const pendingRequestsQuery = query(
+      collection(db, PENDING_BRAND_REQUESTS_COLLECTION),
+      where("quotationId", "==", quotationId),
+      where("supplierId", "==", supplierId),
+      where("status", "==", "pending")
+    );
+
+    const unsubscribe = onSnapshot(pendingRequestsQuery, (snapshot) => {
+      const pendingRequests = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as PendingBrandRequest));
+
+      console.log('🔶 Pending brand requests received:', pendingRequests);
+
+      // Update products to include pending requests
+      setProductsToQuote(prevProducts =>
+        prevProducts.map(product => {
+          const productPendingRequests = pendingRequests.filter(req => req.productId === product.id);
+          console.log(`🔶 Product ${product.name} pending requests:`, productPendingRequests);
+          return {
+            ...product,
+            pendingBrandRequests: productPendingRequests
+          };
+        })
+      );
+    });
+
+    return () => unsubscribe();
+  }, [quotationId, supplierId]);
+
+  // Effect to listen for real-time changes in shopping_list_items (preferred brands updates)
+  useEffect(() => {
+    if (!quotationId) return;
+
+    const shoppingListItemsQuery = query(
+      collection(db, SHOPPING_LIST_ITEMS_COLLECTION),
+      where("quotationId", "==", quotationId)
+    );
+
+    const unsubscribe = onSnapshot(shoppingListItemsQuery, (snapshot) => {
+      console.log('🛒 Shopping list items updated in real-time');
+      
+      // Update products with new preferred brands
+      setProductsToQuote(prevProducts => {
+        const updatedProducts = prevProducts.map(product => {
+          const updatedDoc = snapshot.docs.find(doc => doc.id === product.id);
+          if (updatedDoc) {
+            const updatedData = updatedDoc.data() as ShoppingListItem;
+            console.log(`📦 Updated product ${product.name} with new preferredBrands:`, updatedData.preferredBrands);
+            return {
+              ...product,
+              preferredBrands: updatedData.preferredBrands,
+              updatedAt: updatedData.updatedAt
+            };
+          }
+          return product;
+        });
+        
+        return updatedProducts;
+      });
+    });
+
+    return () => unsubscribe();
+  }, [quotationId]);
 
 
   useEffect(() => {
@@ -575,6 +825,8 @@ export default function SellerQuotationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotationId, supplierId, currentSupplierDetails, toast, isLoading, quotation]);
+  
+
   
   // Effect for component unmount cleanup - only runs once
   useEffect(() => {
@@ -1482,6 +1734,60 @@ export default function SellerQuotationPage() {
                                       })}
                                   </div>
                                 )}
+
+                                {/* Render pending brand requests with orange cards */}
+                                {(() => {
+                                  const hasPendingRequests = product.pendingBrandRequests && product.pendingBrandRequests.length > 0;
+                                  console.log(`🔶 Product ${product.name} - hasPendingRequests:`, hasPendingRequests, product.pendingBrandRequests);
+                                  return hasPendingRequests;
+                                })() && (
+                                  <div className="flex flex-row flex-wrap gap-2 p-1">
+                                      {product.pendingBrandRequests?.map(request => {
+                                        console.log('🔶 Rendering pending request card:', request);
+                                        return (
+                                          <div key={request.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50/50 border-l-4 border-orange-500 min-w-[200px] flex-grow">
+                                              <div className="flex items-center gap-3">
+                                                  <TooltipProvider>
+                                                      <Tooltip>
+                                                          <TooltipTrigger asChild>
+                                                              <Avatar className="h-8 w-8 shrink-0 cursor-pointer">
+                                                                {request.imageUrl ? (
+                                                                  <Image 
+                                                                    src={request.imageUrl} 
+                                                                    alt={request.brandName} 
+                                                                    width={40} 
+                                                                    height={40} 
+                                                                    className="object-cover w-full h-full rounded-full" 
+                                                                  />
+                                                                ) : (
+                                                                  <AvatarFallback className="text-xs bg-orange-100">{request.supplierInitials}</AvatarFallback>
+                                                                )}
+                                                              </Avatar>
+                                                          </TooltipTrigger>
+                                                          <TooltipContent side="top" className="bg-background border text-foreground shadow-lg rounded-md text-xs p-2">
+                                                            <p className="font-semibold">{request.supplierName}</p>
+                                                            <p className="text-muted-foreground">Nova marca proposta</p>
+                                                          </TooltipContent>
+                                                      </Tooltip>
+                                                  </TooltipProvider>
+                                                  <div>
+                                                      <p className="text-sm font-semibold" title={request.brandName}>{request.brandName}</p>
+                                                      <p className="text-xs text-muted-foreground">por {request.supplierName}</p>
+                                                  </div>
+                                              </div>
+                                              <div className="text-right">
+                                                  <p className="text-base font-bold text-orange-600">{formatCurrency(request.pricePerUnit)} / {abbreviateUnit(product.unit)}</p>
+                                                  <div className="mt-1">
+                                                    <Badge variant="outline" className="text-xs border-orange-600 text-orange-700">
+                                                      Aguardando Aprovação
+                                                    </Badge>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                )}
                                 <div className="sm:ml-auto">
                                   {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                                 </div>
@@ -1525,12 +1831,16 @@ export default function SellerQuotationPage() {
                                         {product.preferredBrands && product.preferredBrands.length > 0 && (
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="font-medium text-muted-foreground mr-1">Marcas Sugeridas:</span>
-                                            {product.preferredBrands.split(',').map(brand => (
+                                            {getPreferredBrandsArray(product.preferredBrands).map(brand => (
                                                 <Badge key={brand.trim()} variant="outline" onClick={() => !isLockedOut && handleSuggestedBrandClick(product.id, brand.trim())} className={isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}>{brand.trim()}</Badge>
                                             ))}
                                           </div>
                                         )}
-                                        <Badge variant="outline" onClick={() => !isLockedOut && handleOtherBrandClick(product.id)} className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}>
+                                        <Badge 
+                                          variant="outline" 
+                                          onClick={() => !isLockedOut && openNewBrandModal(product.id, product.name)} 
+                                          className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}
+                                        >
                                           <PlusCircle className="mr-1.5 h-3 w-3" /> Outra Marca
                                         </Badge>
                                         {product.notes && <p className="text-muted-foreground mt-2 sm:mt-0"><span className="font-medium">Obs. Comprador:</span> {product.notes}</p>}
@@ -1732,6 +2042,104 @@ export default function SellerQuotationPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de Nova Marca */}
+      <Dialog open={newBrandModal.isOpen} onOpenChange={(open) => !open && closeNewBrandModal()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Propor Nova Marca</DialogTitle>
+            <DialogDescription>
+              Envie uma proposta de nova marca para &quot;{newBrandModal.productName}&quot;. 
+              Ela será enviada ao comprador para aprovação.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="brand-name">Sua Marca Ofertada *</Label>
+              <Input
+                id="brand-name"
+                value={newBrandForm.brandName}
+                onChange={(e) => handleNewBrandFormChange('brandName', e.target.value)}
+                placeholder="Ex: Maturatta"
+                className="text-base"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="packaging-desc">Descrição da Embalagem *</Label>
+              <Input
+                id="packaging-desc"
+                value={newBrandForm.packagingDescription}
+                onChange={(e) => handleNewBrandFormChange('packagingDescription', e.target.value)}
+                placeholder="Ex: Caixa com 12 Unid."
+                className="text-base"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="units-packaging">Total Un na Emb. *</Label>
+              <Input
+                id="units-packaging"
+                type="number"
+                value={newBrandForm.unitsInPackaging || ''}
+                onChange={(e) => handleNewBrandFormChange('unitsInPackaging', parseInt(e.target.value) || 0)}
+                placeholder="Ex: 12"
+                className="text-base"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="total-price">Preço Total da Emb. (R$) *</Label>
+              <Input
+                id="total-price"
+                type="number"
+                step="0.01"
+                value={newBrandForm.totalPackagingPrice || ''}
+                onChange={(e) => handleNewBrandFormChange('totalPackagingPrice', parseFloat(e.target.value) || 0)}
+                placeholder="Ex: 90.00"
+                className="text-base"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="brand-image">Imagem da Marca (Opcional)</Label>
+              <Input
+                id="brand-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleNewBrandFormChange('imageFile', e.target.files?.[0] || null)}
+                className="text-base file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+              />
+              <p className="text-xs text-muted-foreground">
+                Envie uma imagem da marca/produto para ajudar na aprovação
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={closeNewBrandModal}
+              disabled={isSubmittingNewBrand}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={submitNewBrandRequest}
+              disabled={isSubmittingNewBrand || !newBrandForm.brandName.trim() || !newBrandForm.packagingDescription.trim() || newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {isSubmittingNewBrand ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar Proposta'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

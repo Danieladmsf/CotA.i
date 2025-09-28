@@ -5,6 +5,7 @@ import * as React from "react";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import BrandApprovalsTab from './BrandApprovalsTab';
 import {
   Select,
   SelectContent,
@@ -48,6 +49,9 @@ import {
   Grid3X3,
   List,
   Eye,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   Filter,
   TrendingDown,
   Percent
@@ -63,6 +67,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
+
+// Utility function to handle preferredBrands as both string and array
+const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
+  if (!preferredBrands) return [];
+  if (Array.isArray(preferredBrands)) return preferredBrands;
+  return preferredBrands.split(',').map(b => b.trim());
+};
 
 interface OfferByBrandDisplay {
   brandName: string;
@@ -139,7 +150,10 @@ export default function CotacaoClient() {
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
 
   // Novos states para a interface melhorada
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    return tab === 'aprovacoes' ? 'aprovacoes' : 'overview';
+  });
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
   const [filterByBrand, setFilterByBrand] = useState<string>("all");
@@ -469,7 +483,7 @@ export default function CotacaoClient() {
       const validOffers = allOffersForThisProduct.filter(offer => offer.pricePerUnit > 0);
       const prices = validOffers.map(offer => offer.pricePerUnit);
       
-      const preferredBrandsArray = item.preferredBrands ? item.preferredBrands.split(',').map(b => b.trim().toLowerCase()) : [];
+      const preferredBrandsArray = item.preferredBrands ? getPreferredBrandsArray(item.preferredBrands) : [];
       
       const bestOfferForPref = allOffersForThisProduct
         .filter(offer => offer.pricePerUnit > 0 && preferredBrandsArray.length > 0 && preferredBrandsArray.includes(offer.brandOffered.toLowerCase()))
@@ -792,7 +806,7 @@ export default function CotacaoClient() {
         <section className="space-y-6">
           {/* Estatísticas e Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 card-professional modern-shadow-lg">
+            <TabsList className="grid w-full grid-cols-4 card-professional modern-shadow-lg">
               <TabsTrigger 
                 value="overview" 
                 className="flex items-center gap-2 py-3 nav-item-modern font-heading"
@@ -813,6 +827,13 @@ export default function CotacaoClient() {
               >
                 <Building2 className="h-5 w-5 rotate-hover" />
                 Fornecedores
+              </TabsTrigger>
+              <TabsTrigger 
+                value="aprovacoes" 
+                className="flex items-center gap-2 py-3 nav-item-modern font-heading relative"
+              >
+                <AlertCircle className="h-5 w-5 rotate-hover text-orange-600" />
+                Aprovações
               </TabsTrigger>
             </TabsList>
 
@@ -1077,7 +1098,7 @@ export default function CotacaoClient() {
                                   <p className="text-caption">Pedido: {product.requestedQuantity} {product.unit}</p>
                                   {product.preferredBrands && (
                                     <p className="text-caption">
-                                      Marcas Pref.: {product.preferredBrands.split(',').map(b => b.trim()).join(', ')}
+                                      Marcas Pref.: {getPreferredBrandsArray(product.preferredBrands).join(', ')}
                                     </p>
                                   )}
                                   {product.notes && (
@@ -1280,6 +1301,11 @@ export default function CotacaoClient() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Tab: Aprovações */}
+            <TabsContent value="aprovacoes" className="mt-6 bounce-in">
+              <BrandApprovalsTab />
             </TabsContent>
           </Tabs>
         </section>

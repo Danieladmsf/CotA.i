@@ -38,7 +38,12 @@ import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
 
-
+// Utility function to handle preferredBrands as both string and array
+const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
+  if (!preferredBrands) return [];
+  if (Array.isArray(preferredBrands)) return preferredBrands;
+  return preferredBrands.split(',').map(b => b.trim());
+};
 
 interface OfferByBrandDisplay {
   brandName: string;
@@ -416,7 +421,7 @@ export default function ComprasCotacaoClient() {
       const productOffersMap = activeQuotationDetails.offersByProduct.get(item.id); 
       const allOffersForThisProduct: Offer[] = productOffersMap ? Array.from(productOffersMap.values()) : [];
 
-      const preferredBrandsArray = item.preferredBrands ? item.preferredBrands.split(',').map(b => b.trim().toLowerCase()) : [];
+      const preferredBrandsArray = item.preferredBrands ? getPreferredBrandsArray(item.preferredBrands).map(b => b.toLowerCase()) : [];
       
       const bestOfferForPref = allOffersForThisProduct
         .filter(offer => offer.pricePerUnit > 0 && preferredBrandsArray.length > 0 && preferredBrandsArray.includes(offer.brandOffered.toLowerCase()))
@@ -594,7 +599,7 @@ export default function ComprasCotacaoClient() {
                         {productRow.preferredBrands && (
                           <div className="text-sm text-muted-foreground mt-1">
                             Marcas Pref.:{" "}
-                            {productRow.preferredBrands.split(',').map((brand, i, arr) => (
+                            {getPreferredBrandsArray(productRow.preferredBrands).map((brand, i, arr) => (
                               <React.Fragment key={brand}>
                                 <span className="text-primary font-medium">{brand.trim()}</span>
                                 {i < arr.length - 1 && ', '}

@@ -13,7 +13,9 @@ import type { Quotation, Fornecedor } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
 import AddFornecedorModal, { FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
 
 const QUOTATIONS_COLLECTION = "quotations";
@@ -180,15 +182,33 @@ export default function SupplierPortalPage() {
   return (
     <>
       <div className="container mx-auto p-4 md:p-6 lg:p-8 min-h-screen bg-background">
-        <header className="mb-8 text-center md:text-left">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-2">Portal do Fornecedor</h1>
-          <div className="flex items-center justify-center md:justify-start gap-2">
-            <p className="text-xl text-foreground">Bem-vindo(a), {supplier.empresa}!</p>
-            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)}>
-              <Settings className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
-            </Button>
-          </div>
-          <p className="text-md text-muted-foreground">Aqui você pode visualizar e responder às cotações abertas.</p>
+        <header className="mb-8">
+          <Card className="shadow-lg overflow-hidden">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6 bg-card">
+              <div className="relative">
+                <Avatar className="h-24 w-24 border-4 border-background shadow-md">
+                  {supplier.fotoUrl ? (
+                                        <Image src={supplier.fotoUrl} alt={supplier.empresa} width={96} height={96} className="object-cover w-full h-full" />
+                  ) : (
+                    <AvatarFallback className="text-3xl bg-primary text-primary-foreground">
+                      {supplier.empresa.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              </div>
+              <div className="flex-grow text-center sm:text-left">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{supplier.empresa}</h1>
+                <p className="text-md text-muted-foreground">Bem-vindo(a) ao seu portal, {supplier.vendedor}!</p>
+                <p className="text-sm text-muted-foreground mt-1">Aqui você pode visualizar e responder às cotações abertas.</p>
+              </div>
+              <div className="flex-shrink-0 self-center sm:self-start">
+                <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Editar Dados
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </header>
 
         {openQuotations.length === 0 ? (

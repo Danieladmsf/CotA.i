@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarTrigger, SidebarContent, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import ClientSidebarNavigation from '@/components/shared/ClientSidebarNavigation';
+import NotificationBell from '@/components/shared/NotificationBell';
 import { Zap, Loader2, LogOut } from 'lucide-react';
 import { CurrentYear } from '@/components/shared/CurrentYear';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,10 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground">Gestão Inteligente</p>
             </div>
           </div>
-          <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <ClientSidebarNavigation />

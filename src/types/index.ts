@@ -99,6 +99,27 @@ export interface Offer {
   productId: string; // Added to explicitly link offer to product within the offer data itself
 }
 
+export interface PendingBrandRequest {
+  id?: string; // Firestore document ID
+  quotationId: string;
+  productId: string;
+  supplierId: string;
+  supplierName: string;
+  supplierInitials: string;
+  brandName: string;
+  packagingDescription: string;
+  unitsInPackaging: number;
+  totalPackagingPrice: number;
+  pricePerUnit: number; // Calculated from totalPackagingPrice / unitsInPackaging
+  imageUrl?: string; // URL do Vercel Blob Storage
+  imageFileName?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  userId: string; // ID do comprador que vai aprovar
+  createdAt: Timestamp | FieldValue;
+  updatedAt: Timestamp | FieldValue;
+  rejectionReason?: string; // Motivo da rejeição, se aplicável
+}
+
 
 // Unified message type for the 'incoming_messages' collection
 export interface IncomingMessage {
