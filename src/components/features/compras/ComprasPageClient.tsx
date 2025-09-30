@@ -104,14 +104,6 @@ export default function ComprasPageClient() {
 
   return (
     <main className="space-y-8" role="main">
-      <header className="fade-in">
-        <h1 className="text-5xl font-heading font-bold text-gradient mb-3">
-          Sistema de Compras
-        </h1>
-        <p className="text-muted-foreground text-xl font-medium">
-          Gerencie suas listas de compras e cotações de forma eficiente e inteligente
-        </p>
-      </header>
         
       <section className="w-full" aria-labelledby="compras-tabs">
         <Tabs value={activeTab} onValueChange={(tab) => handleTabChange(tab, listDateForQuotation ?? currentDate, listIdForQuotation ?? undefined)} className="w-full">
@@ -146,11 +138,11 @@ export default function ComprasPageClient() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="criar-editar" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="criar-editar-tab">
+          <TabsContent value="criar-editar" className="mt-8 fade-in" role="tabpanel" aria-labelledby="criar-editar-tab">
             <NewShoppingListClient selectedDate={currentDate} onDateChange={handleDateChangeForList} onListSaved={handleListSaved} />
           </TabsContent>
 
-          <TabsContent value="iniciar-cotacao" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="iniciar-cotacao-tab">
+          <TabsContent value="iniciar-cotacao" className="mt-8 fade-in" role="tabpanel" aria-labelledby="iniciar-cotacao-tab">
             <SelecionarFornecedoresTab
               shoppingListDate={listDateForQuotation}
               listId={listIdForQuotation}
@@ -158,7 +150,7 @@ export default function ComprasPageClient() {
             />
           </TabsContent>
 
-          <TabsContent value="gestao" className="mt-8 bounce-in" role="tabpanel" aria-labelledby="gestao-tab">
+          <TabsContent value="gestao" className="mt-8 fade-in" role="tabpanel" aria-labelledby="gestao-tab">
             <GestaoComprasTab selectedDate={currentDate} onDateChange={setCurrentDate} />
           </TabsContent>
 

@@ -15,6 +15,8 @@ import type { SystemNotification, Quotation, PendingBrandRequest } from '@/types
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { useMemo } from 'react';
+
 export default function NotificationBell() {
   const { user } = useAuth();
   const router = useRouter();
@@ -24,8 +26,9 @@ export default function NotificationBell() {
   const [fallbackPendingCount, setFallbackPendingCount] = useState(0);
   const [hasNotificationAccess, setHasNotificationAccess] = useState(true);
   
+  const filters = useMemo(() => ({}), []);
   // Use the notifications hook for recent notifications in dropdown
-  const { notifications: recentNotifications, unreadCount, markAsRead, isLoading } = useNotifications({}, 5);
+  const { notifications: recentNotifications, unreadCount, markAsRead, isLoading } = useNotifications(filters, 5);
 
   // Fallback to pending brand requests if notifications system is not available
   useEffect(() => {

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wifi, WifiOff, QrCode, Clock, AlertTriangle, Send, CloudCog, CheckCircle } from 'lucide-react';
+import { Loader2, Wifi, WifiOff, QrCode, Clock, AlertTriangle, Send, CheckCircle } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription as AlertPrimitiveDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
@@ -94,7 +94,6 @@ export default function WhatsAppAdminPage() {
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestTimedOut, setRequestTimedOut] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isSettingCors, setIsSettingCors] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -145,33 +144,6 @@ export default function WhatsAppAdminPage() {
       }
     };
   }, [user, toast]);
-  
-  const handleSetupCors = async () => {
-    setIsSettingCors(true);
-    try {
-      const response = await fetch('/api/setup-cors', {
-        method: 'POST',
-      });
-      const result = await response.json();
-      if (response.ok) {
-        toast({
-          title: 'Sucesso!',
-          description: result.message || 'As permissões de CORS foram configuradas com sucesso. Os uploads devem funcionar agora.',
-          variant: 'default',
-        });
-      } else {
-        throw new Error(result.error || 'Falha ao configurar o CORS.');
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao Configurar CORS',
-        description: error.message || 'Ocorreu um erro desconhecido.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSettingCors(false);
-    }
-  };
 
   const handleRequestConnection = async () => {
     if (!user) {
@@ -366,12 +338,9 @@ export default function WhatsAppAdminPage() {
   }
 
   return (
-    <div className="flex justify-center items-start pt-10">
-      <Header 
-        title="Conexão com WhatsApp"
-        description="Gerencie a ponte de conexão para envio de notificações em tempo real."
-      />
-      <Card className="w-full max-w-2xl card-professional modern-shadow-xl">
+    <main className="space-y-6">
+      <div className="flex justify-center items-start">
+        <Card className="w-full max-w-2xl card-professional modern-shadow-xl">
         <CardContent className="p-6 sm:p-8 space-y-6">
            <div className="flex items-center justify-center">
               <StatusIndicator status={waStatus?.status} lastConnectedAt={waStatus?.readyAt as Timestamp | undefined} />
@@ -381,30 +350,9 @@ export default function WhatsAppAdminPage() {
             <h3 className="text-center text-xl font-bold text-foreground mb-4">Status da Conexão</h3>
             {renderStatusContent()}
           </div>
-          
-          <div className="pt-6 border-t border-border/50">
-            <h3 className="text-center text-xl font-bold text-foreground mb-4">Configuração Avançada</h3>
-            <Card>
-              <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-semibold">Permissões de Upload (CORS)</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Se os uploads de imagens (logos) estiverem falhando, clique aqui para configurar as permissões do Firebase Storage.
-                  </p>
-                </div>
-                <Button onClick={handleSetupCors} disabled={isSettingCors} variant="outline" className="shrink-0">
-                  {isSettingCors ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <CloudCog className="mr-2 h-4 w-4" />
-                  )}
-                  {isSettingCors ? 'Configurando...' : 'Configurar CORS'}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </main>
   );
 }

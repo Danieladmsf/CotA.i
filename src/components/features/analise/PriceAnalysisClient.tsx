@@ -24,7 +24,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Image from "next/image";
 
 import {
-  BarChart3,
   Loader2,
   Clock,
   Calendar as CalendarIcon,
@@ -142,12 +141,18 @@ export default function PriceAnalysisClient() {
   
   // Fetch quotations list
   useEffect(() => {
+    console.log('📊 [ANALYSIS] Fetch quotations useEffect triggered', { user: !!user, dateRange });
+
     if (!user) {
+      console.log('⚠️ [ANALYSIS] No user, skipping quotations fetch');
       setQuotations([]);
       setLoadingQuotations(false);
       return;
     }
+
+    console.log('🔄 [ANALYSIS] Starting quotations fetch...');
     setLoadingQuotations(true);
+
     const q = query(
       collection(db, QUOTATIONS_COLLECTION),
       where("userId", "==", user.uid),
@@ -157,22 +162,32 @@ export default function PriceAnalysisClient() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('✅ [ANALYSIS] Quotations snapshot received', { count: snapshot.docs.length });
       const fetchedQuotations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
       setQuotations(fetchedQuotations);
-      
+
       const currentSelectionExists = fetchedQuotations.some(q => q.id === selectedQuotationId);
+      console.log('🔍 [ANALYSIS] Current selection check', {
+        selectedQuotationId,
+        currentSelectionExists,
+        quotationsCount: fetchedQuotations.length
+      });
+
       if (!currentSelectionExists && fetchedQuotations.length > 0) {
         const newId = fetchedQuotations[0].id;
+        console.log('🎯 [ANALYSIS] Auto-selecting first quotation:', newId);
         setSelectedQuotationId(newId);
         router.replace(`/analise-de-precos?quotationId=${newId}`, { scroll: false });
       } else if (fetchedQuotations.length === 0) {
+        console.log('⚠️ [ANALYSIS] No quotations found');
         setSelectedQuotationId('');
         router.replace('/analise-de-precos', { scroll: false });
       }
 
       setLoadingQuotations(false);
+      console.log('✅ [ANALYSIS] Quotations loading complete');
     }, (error) => {
-      console.error("Error fetching quotations list:", error);
+      console.error("❌ [ANALYSIS] Error fetching quotations list:", error);
       toast({ title: "Erro ao buscar cotações", description: error.message, variant: "destructive" });
       setLoadingQuotations(false);
     });
@@ -183,32 +198,46 @@ export default function PriceAnalysisClient() {
   // Set selected quotation from URL or first in list
   useEffect(() => {
     const urlQuotationId = searchParams.get('quotationId');
+    console.log('🔗 [ANALYSIS] URL quotation ID check', { urlQuotationId, quotationsCount: quotations.length });
+
     if (urlQuotationId) {
+        console.log('✅ [ANALYSIS] Setting quotation from URL:', urlQuotationId);
         setSelectedQuotationId(urlQuotationId);
     } else if (quotations.length > 0) {
+        console.log('✅ [ANALYSIS] Auto-selecting first quotation:', quotations[0].id);
         setSelectedQuotationId(quotations[0].id);
     }
   }, [searchParams, quotations]);
 
   // Fetch and analyze data for the selected quotation
   useEffect(() => {
+    console.log('📈 [ANALYSIS] Analyze quotation useEffect triggered', { selectedQuotationId });
+
     if (!selectedQuotationId) {
+      console.log('⚠️ [ANALYSIS] No quotation selected, clearing data');
       setSelectedQuotation(null);
       setAnalysisData([]);
       return;
     }
 
+    console.log('🔄 [ANALYSIS] Starting analysis for quotation:', selectedQuotationId);
     setLoadingAnalysis(true);
+
     const unsubQuotation = onSnapshot(doc(db, QUOTATIONS_COLLECTION, selectedQuotationId), (docSnap) => {
+      console.log('📄 [ANALYSIS] Quotation document snapshot', { exists: docSnap.exists() });
+
       if (docSnap.exists()) {
         const quotationData = { id: docSnap.id, ...docSnap.data() } as Quotation;
+        console.log('✅ [ANALYSIS] Quotation data loaded', { id: quotationData.id, status: quotationData.status });
         setSelectedQuotation(quotationData);
 
         if (quotationData.status === 'Aberta' && quotationData.deadline.toDate() < new Date()) {
+          console.log('⏰ [ANALYSIS] Deadline passed, auto-closing quotation');
           handleAutoCloseQuotation(quotationData.id);
         }
 
       } else {
+        console.error('❌ [ANALYSIS] Quotation document not found');
         toast({ title: "Erro", description: "A cotação selecionada não foi encontrada.", variant: "destructive" });
         setSelectedQuotation(null);
       }
@@ -216,9 +245,11 @@ export default function PriceAnalysisClient() {
 
     const performAnalysis = async () => {
         try {
+            console.log('🔍 [ANALYSIS] Fetching shopping list items...');
             const itemsQuery = query(collection(db, SHOPPING_LIST_ITEMS_COLLECTION), where("quotationId", "==", selectedQuotationId));
             const itemsSnapshot = await getDocs(itemsQuery);
             const items = itemsSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingListItem));
+            console.log('✅ [ANALYSIS] Shopping list items fetched', { count: items.length });
 
             const newAnalysisData: PriceAnalysisItem[] = [];
             const newSupplierCache = new Map(supplierDataCache);
@@ -271,20 +302,26 @@ export default function PriceAnalysisClient() {
                 };
                 newAnalysisData.push(analysisItem);
             }
+            console.log('✅ [ANALYSIS] Analysis complete', { productsAnalyzed: newAnalysisData.length });
             setAnalysisData(newAnalysisData.sort((a, b) => a.name.localeCompare(b.name)));
             setSupplierDataCache(newSupplierCache);
         } catch (error) {
-            console.error("Error performing analysis:", error);
+            console.error("❌ [ANALYSIS] Error performing analysis:", error);
             toast({ title: "Erro na Análise", description: "Não foi possível carregar os detalhes da cotação.", variant: "destructive" });
         } finally {
+            console.log('🏁 [ANALYSIS] Loading analysis complete');
             setLoadingAnalysis(false);
         }
     };
-    
+
+    console.log('🚀 [ANALYSIS] Calling performAnalysis...');
     performAnalysis();
 
-    return () => unsubQuotation();
-  }, [selectedQuotationId, toast, handleAutoCloseQuotation, supplierDataCache]);
+    return () => {
+      console.log('🧹 [ANALYSIS] Cleaning up quotation subscription');
+      unsubQuotation();
+    };
+  }, [selectedQuotationId, toast, handleAutoCloseQuotation]); // Removed supplierDataCache to prevent infinite loop
   
   // Countdown Timer
   useEffect(() => {
@@ -372,20 +409,22 @@ export default function PriceAnalysisClient() {
   };
   
   const isLoading = loadingQuotations || loadingAnalysis;
-  
+
+  console.log('🎨 [ANALYSIS] Rendering component', {
+    isLoading,
+    loadingQuotations,
+    loadingAnalysis,
+    quotationsCount: quotations.length,
+    selectedQuotationId,
+    hasSelectedQuotation: !!selectedQuotation,
+    analysisDataCount: analysisData.length
+  });
+
   return (
     <div className="space-y-6">
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3"><BarChart3 className="h-8 w-8 text-primary" /> Análise de Preços</h1>
-          <p className="text-muted-foreground mt-1">Acompanhe ofertas e tome decisões inteligentes de compra.</p>
-        </div>
-      </header>
-
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-            <CardTitle>Seleção de Cotação</CardTitle>
             <div className="flex items-center gap-2">
               <Popover>
                 <PopoverTrigger asChild>

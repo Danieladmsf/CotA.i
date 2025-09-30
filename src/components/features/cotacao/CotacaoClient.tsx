@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BrandApprovalsTab from './BrandApprovalsTab';
+import ResultadoEnvioTab from './ResultadoEnvioTab';
 import {
   Select,
   SelectContent,
@@ -31,14 +32,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KeepAliveTabsContent } from "@/components/ui/keep-alive-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  FileBarChart, 
-  Loader2, 
-  Clock, 
-  CalendarDays, 
-  ChevronLeft, 
-  ChevronRight, 
-  Info, 
+import {
+  FileBarChart,
+  Loader2,
+  Clock,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Info,
   PauseCircle,
   TrendingUp,
   Package2,
@@ -55,7 +56,8 @@ import {
   AlertCircle,
   Filter,
   TrendingDown,
-  Percent
+  Percent,
+  Send
 } from "lucide-react";
 import { db } from "@/lib/config/firebase";
 import { formatCurrency, isValidImageUrl } from "@/lib/utils";
@@ -68,7 +70,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
-import Header from '@/components/shared/Header';
 
 // Utility function to handle preferredBrands as both string and array
 const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
@@ -265,7 +266,9 @@ export default function CotacaoClient() {
         router.replace('/cotacao', { scroll: false });
       }
     }
-  }, [searchParams, filteredQuotationsForSelect, isLoadingAllQuotations, router, selectedQuotationId]);
+    // selectedQuotationId removido das dependências para evitar loop - usado apenas para comparação
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, filteredQuotationsForSelect, isLoadingAllQuotations, router]);
 
   useEffect(() => {
     if (!selectedQuotationId) {
@@ -674,33 +677,32 @@ export default function CotacaoClient() {
     return filtered;
   }, [tableProducts, filterByBrand, sortBy]);
 
+  // Converter offersByProduct de Map<string, Map<string, Offer>> para Map<string, Offer[]>
+  const offersForResultTab = useMemo(() => {
+    const result = new Map<string, Offer[]>();
+
+    if (activeQuotationDetails?.offersByProduct) {
+      activeQuotationDetails.offersByProduct.forEach((offersMap, productId) => {
+        result.set(productId, Array.from(offersMap.values()));
+      });
+    }
+
+    return result;
+  }, [activeQuotationDetails?.offersByProduct]);
+
   const isLoading = isLoadingAllQuotations || (isLoadingSelectedQuotationData && !!selectedQuotationId);
   const isQuotationPaused = activeQuotationDetails?.status === 'Pausada';
 
   return (
     <main className="w-full space-y-8" role="main">
-      <Header
-        title="Central de Cotações"
-        description="Acompanhe ofertas, compare preços e tome decisões inteligentes de compra"
-      />
-
-      {/* Seleção de Cotação */}
+      {/* Cotações */}
       <section className="card-professional modern-shadow-xl" aria-labelledby="quotation-selector">
         <header className="p-6 border-b header-modern">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <h2 id="quotation-selector" className="text-2xl font-heading font-bold text-gradient">
-                Seleção de Cotação
-              </h2>
-              <p className="text-muted-foreground mt-2">
-                Escolha uma cotação para analisar as ofertas recebidas
-              </p>
-            </div>
-            
             <div className="flex flex-wrap items-center gap-3">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="hover-lift">
+                  <Button variant="outline" className="hover-lift text-sm">
                     <CalendarDays className="mr-2 h-4 w-4" />
                     {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yyyy") : "Filtrar por Data"}
                   </Button>
@@ -716,6 +718,68 @@ export default function CotacaoClient() {
                 </Button>
               )}
               
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => navigateQuotation('prev')} 
+                  disabled={filteredQuotationsForSelect.length < 2 || isLoading}
+                  className="hover-lift"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <Select 
+                  value={selectedQuotationId} 
+                  onValueChange={handleSelectQuotationFromDropdown} 
+                  disabled={isLoading || filteredQuotationsForSelect.length === 0}
+                >
+                  <SelectTrigger className="flex-1 input-modern text-sm">
+                    <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
+                  </SelectTrigger>
+                  <SelectContent className="card-professional">
+                    {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && 
+                      <SelectItem value="no-quote" disabled>
+                        Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}
+                      </SelectItem>
+                    }
+                    {filteredQuotationsForSelect.map((quotation) => {
+                      const quotationsOnSameDay = allFetchedQuotations.filter(q => 
+                         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
+                      );
+                      
+                      const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
+                        const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
+                        const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
+                        return aTime - bTime;
+                      });
+                      
+                      const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === quotation.id) + 1;
+                          
+                      const quotationName = quotation.createdAt && quotation.shoppingListDate
+                          ? `Cotação #${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`
+                          : `Cotação de ${quotation.shoppingListDate ? format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
+
+                      return (
+                        <SelectItem key={quotation.id} value={quotation.id}>
+                          {quotationName}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+                
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => navigateQuotation('next')} 
+                  disabled={filteredQuotationsForSelect.length < 2 || isLoading}
+                  className="hover-lift"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
               {timeLeft && selectedQuotationId && activeQuotationDetails && (
                 <Badge 
                   variant={isDeadlinePassed ? "destructive" : isQuotationPaused ? "outline" : "secondary"} 
@@ -725,68 +789,6 @@ export default function CotacaoClient() {
                 </Badge>
               )}
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3 mt-6">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => navigateQuotation('prev')} 
-              disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-              className="hover-lift"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <Select 
-              value={selectedQuotationId} 
-              onValueChange={handleSelectQuotationFromDropdown} 
-              disabled={isLoading || filteredQuotationsForSelect.length === 0}
-            >
-              <SelectTrigger className="flex-1 input-modern">
-                <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
-              </SelectTrigger>
-              <SelectContent className="card-professional">
-                {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && 
-                  <SelectItem value="no-quote" disabled>
-                    Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}
-                  </SelectItem>
-                }
-                {filteredQuotationsForSelect.map((quotation) => {
-                  const quotationsOnSameDay = allFetchedQuotations.filter(q => 
-                     q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                  );
-                  
-                  const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
-                    const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
-                    const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
-                    return aTime - bTime;
-                  });
-                  
-                  const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === quotation.id) + 1;
-                      
-                  const quotationName = quotation.createdAt && quotation.shoppingListDate
-                      ? `Cotação #${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`
-                      : `Cotação de ${quotation.shoppingListDate ? format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
-
-                  return (
-                    <SelectItem key={quotation.id} value={quotation.id}>
-                      {quotationName}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => navigateQuotation('next')} 
-              disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-              className="hover-lift"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
           </div>
         </header>
       </section>
@@ -809,7 +811,7 @@ export default function CotacaoClient() {
         <section className="space-y-6">
           {/* Estatísticas e Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 card-professional modern-shadow-lg">
+            <TabsList className="grid w-full grid-cols-5 card-professional modern-shadow-lg">
               <TabsTrigger 
                 value="overview" 
                 className="flex items-center gap-2 py-3 nav-item-modern font-heading"
@@ -831,17 +833,28 @@ export default function CotacaoClient() {
                 <Building2 className="h-5 w-5 rotate-hover" />
                 Fornecedores
               </TabsTrigger>
-              <TabsTrigger 
-                value="aprovacoes" 
+              <TabsTrigger
+                value="aprovacoes"
                 className="flex items-center gap-2 py-3 nav-item-modern font-heading relative"
               >
                 <AlertCircle className="h-5 w-5 rotate-hover text-orange-600" />
                 Aprovações
               </TabsTrigger>
+              <TabsTrigger
+                value="resultado-envio"
+                className="flex items-center gap-2 py-3 nav-item-modern font-heading"
+                disabled={activeQuotationDetails?.status !== 'Fechada'}
+              >
+                <Send className="h-5 w-5 rotate-hover text-green-600" />
+                Resultado & Envio
+                {activeQuotationDetails?.status === 'Fechada' && (
+                  <Badge variant="default" className="ml-2">Pronto</Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             {/* Tab: Visão Geral */}
-            <KeepAliveTabsContent value="overview" activeTab={activeTab} className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="overview" activeTab={activeTab} className="mt-6 fade-in">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <Card className="card-professional hover-lift">
                   <CardContent className="p-6">
@@ -1017,7 +1030,7 @@ export default function CotacaoClient() {
             </KeepAliveTabsContent>
 
             {/* Tab: Produtos */}
-            <KeepAliveTabsContent value="products" activeTab={activeTab} className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="products" activeTab={activeTab} className="mt-6 fade-in">
               <div className="space-y-6">
                 {/* Controles de Visualização */}
                 <Card className="card-professional">
@@ -1253,7 +1266,7 @@ export default function CotacaoClient() {
             </KeepAliveTabsContent>
 
             {/* Tab: Fornecedores */}
-            <KeepAliveTabsContent value="suppliers" activeTab={activeTab} className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="suppliers" activeTab={activeTab} className="mt-6 fade-in">
               <Card className="card-professional">
                 <CardHeader>
                   <CardTitle className="text-title text-gradient">Participação dos Fornecedores</CardTitle>
@@ -1307,8 +1320,18 @@ export default function CotacaoClient() {
             </KeepAliveTabsContent>
 
             {/* Tab: Aprovações */}
-            <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 bounce-in">
-              <BrandApprovalsTab />
+            <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 fade-in">
+              <BrandApprovalsTab quotationId={selectedQuotationId} />
+            </KeepAliveTabsContent>
+
+            {/* Tab: Resultado & Envio */}
+            <KeepAliveTabsContent value="resultado-envio" activeTab={activeTab} className="mt-6 fade-in">
+              <ResultadoEnvioTab
+                quotation={activeQuotationDetails}
+                products={activeQuotationDetails.shoppingListItems}
+                offers={offersForResultTab}
+                suppliers={supplierDataCacheRef.current}
+              />
             </KeepAliveTabsContent>
           </Tabs>
         </section>

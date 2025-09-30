@@ -30,33 +30,50 @@ const navItems = [
 export default function ClientSidebarNavigation() {
   const pathname = usePathname();
 
+  console.log('🧭 [NAVIGATION] Current pathname:', pathname);
+
+  const handleClick = (href: string, label: string) => {
+    console.log('🖱️ [NAVIGATION] Click detected on:', { href, label, currentPath: pathname });
+  };
+
   return (
     <SidebarMenu className="p-2">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive = item.exact 
-          ? pathname === item.href 
+        const isActive = item.exact
+          ? pathname === item.href
           : pathname.startsWith(item.href);
-        
+
+        console.log('📍 [NAVIGATION] Item:', {
+          label: item.label,
+          href: item.href,
+          isActive,
+          pathname
+        });
+
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton
               asChild
               isActive={isActive}
               className="justify-start nav-item-modern h-12 px-3"
-              tooltip={{ 
+              tooltip={{
                 children: (
                   <div className="text-center">
                     <div className="font-semibold">{item.label}</div>
                     <div className="text-xs text-muted-foreground mt-3">{item.description}</div>
                   </div>
-                ), 
-                side: "right", 
-                align: "center" 
+                ),
+                side: "right",
+                align: "center"
               }}
               data-active={isActive}
             >
-              <Link href={item.href} className="flex items-center gap-3 w-full">
+              <Link
+                href={item.href}
+                className="flex items-center gap-3 w-full"
+                onClick={() => handleClick(item.href, item.label)}
+              >
                 <Icon className="h-6 w-6 rotate-hover shrink-0" aria-hidden="true" />
                 <span className="group-data-[collapsible=icon]:hidden font-medium">
                   {item.label}

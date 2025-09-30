@@ -84,5 +84,18 @@ service cloud.firestore {
         allow list: if request.auth != null;
         allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
+
+    // WhatsApp queue - authenticated users can create and read their messages
+    match /whatsapp_queue/{messageId} {
+        allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+        allow list: if request.auth != null && request.auth.uid != null;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // WhatsApp conversations - authenticated users can read and write
+    match /whatsapp_conversations/{conversationId} {
+        allow read, write: if request.auth != null;
+    }
   }
 }

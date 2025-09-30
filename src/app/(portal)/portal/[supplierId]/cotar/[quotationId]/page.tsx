@@ -466,18 +466,12 @@ export default function SellerQuotationPage() {
           variant: "destructive" 
         });
       }
-    setIsSubmittingBrand(false);
+    setIsSubmittingNewBrand(false);
   };
 
-  const handleBrandPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/[^0-9]/g, '');
-    if (rawValue === '') {
-      setNewBrandOffer(prev => ({ ...prev, totalPackagingPrice: '' }));
-      return;
-    }
-    const numericValue = parseInt(rawValue, 10) / 100;
-    setNewBrandOffer(prev => ({ ...prev, totalPackagingPrice: numericValue.toFixed(2) }));
-  };
+  }
+
+
 
 
   // Main listener for the quotation document itself
@@ -529,6 +523,16 @@ export default function SellerQuotationPage() {
         );
         
         const shoppingListSnapshot = await getDocs(shoppingListItemsQuery);
+
+        // Fetch pending brand requests at the same time
+        const pendingRequestsQuery = query(
+          collection(db, PENDING_BRAND_REQUESTS_COLLECTION),
+          where("quotationId", "==", quotationId),
+          where("supplierId", "==", supplierId),
+          where("status", "==", "pending")
+        );
+        const pendingRequestsSnapshot = await getDocs(pendingRequestsQuery);
+        const allPendingRequests = pendingRequestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingBrandRequest));
         
         const fetchedProducts = shoppingListSnapshot.docs.map(docSnap => {
           const itemData = docSnap.data() as ShoppingListItem;
@@ -539,6 +543,9 @@ export default function SellerQuotationPage() {
             const deliveryDay = dayMap[deliveryDate.getDay()];
             isMismatch = !supplierDeliveryDays.includes(deliveryDay);
           }
+
+          // Find pending requests for this specific product
+          const productPendingRequests = allPendingRequests.filter(req => req.productId === docSnap.id);
           
           return {
             ...itemData,
@@ -549,7 +556,7 @@ export default function SellerQuotationPage() {
             isDeliveryDayMismatch: isMismatch,
             counterProposalInfo: null,
             isLockedOut: false,
-            pendingBrandRequests: [] // Inicializar como array vazio
+            pendingBrandRequests: productPendingRequests // Initialize with fetched data
           } as ProductToQuoteVM;
         }).sort((a,b) => a.name.localeCompare(b.name));
         
@@ -2102,14 +2109,18 @@ export default function SellerQuotationPage() {
             
             <div className="grid gap-2">
               <Label htmlFor="total-price">Preço Total da Emb. (R$) *</Label>
-                <Input
-                  id="price"
-                  type="text"
-                  value={newBrandOffer.totalPackagingPrice ? `R$ ${newBrandOffer.totalPackagingPrice.replace('.', ',')}` : ''}
-                  onChange={handleBrandPriceChange}
-                  className="col-span-3"
-                  placeholder="R$ 0,00"
-                />
+              <Input
+                id="total-price"
+                type="text"
+                value={newBrandForm.totalPackagingPrice > 0 ? formatCurrencyInput(newBrandForm.totalPackagingPrice * 100) : ''}
+                onChange={(e) => {
+                  const centavos = parseCurrencyInput(e.target.value);
+                  const decimalValue = centavos / 100;
+                  handleNewBrandFormChange('totalPackagingPrice', decimalValue);
+                }}
+                placeholder="R$ 0,00"
+                className="text-base"
+              />
             </div>
             
             <div className="grid gap-2">

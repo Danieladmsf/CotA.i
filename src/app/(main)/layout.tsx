@@ -1,6 +1,6 @@
 'use client';
 
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarTrigger, SidebarContent, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
@@ -12,23 +12,62 @@ import { CurrentYear } from '@/components/shared/CurrentYear';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Header from '@/components/shared/Header';
 
 
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Initialize notification watcher
   useNotificationWatcher();
 
+  // Add global navigation error handler
+  useEffect(() => {
+    const handleRouteChange = () => {
+      console.log('🚀 [ROUTER] Route change detected:', window.location.pathname);
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      console.error('❌ [WINDOW] Error detected:', event.message, event.error);
+    };
+
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('error', handleError);
+
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  // Page information mapping
+  const pageInfo: Record<string, { title: string; description: string }> = {
+    '/compras': { title: 'Compras', description: 'Gerencie suas solicitações de compra' },
+    '/cotacao': { title: 'Cotações', description: 'Acompanhe suas cotações em andamento' },
+    '/insumos': { title: 'Insumos', description: 'Cadastro e gestão de produtos' },
+    '/fornecedores': { title: 'Fornecedores', description: 'Gerencie sua rede de fornecedores' },
+    '/historico': { title: 'Histórico', description: 'Histórico de cotações e compras' },
+    '/analise-de-precos': { title: 'Análise de Preços', description: 'Análise comparativa de preços' },
+    '/whatsapp-admin': { title: 'WhatsApp Admin', description: 'Administração do WhatsApp Bridge' },
+    '/whatsapp-chat': { title: 'WhatsApp Chat', description: 'Interface de chat do WhatsApp' },
+  };
+
+  const currentInfo = pageInfo[pathname] || { title: 'Dashboard', description: 'Visão geral do sistema' };
+
   const BYPASS_AUTH = false; // Should be false in production
 
+  console.log('🔐 [LAYOUT] Auth state:', { user: !!user, loading, pathname });
+
   useEffect(() => {
+    console.log('🔄 [LAYOUT] useEffect triggered:', { BYPASS_AUTH, loading, user: !!user, pathname });
     if (!BYPASS_AUTH && !loading && !user) {
+      console.log('⚠️ [LAYOUT] Redirecting to login - user not authenticated');
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
   if (!BYPASS_AUTH && (loading || !user)) {
     return (
@@ -78,7 +117,10 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="p-4">
-        {children}
+        <Header title={currentInfo.title} description={currentInfo.description} />
+        <main className="mt-6">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

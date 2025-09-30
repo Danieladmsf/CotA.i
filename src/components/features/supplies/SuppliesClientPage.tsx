@@ -441,22 +441,10 @@ export default function SuppliesClientPage() {
 
   return (
     <div className="space-y-6">
-      <header className="fade-in">
-        <h1 className="text-5xl text-display text-gradient mb-3">
-          Gerenciar Insumos
-        </h1>
-        <p className="text-body-large text-muted-foreground">
-          Adicione, edite e organize seus insumos por categoria com eficiência e inteligência
-        </p>
-      </header>
       
       <Card className="card-professional modern-shadow-xl hover-lift">
         <CardHeader className="p-4 md:p-6 border-b header-modern">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-             <div>
-               <CardTitle className="text-2xl font-bold tracking-tight text-gradient">Central de Insumos</CardTitle>
-               <CardDescription className="text-muted-foreground mt-1">Organize e controle seu estoque de forma inteligente</CardDescription>
-             </div>
              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
                 <Button variant="outline" onClick={() => document.getElementById('import-supplies-input')?.click()} disabled={isLoadingPageData} className="w-full sm:w-auto hover-lift"><Upload className="mr-2 h-4 w-4 rotate-hover" /> Importar</Button>
                 <input type="file" id="import-supplies-input" accept=".csv,.txt" onChange={handleImportSupplies} className="hidden" />

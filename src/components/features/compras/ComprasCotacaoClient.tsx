@@ -510,7 +510,7 @@ export default function ComprasCotacaoClient() {
             <div className="flex items-center gap-2">
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                        <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal text-sm">
                             <CalendarDays className="mr-2 h-4 w-4" />
                             {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yyyy") : <span>Filtrar por Data</span>}
                         </Button>
@@ -521,49 +521,50 @@ export default function ComprasCotacaoClient() {
                 </Popover>
                 {selectedDateForFilter && <Button variant="ghost" size="sm" onClick={() => handleDateChangeForFilter(undefined)}>Limpar Filtro</Button>}
                 
+                <div className="flex items-center gap-2">
+                   <Button variant="outline" size="icon" onClick={() => navigateQuotation('prev')} disabled={filteredQuotationsForSelect.length < 2 || isLoading}>
+                     <ChevronLeft className="h-4 w-4" />
+                     <span className="sr-only">Cotação anterior</span>
+                   </Button>
+                   <Select value={selectedQuotationId} onValueChange={handleSelectQuotationFromDropdown} disabled={isLoading || filteredQuotationsForSelect.length === 0}>
+                      <SelectTrigger className="w-full md:min-w-[350px] text-sm">
+                          <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && <SelectItem value="no-quote" disabled>Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}</SelectItem>}
+                          {filteredQuotationsForSelect.map((quotation, index) => {
+                             const quotationsOnSameDay = filteredQuotationsForSelect.filter(q => 
+                                q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
+                             );
+                             const isMultipleOnSameDay = quotationsOnSameDay.length > 1;
+                             const quotationNumber = isMultipleOnSameDay 
+                               ? quotationsOnSameDay.length - quotationsOnSameDay.findIndex(q => q.id === quotation.id) 
+                               : 0;
+                             
+                             const quotationName = isMultipleOnSameDay
+                               ? `Cotação ${quotationNumber} de ${format(quotation.shoppingListDate.toDate(), "dd/MM/yy")} (Status: ${quotation.status})`
+                               : `Cotação de ${quotation.shoppingListDate ? format(quotation.shoppingListDate.toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
+                               
+                             return (
+                               <SelectItem key={quotation.id} value={quotation.id}>
+                                 {quotationName}
+                               </SelectItem>
+                             )
+                          })}
+                      </SelectContent>
+                   </Select>
+                   <Button variant="outline" size="icon" onClick={() => navigateQuotation('next')} disabled={filteredQuotationsForSelect.length < 2 || isLoading}>
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="sr-only">Próxima cotação</span>
+                  </Button>
+                </div>
+
                 {timeLeft && selectedQuotationId && activeQuotationDetails && (
                   <Badge variant={isDeadlinePassed ? "destructive" : isQuotationPaused ? "outline" : "secondary"} className="text-base px-4 py-2 shadow-sm">
                     <Clock className="mr-2 h-5 w-5" /> {timeLeft}
                   </Badge>
                 )}
             </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-             <Button variant="outline" size="icon" onClick={() => navigateQuotation('prev')} disabled={filteredQuotationsForSelect.length < 2 || isLoading}>
-               <ChevronLeft className="h-4 w-4" />
-               <span className="sr-only">Cotação anterior</span>
-             </Button>
-             <Select value={selectedQuotationId} onValueChange={handleSelectQuotationFromDropdown} disabled={isLoading || filteredQuotationsForSelect.length === 0}>
-                <SelectTrigger className="w-full md:min-w-[350px]">
-                    <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
-                </SelectTrigger>
-                <SelectContent>
-                    {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && <SelectItem value="no-quote" disabled>Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}</SelectItem>}
-                    {filteredQuotationsForSelect.map((quotation, index) => {
-                       const quotationsOnSameDay = filteredQuotationsForSelect.filter(q => 
-                          q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                       );
-                       const isMultipleOnSameDay = quotationsOnSameDay.length > 1;
-                       const quotationNumber = isMultipleOnSameDay 
-                         ? quotationsOnSameDay.length - quotationsOnSameDay.findIndex(q => q.id === quotation.id) 
-                         : 0;
-                       
-                       const quotationName = isMultipleOnSameDay
-                         ? `Cotação ${quotationNumber} de ${format(quotation.shoppingListDate.toDate(), "dd/MM/yy")} (Status: ${quotation.status})`
-                         : `Cotação de ${quotation.shoppingListDate ? format(quotation.shoppingListDate.toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
-                         
-                       return (
-                         <SelectItem key={quotation.id} value={quotation.id}>
-                           {quotationName}
-                         </SelectItem>
-                       )
-                    })}
-                </SelectContent>
-             </Select>
-             <Button variant="outline" size="icon" onClick={() => navigateQuotation('next')} disabled={filteredQuotationsForSelect.length < 2 || isLoading}>
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Próxima cotação</span>
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">

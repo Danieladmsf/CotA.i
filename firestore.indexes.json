@@ -309,6 +309,15 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pending_brand_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "quotationId", "order": "ASCENDING" },
+        { "fieldPath": "supplierId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

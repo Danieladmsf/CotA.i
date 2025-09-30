@@ -65,6 +65,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
   const [activeSelectionTab, setActiveSelectionTab] = useState<string>("all");
   const [searchTermSupplies, setSearchTermSupplies] = useState('');
   const [lastAddedSupplyId, setLastAddedSupplyId] = useState<string | null>(null);
+  const [openCalendarId, setOpenCalendarId] = useState<string | null>(null);
 
   const quantityInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -527,7 +528,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
                     </div>
                     <div className="sm:col-span-1">
                       <label htmlFor={`date-${item.supplyId}`} className="text-xs text-muted-foreground block mb-0.5">Data Entrega</label>
-                       <Popover>
+                      <Popover open={openCalendarId === item.supplyId} onOpenChange={(isOpen) => setOpenCalendarId(isOpen ? item.supplyId : null)}>
                           <PopoverTrigger asChild>
                               <Button variant={'outline'} className="w-full justify-start text-left font-normal" disabled={isLocked}>
                                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -539,7 +540,8 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
                                   mode="single"
                                   selected={item.deliveryDate?.toDate()}
                                   onSelect={(date) => {
-                                      handleUpdateListItem(item.supplyId, 'deliveryDate', date ? Timestamp.fromDate(date) : undefined)
+                                      handleUpdateListItem(item.supplyId, 'deliveryDate', date ? Timestamp.fromDate(date) : undefined);
+                                      setOpenCalendarId(null);
                                   }}
                                   defaultMonth={selectedDate}
                                   initialFocus

@@ -53,8 +53,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const FORNECEDORES_COLLECTION = 'fornecedores';
 
-import Header from '@/components/shared/Header';
-
 export default function FornecedoresPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -549,22 +547,9 @@ export default function FornecedoresPage() {
 
   return (
     <main className="w-full space-y-8" role="main">
-      <Header
-        title="Fornecedores & Serviços"
-        description="Gerencie seus fornecedores e prestadores de serviços com eficiência"
-      />
-
       <section className="card-professional modern-shadow-xl hover-lift" aria-labelledby="fornecedores-section">
         <header className="p-6 md:p-8 border-b header-modern">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex-1">
-              <h2 id="fornecedores-section" className="text-2xl font-heading font-bold text-gradient mb-2">
-                Central de Fornecedores
-              </h2>
-              <p className="text-muted-foreground">
-                Encontre, gerencie e conecte-se com seus parceiros comerciais
-              </p>
-            </div>
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -830,7 +815,7 @@ export default function FornecedoresPage() {
       <Dialog open={!!generatedLinkInfo} onOpenChange={() => setGeneratedLinkInfo(null)}>
         <DialogContent>
           <div className="sm:max-w-md card-professional modern-shadow-xl">
-            <DialogHeader className="bounce-in">
+            <DialogHeader className="fade-in">
               <DialogTitle className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-5 w-5 pulse-glow" />
                 Link de Convite Gerado!

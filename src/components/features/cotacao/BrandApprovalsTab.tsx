@@ -8,14 +8,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion, getDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion, getDoc, addDoc, Timestamp, getDocs } from 'firebase/firestore';
 import { CheckCircle, XCircle, AlertCircle, Package, Calendar, User, DollarSign, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import type { PendingBrandRequest } from '@/types';
 
-export default function BrandApprovalsTab() {
+export default function BrandApprovalsTab({ quotationId }: { quotationId: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [allRequests, setAllRequests] = useState<PendingBrandRequest[]>([]);
@@ -25,14 +25,14 @@ export default function BrandApprovalsTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !quotationId) return;
 
-    console.log('🔍 Querying for all brand requests with userId:', user.uid);
+    console.log('🔍 Querying for brand requests with userId:', user.uid, 'and quotationId:', quotationId);
 
-    // Query for ALL requests (not just pending)
     const allRequestsQuery = query(
       collection(db, 'pending_brand_requests'),
-      where('userId', '==', user.uid)
+      where('userId', '==', user.uid),
+      where('quotationId', '==', quotationId)
     );
 
     const unsubscribe = onSnapshot(
@@ -43,7 +43,6 @@ export default function BrandApprovalsTab() {
           ...doc.data()
         } as PendingBrandRequest));
 
-        // Sort by createdAt descending (newest first)
         requests.sort((a, b) => {
           const aTime = (a.createdAt as any)?.toDate?.() || new Date(0);
           const bTime = (b.createdAt as any)?.toDate?.() || new Date(0);
@@ -52,7 +51,7 @@ export default function BrandApprovalsTab() {
 
         setAllRequests(requests);
         setIsLoading(false);
-        console.log('📋 Loaded all brand requests:', requests);
+        console.log('📋 Loaded brand requests for quotation:', requests);
       },
       (error) => {
         console.error('🔴 [BrandApprovalsTab] Error in pending_brand_requests listener:', error);
@@ -61,7 +60,7 @@ export default function BrandApprovalsTab() {
     );
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, quotationId]);
 
   // Filter requests based on status filter
   const filteredRequests = statusFilter === 'all'
@@ -252,6 +251,33 @@ export default function BrandApprovalsTab() {
           variant: "destructive"
         });
       }
+
+      // Mark the associated notification as read, regardless of outcome
+      try {
+        console.log(`🔔 Attempting to mark notification as read for request ID: ${request.id}`);
+        const notificationsQuery = query(
+          collection(db, 'notifications'),
+          where('entityId', '==', request.id),
+          where('type', '==', 'brand_approval_pending')
+        );
+        const notificationSnapshot = await getDocs(notificationsQuery);
+        if (!notificationSnapshot.empty) {
+          const notificationDoc = notificationSnapshot.docs[0];
+          if (!notificationDoc.data().isRead) {
+            await updateDoc(doc(db, 'notifications', notificationDoc.id), {
+              isRead: true,
+              readAt: new Date()
+            });
+            console.log(`✅ Notification ${notificationDoc.id} marked as read.`);
+          }
+        } else {
+          console.log(`🤷 No matching notification found for request ID: ${request.id}`);
+        }
+      } catch (notificationError) {
+        console.error('⚠️ Error marking notification as read:', notificationError);
+        // Do not re-throw, as the main action (approval/rejection) was successful
+      }
+
     } catch (error: any) {
       console.error('Error processing brand request:', error);
       toast({
@@ -272,7 +298,7 @@ export default function BrandApprovalsTab() {
   const runDiagnostic = async () => {
     console.log('🔍 STARTING COMPREHENSIVE DIAGNOSTIC');
     
-    if (pendingRequests.length === 0) {
+    if (allRequests.length === 0) {
       toast({
         title: "Nenhuma Solicitação Pendente",
         description: "Não há solicitações pendentes para diagnosticar.",
@@ -281,7 +307,7 @@ export default function BrandApprovalsTab() {
       return;
     }
 
-    const request = pendingRequests[0]; // Use first pending request
+    const request = allRequests[0]; // Use first request
     
     console.log('📋 Request being analyzed:', {
       id: request.id,
