@@ -40,7 +40,7 @@ interface SupplierOrder {
 }
 
 interface ResultadoEnvioTabProps {
-  quotation: Pick<Quotation, 'status'>;
+  quotation: Pick<Quotation, 'id' | 'status' | 'deadline'>;
   products: ShoppingListItem[];
   offers: Map<string, Offer[]>; // productId -> offers
   suppliers: Map<string, Fornecedor>; // supplierId -> supplier
