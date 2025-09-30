@@ -25,7 +25,7 @@ interface SupplierOrder {
 }
 
 interface UseQuotationExportProps {
-  quotation: Quotation;
+  quotation: Pick<Quotation, 'id' | 'deadline' | 'status'>;
   supplierOrders: SupplierOrder[];
   selectedSuppliers: Set<string>;
 }

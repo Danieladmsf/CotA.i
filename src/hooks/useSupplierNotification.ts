@@ -26,7 +26,7 @@ interface SupplierOrder {
 }
 
 interface UseSupplierNotificationProps {
-  quotation: Quotation;
+  quotation: Pick<Quotation, 'id' | 'deadline'>;
   supplierOrders: SupplierOrder[];
   suppliers: Map<string, any>; // Map com dados completos dos fornecedores
 }
