@@ -114,7 +114,7 @@ export default function ResultadoEnvioTab({
         productName: product.name,
         quantity: product.quantity,
         unit: product.unit,
-        brand: bestOffer.brand || 'Sem marca',
+        brand: bestOffer.brandOffered || 'Sem marca',
         pricePerUnit: bestOffer.pricePerUnit,
         totalPrice: itemTotal,
       });
