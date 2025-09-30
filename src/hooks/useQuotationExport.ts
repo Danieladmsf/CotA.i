@@ -156,7 +156,7 @@ export function useQuotationExport({
       const deadlineDate = quotation.deadline?.toDate ? quotation.deadline.toDate() : new Date();
       const totalGeral = ordersToExport.reduce((sum, order) => sum + order.totalValue, 0);
 
-      const resumoData = [
+      const resumoData: (string | number)[][] = [
         ['RESUMO DA COTAÇÃO'],
         [''],
         ['ID da Cotação:', quotation.id],
@@ -172,7 +172,7 @@ export function useQuotationExport({
 
       // Planilha por fornecedor
       ordersToExport.forEach((order, index) => {
-        const sheetData = [
+        const sheetData: (string | number)[][] = [
           [`PEDIDO - ${order.supplierName}`],
           [''],
           ['Produto', 'Marca', 'Quantidade', 'Unidade', 'Preço Unitário', 'Total'],
