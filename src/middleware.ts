@@ -8,9 +8,10 @@ export function middleware(request: NextRequest) {
   // Detectar ambiente
   const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
   const isNipIo = hostname.includes('nip.io');
+  const isVercelDomain = hostname.includes('vercel.app');
 
-  // Em desenvolvimento local, permitir tudo
-  if (isLocalhost || isNipIo) {
+  // Em desenvolvimento local e domínios Vercel, permitir tudo
+  if (isLocalhost || isNipIo || isVercelDomain) {
     return NextResponse.next();
   }
 
