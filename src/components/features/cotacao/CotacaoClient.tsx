@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KeepAliveTabsContent } from "@/components/ui/keep-alive-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -58,7 +59,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/config/firebase";
 import { formatCurrency, isValidImageUrl } from "@/lib/utils";
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocs, Timestamp, FieldValue, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocs, Timestamp, FieldValue, updateDoc, collectionGroup } from "firebase/firestore";
 import type { Quotation, Offer, ShoppingListItem, Fornecedor, UnitOfMeasure } from "@/types";
 import { format, startOfDay, endOfDay, intervalToDuration, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -67,6 +68,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
+import Header from '@/components/shared/Header';
 
 // Utility function to handle preferredBrands as both string and array
 const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
@@ -214,6 +216,7 @@ export default function CotacaoClient() {
       setAllFetchedQuotations(fetchedQuotations);
       setIsLoadingAllQuotations(false);
     }, (error) => {
+      console.error('🔴 [CotacaoClient] Error in quotations listener (with double orderBy):', error);
       toast({title: "Erro ao buscar cotações", description: error.message, variant: "destructive"});
       setIsLoadingAllQuotations(false);
     });
@@ -320,56 +323,60 @@ export default function CotacaoClient() {
       listenersToUnsubscribe.length = currentMainListenerIndex !== -1 ? 1 : 0; 
       if (currentMainListenerIndex === -1) listenersToUnsubscribe.push(unsubQuotationDoc);
 
-      for (const item of items) {
-        const offersPath = `quotations/${selectedQuotationId}/products/${item.id}/offers`;
-        const offersQuery = query(collection(db, offersPath));
-        
-        const unsubProductOffers = onSnapshot(offersQuery, async (offersSnapshot) => {
-          const productOffersMap = new Map<string, Offer>();
-          const supplierIdsToFetchDetails = new Set<string>();
+      const offersQuery = query(
+        collectionGroup(db, 'offers'),
+        where('quotationId', '==', selectedQuotationId)
+      );
 
-          offersSnapshot.forEach(offerDoc => {
-            const offerData = offerDoc.data();
-            const offer: Offer = {
-              id: offerDoc.id,
-              supplierId: offerData.supplierId,
-              supplierName: offerData.supplierName,
-              supplierInitials: offerData.supplierInitials,
-              pricePerUnit: offerData.pricePerUnit,
-              brandOffered: offerData.brandOffered,
-              packagingDescription: offerData.packagingDescription,
-              unitsInPackaging: offerData.unitsInPackaging,
-              totalPackagingPrice: offerData.totalPackagingPrice,
-              updatedAt: offerData.updatedAt,
-              productId: offerData.productId,
-            };
-            productOffersMap.set(offerDoc.id, offer); 
+      const unsubOffers = onSnapshot(
+        offersQuery,
+        async (offersSnapshot) => {
+          const allOffers = offersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Offer));
+          const supplierIdsToFetch = new Set<string>();
+
+          allOffers.forEach(offer => {
             if (offer.supplierId && !supplierDataCacheRef.current.has(offer.supplierId)) {
-              supplierIdsToFetchDetails.add(offer.supplierId);
+              supplierIdsToFetch.add(offer.supplierId);
             }
           });
 
-          if (supplierIdsToFetchDetails.size > 0) {
-            const supplierFetchPromises = Array.from(supplierIdsToFetchDetails).map(sid =>
-              getDoc(doc(db, FIREBASE_COLLECTIONS.FORNECEDORES, sid)).then(docSnap => {
-                if (docSnap.exists()) {
-                  supplierDataCacheRef.current.set(sid, { id: sid, ...docSnap.data() } as Fornecedor);
-                }
-              }).catch(err => { /* silently ignore fetch error for individual suppliers */ })
+          if (supplierIdsToFetch.size > 0) {
+            const supplierPromises = Array.from(supplierIdsToFetch).map(id =>
+              getDoc(doc(db, FIREBASE_COLLECTIONS.FORNECEDORES, id))
             );
-            await Promise.all(supplierFetchPromises);
+            const supplierSnaps = await Promise.all(supplierPromises);
+            supplierSnaps.forEach(snap => {
+              if (snap.exists()) {
+                supplierDataCacheRef.current.set(snap.id, { id: snap.id, ...snap.data() } as Fornecedor);
+              }
+            });
+          }
+
+          const offersByProduct = new Map<string, Map<string, Offer>>();
+          for (const offer of allOffers) {
+            if (!offersByProduct.has(offer.productId)) {
+              offersByProduct.set(offer.productId, new Map());
+            }
+            offersByProduct.get(offer.productId)!.set(offer.id!, offer);
           }
 
           setActiveQuotationDetails(prev => {
-            if (!prev || prev.id !== selectedQuotationId) return prev; 
-            const newOffersByProduct = new Map(prev.offersByProduct);
-            newOffersByProduct.set(item.id, productOffersMap);
-            return { ...prev, offersByProduct: newOffersByProduct };
+            if (!prev || prev.id !== selectedQuotationId) return prev;
+            return { ...prev, offersByProduct };
           });
-        });
-        listenersToUnsubscribe.push(unsubProductOffers);
-      }
-      setIsLoadingSelectedQuotationData(false); 
+        },
+        (error) => {
+          console.error('🔴 [CotacaoClient] Error in offers collectionGroup listener:', error);
+          if (error.code === 'failed-precondition') {
+            console.warn('⚠️ Firestore index missing for offers collectionGroup. Please create the index in Firebase Console.');
+            console.warn('Query: collectionGroup("offers").where("quotationId", "==", quotationId)');
+          }
+        }
+      );
+      
+      listenersToUnsubscribe.push(unsubOffers);
+      setIsLoadingSelectedQuotationData(false);
+
     }, (error) => {
       toast({title: "Erro ao carregar dados da cotação", description: error.message, variant: "destructive"})
       setActiveQuotationDetails(null);
@@ -377,8 +384,9 @@ export default function CotacaoClient() {
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       setTimeLeft(""); setIsDeadlinePassed(false);
     });
-    if (!listenersToUnsubscribe.includes(unsubQuotationDoc)) { 
-        listenersToUnsubscribe.push(unsubQuotationDoc);
+
+    if (!listenersToUnsubscribe.includes(unsubQuotationDoc)) {
+      listenersToUnsubscribe.push(unsubQuotationDoc);
     }
     
     return () => {
@@ -671,15 +679,10 @@ export default function CotacaoClient() {
 
   return (
     <main className="w-full space-y-8" role="main">
-      <header className="fade-in">
-        <h1 className="text-5xl font-heading font-bold text-gradient mb-3">
-          <FileBarChart className="inline-block mr-4 h-12 w-12 float" />
-          Central de Cotações
-        </h1>
-        <p className="text-body-large text-muted-foreground">
-          Acompanhe ofertas, compare preços e tome decisões inteligentes de compra
-        </p>
-      </header>
+      <Header
+        title="Central de Cotações"
+        description="Acompanhe ofertas, compare preços e tome decisões inteligentes de compra"
+      />
 
       {/* Seleção de Cotação */}
       <section className="card-professional modern-shadow-xl" aria-labelledby="quotation-selector">
@@ -838,7 +841,7 @@ export default function CotacaoClient() {
             </TabsList>
 
             {/* Tab: Visão Geral */}
-            <TabsContent value="overview" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="overview" activeTab={activeTab} className="mt-6 bounce-in">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <Card className="card-professional hover-lift">
                   <CardContent className="p-6">
@@ -1011,10 +1014,10 @@ export default function CotacaoClient() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            </KeepAliveTabsContent>
 
             {/* Tab: Produtos */}
-            <TabsContent value="products" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="products" activeTab={activeTab} className="mt-6 bounce-in">
               <div className="space-y-6">
                 {/* Controles de Visualização */}
                 <Card className="card-professional">
@@ -1247,10 +1250,10 @@ export default function CotacaoClient() {
                   </div>
                 )}
               </div>
-            </TabsContent>
+            </KeepAliveTabsContent>
 
             {/* Tab: Fornecedores */}
-            <TabsContent value="suppliers" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="suppliers" activeTab={activeTab} className="mt-6 bounce-in">
               <Card className="card-professional">
                 <CardHeader>
                   <CardTitle className="text-title text-gradient">Participação dos Fornecedores</CardTitle>
@@ -1301,12 +1304,12 @@ export default function CotacaoClient() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </KeepAliveTabsContent>
 
             {/* Tab: Aprovações */}
-            <TabsContent value="aprovacoes" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 bounce-in">
               <BrandApprovalsTab />
-            </TabsContent>
+            </KeepAliveTabsContent>
           </Tabs>
         </section>
       ) : selectedQuotationId ? (

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Forçar Erro de Índice - IGUAL DA ÚLTIMA VEZ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .title {
+            font-size: 2em;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .step {
+            background: rgba(255,255,255,0.1);
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #4CAF50;
+        }
+        .button {
+            background: linear-gradient(45deg, #FF5722, #E64A19);
+            border: none;
+            color: white;
+            padding: 20px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 87, 34, 0.3);
+            transition: all 0.3s ease;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 87, 34, 0.4);
+        }
+        .console-info {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            border: 2px solid #4CAF50;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border-left: 5px solid #FFC107;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border-left: 5px solid #4CAF50;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🔥 FORÇAR ERRO DE ÍNDICE</h1>
+        <h2 style="text-align: center; color: #FFC107;">IGUAL DA ÚLTIMA VEZ!</h2>
+        
+        <div class="step">
+            <h3>🎯 Este script vai:</h3>
+            <ul>
+                <li>Fazer uma query que <strong>OBRIGATORIAMENTE</strong> precisa de índice</li>
+                <li>Forçar o erro <code>failed-precondition</code></li>
+                <li>Firestore vai gerar o link automático</li>
+                <li>Você clica no link azul e confirma!</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <button class="button" onclick="forceIndexError()">
+                💥 FORÇAR ERRO DE ÍNDICE AGORA!
+            </button>
+        </div>
+
+        <div class="warning">
+            <h3>📺 INSTRUÇÕES:</h3>
+            <ol>
+                <li>Clique no botão vermelho acima</li>
+                <li><strong>Abra o Console (F12 → Console)</strong></li>
+                <li>Procure pelo <strong>LINK AZUL</strong> que vai aparecer</li>
+                <li>Clique no link azul</li>
+                <li>Faça login e confirme a criação</li>
+            </ol>
+        </div>
+
+        <div class="console-info">
+            <div id="output">Aguardando... Clique no botão acima!</div>
+        </div>
+
+        <div class="success" id="success">
+            <h3>✅ SUCESSO!</h3>
+            <p>Erro forçado com sucesso! Procure o <strong>LINK AZUL</strong> no console do browser!</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getFirestore, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA-yqpXpTm8rZWZWKxgMhLn0afPM_I8BpE",
+            authDomain: "pagina-cota-i.firebaseapp.com",
+            projectId: "pagina-cota-i",
+            storageBucket: "pagina-cota-i.firebasestorage.app",
+            messagingSenderId: "779977306978",
+            appId: "1:779977306978:web:85aa61c962c74cb97dc1a2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.forceIndexError = async function() {
+            const output = document.getElementById('output');
+            const success = document.getElementById('success');
+            
+            output.innerHTML = '🔄 Autenticando anonimamente...';
+            
+            try {
+                // Fazer login anônimo primeiro
+                await signInAnonymously(auth);
+                output.innerHTML = '✅ Autenticado! Executando query que OBRIGATORIAMENTE precisa de índice...';
+                
+                console.log('🔥🔥🔥 FORÇANDO ERRO DE ÍNDICE - IGUAL DA ÚLTIMA VEZ! 🔥🔥🔥');
+                console.log('📍 Esta query VAI DAR ERRO e gerar o link automático:');
+                
+                // Query que OBRIGATORIAMENTE precisa de índice composto
+                const q = query(
+                    collection(db, 'fornecedores'),
+                    where("status", "==", "ativo"),
+                    where("userId", ">=", ""),  // Força índice
+                    where("empresa", ">=", ""), // Força ainda mais
+                    orderBy("userId"),
+                    orderBy("empresa"),
+                    orderBy("status")  // Múltiplos orderBy = OBRIGATÓRIO índice
+                );
+                
+                console.log('⚡ Executando query impossível sem índice...');
+                const snapshot = await getDocs(q);
+                
+                // Se chegou aqui, algo deu errado
+                output.innerHTML = '❌ Query não deveria ter funcionado. Tentando outra...';
+                
+                // Tentar query ainda mais complexa
+                const q2 = query(
+                    collection(db, 'fornecedores'),
+                    where("status", "array-contains", "ativo"), // Operador complexo
+                    where("userId", ">=", ""),
+                    orderBy("userId"),
+                    orderBy("empresa")
+                );
+                
+                await getDocs(q2);
+                output.innerHTML = '⚠️ Queries funcionaram - índice pode já existir ou estar sendo criado.';
+                
+            } catch (error) {
+                console.log('🎯🎯🎯 ERRO CAPTURADO - ISSO É O QUE QUEREMOS! 🎯🎯🎯');
+                console.error('ESTE ERRO VAI GERAR O LINK AUTOMÁTICO ↓');
+                console.error(error);
+                
+                if (error.code === 'failed-precondition' || error.message.includes('index')) {
+                    output.innerHTML = `
+                        🎉 <strong>ERRO DE ÍNDICE FORÇADO COM SUCESSO!</strong><br><br>
+                        📺 <strong>AGORA:</strong><br>
+                        1. Olhe no <strong>CONSOLE DO BROWSER</strong> (F12 → Console)<br>
+                        2. Procure pelo <strong>LINK AZUL</strong> do Firebase<br>
+                        3. Clique no link azul<br>
+                        4. Faça login e confirme!<br><br>
+                        ✅ <strong>IGUAL DA ÚLTIMA VEZ!</strong>
+                    `;
+                    success.style.display = 'block';
+                    
+                    console.log('🎉🎉🎉 SUCESSO! O FIRESTORE GEROU O LINK AUTOMÁTICO! 🎉🎉🎉');
+                    console.log('👆👆👆 PROCURE O LINK AZUL ACIMA E CLIQUE NELE! 👆👆👆');
+                    
+                } else {
+                    output.innerHTML = `❌ Erro diferente: ${error.message}<br>Código: ${error.code}`;
+                    console.log('❌ Erro inesperado:', error);
+                }
+            }
+        };
+    </script>
+</body>
+</html>

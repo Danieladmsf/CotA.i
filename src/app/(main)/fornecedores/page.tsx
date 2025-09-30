@@ -53,6 +53,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const FORNECEDORES_COLLECTION = 'fornecedores';
 
+import Header from '@/components/shared/Header';
+
 export default function FornecedoresPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -547,14 +549,10 @@ export default function FornecedoresPage() {
 
   return (
     <main className="w-full space-y-8" role="main">
-      <header className="fade-in">
-        <h1 className="text-5xl font-heading font-bold text-gradient mb-3">
-          Fornecedores & Serviços
-        </h1>
-        <p className="text-muted-foreground text-xl font-medium">
-          Gerencie seus fornecedores e prestadores de serviços com eficiência
-        </p>
-      </header>
+      <Header
+        title="Fornecedores & Serviços"
+        description="Gerencie seus fornecedores e prestadores de serviços com eficiência"
+      />
 
       <section className="card-professional modern-shadow-xl hover-lift" aria-labelledby="fornecedores-section">
         <header className="p-6 md:p-8 border-b header-modern">
@@ -753,50 +751,47 @@ export default function FornecedoresPage() {
       {isLinkModalOpen && selectedSupplierForLink && (
         <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
           <DialogContent>
-            <div className="card-professional modern-shadow-xl">
-            <DialogHeader className="fade-in">
-              <DialogTitle className="text-gradient">Link de Acesso ao Portal</DialogTitle>
-              <DialogDescription>
-                {/* LÓGICA DO LINK MÁGICO: Este é o link único e secreto para o fornecedor.
-                    Ele contém o ID do documento do fornecedor na URL, garantindo que o portal
-                    só carregue os dados pertencentes a ele. */}
-                Envie este link para o fornecedor {selectedSupplierForLink.empresa} para que ele possa acessar o portal de cotações.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center space-x-2 mt-4 slide-in-up">
-              <Input
-                id="link"
-                value={getSupplierPortalLink(selectedSupplierForLink.id)}
-                readOnly
-                className="input-modern"
-              />
-            </div>
-            <DialogFooter className="slide-in-up mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Button 
-                onClick={() => handleSendLinkViaWhatsApp(selectedSupplierForLink, getSupplierPortalLink(selectedSupplierForLink.id))} 
-                disabled={isSendingLink || !baseUrl || !selectedSupplierForLink.whatsapp}
-                className="w-full button-modern"
-              >
-                {isSendingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4 rotate-hover" />}
-                WhatsApp
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => handleCopyLink(getSupplierPortalLink(selectedSupplierForLink.id))} 
-                disabled={!baseUrl}
-              >
-                <Copy className="mr-2 h-4 w-4 rotate-hover" />
-                Copiar Link
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => handleOpenLinkInNewTab(getSupplierPortalLink(selectedSupplierForLink.id))} 
-                disabled={!baseUrl}
-              >
-                <ExternalLink className="mr-2 h-4 w-4 rotate-hover" />
-                Abrir Link
-              </Button>
-            </DialogFooter>
+            <div className="card-professional modern-shadow-xl p-6 space-y-4">
+              <DialogHeader className="fade-in text-center">
+                <DialogTitle className="text-gradient">Link de Acesso ao Portal</DialogTitle>
+                <DialogDescription>
+                  Envie este link para o fornecedor <span className="font-bold">{selectedSupplierForLink.empresa}</span> para que ele possa acessar o portal de cotações.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center space-x-2 slide-in-up">
+                <Input
+                  id="link"
+                  value={getSupplierPortalLink(selectedSupplierForLink.id)}
+                  readOnly
+                  className="input-modern"
+                />
+              </div>
+              <DialogFooter className="slide-in-up grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Button 
+                  onClick={() => handleSendLinkViaWhatsApp(selectedSupplierForLink, getSupplierPortalLink(selectedSupplierForLink.id))} 
+                  disabled={isSendingLink || !baseUrl || !selectedSupplierForLink.whatsapp}
+                  className="w-full button-modern"
+                >
+                  {isSendingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4 rotate-hover" />}
+                  WhatsApp
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleCopyLink(getSupplierPortalLink(selectedSupplierForLink.id))} 
+                  disabled={!baseUrl}
+                >
+                  <Copy className="mr-2 h-4 w-4 rotate-hover" />
+                  Copiar Link
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleOpenLinkInNewTab(getSupplierPortalLink(selectedSupplierForLink.id))} 
+                  disabled={!baseUrl}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4 rotate-hover" />
+                  Abrir Link
+                </Button>
+              </DialogFooter>
             </div>
           </DialogContent>
         </Dialog>
@@ -865,6 +860,12 @@ export default function FornecedoresPage() {
       </Dialog>
       <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
         <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Visualização Ampliada</DialogTitle>
+            <DialogDescription className="sr-only">
+              Imagem ampliada do logo do fornecedor.
+            </DialogDescription>
+          </DialogHeader>
           <div className="max-w-3xl p-0">
             <img src={viewImage || ''} alt="Visualização Ampliada" className="w-full h-auto rounded-lg" />
           </div>

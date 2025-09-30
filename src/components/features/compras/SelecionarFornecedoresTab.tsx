@@ -10,18 +10,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/config/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-} from 'firebase/firestore';
+import { useOptimizedSuppliers } from '@/hooks/useOptimizedSuppliers';
 import type { Fornecedor } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, Send, Calendar as IconCalendar, UserCheck, AlertTriangle, Timer, Bell } from 'lucide-react';
+import { Loader2, Send, Calendar as IconCalendar, UserCheck, AlertTriangle, Timer, Bell, RefreshCw } from 'lucide-react';
 import { startQuotation } from '@/actions/quotationActions';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,45 +31,39 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [allSuppliers, setAllSuppliers] = useState<Fornecedor[]>([]);
+  // Usar o hook otimizado para carregar fornecedores
+  const { 
+    suppliers: allSuppliers, 
+    isLoading: isLoadingSuppliers, 
+    error: suppliersError,
+    refetch: refetchSuppliers,
+    clearCache: clearSuppliersCache
+  } = useOptimizedSuppliers(user?.uid || null);
+
   const [selectedSuppliers, setSelectedSuppliers] = useState<Record<string, boolean>>({});
-  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
   const [isStartingQuotation, setIsStartingQuotation] = useState(false);
   
-  const [deadlineDate, setDeadlineDate] = useState<Date | undefined>();
-  const [deadlineTime, setDeadlineTime] = useState<string>("17:00");
+  const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(new Date());
+  const [deadlineTime, setDeadlineTime] = useState<string>(() => {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    return now.toTimeString().slice(0, 5);
+  });
   const [counterOfferTime, setCounterOfferTime] = useState('15');
   const [reminderPercentage, setReminderPercentage] = useState('50');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-
+  // Mostrar toast de erro se houver problema ao carregar fornecedores
   useEffect(() => {
-    if (!user) {
-      setIsLoadingSuppliers(false);
-      setAllSuppliers([]);
-      return;
+    if (suppliersError) {
+      toast({
+        title: "Erro ao carregar fornecedores",
+        description: suppliersError,
+        variant: "destructive",
+        duration: 8000
+      });
     }
-    setIsLoadingSuppliers(true);
-    const q = query(
-      collection(db, FORNECEDORES_COLLECTION),
-      where("status", "==", "ativo"),
-      where("userId", "==", user.uid),
-      orderBy("empresa")
-    );
-
-    getDocs(q).then(snapshot => {
-      const fetchedSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Fornecedor));
-      setAllSuppliers(fetchedSuppliers);
-    }).catch(error => {
-      let description = error.message;
-      if (error.code === 'failed-precondition') {
-          description = "A consulta ao banco de dados falhou. Isso geralmente significa que um índice composto é necessário. Verifique o console do desenvolvedor (F12) para obter um link para criar o índice. O erro completo foi logado no console.";
-      }
-      
-      toast({ title: "Erro ao buscar fornecedores", description: description, variant: "destructive", duration: 10000 });
-    }).finally(() => {
-      setIsLoadingSuppliers(false);
-    });
-  }, [toast, user]);
+  }, [suppliersError, toast]);
 
   const handleSupplierSelection = (supplierId: string, checked: boolean) => {
     setSelectedSuppliers(prev => ({ ...prev, [supplierId]: checked }));
@@ -178,26 +165,57 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
           <CardDescription>Marque os fornecedores que participarão da cotação para a lista de <span className="font-semibold">{format(shoppingListDate, "dd/MM/yyyy")}</span>.</CardDescription>
         </CardHeader>
         <CardContent className="max-h-[500px] overflow-y-auto">
+
+          
           {isLoadingSuppliers ? (
             <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : allSuppliers.length === 0 ? (
              <p className="text-muted-foreground text-center p-4">Nenhum fornecedor ativo encontrado. Cadastre um na página &quot;Fornecedores&quot;.</p>
           ) : (
-            <div className="space-y-3">
-              {allSuppliers.map(supplier => (
-                <label key={supplier.id} htmlFor={`supplier-${supplier.id}`} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
-                  <Checkbox 
-                    id={`supplier-${supplier.id}`} 
-                    checked={!!selectedSuppliers[supplier.id]}
-                    onCheckedChange={(checked) => handleSupplierSelection(supplier.id, !!checked)}
-                  />
-                  <Image src={supplier.fotoUrl && (supplier.fotoUrl.startsWith('http') || supplier.fotoUrl.startsWith('data:')) ? supplier.fotoUrl : 'https://placehold.co/40x40.png'} alt={supplier.empresa} width={40} height={40} className="rounded-full object-cover" data-ai-hint={supplier.fotoHint} />
-                  <div className="flex-grow">
-                    <p className="font-semibold">{supplier.empresa}</p>
-                    <p className="text-sm text-muted-foreground">{supplier.vendedor}</p>
-                  </div>
+            <div>
+              <div className="flex items-center space-x-2 pb-4 border-b mb-4">
+                <Checkbox
+                  id="select-all-suppliers"
+                  checked={allSuppliers.length > 0 && selectedSupplierIds.length === allSuppliers.length}
+                  onCheckedChange={(checked) => {
+                    const allIds = allSuppliers.reduce((acc, supplier) => {
+                      acc[supplier.id] = true;
+                      return acc;
+                    }, {} as Record<string, boolean>);
+                    setSelectedSuppliers(checked ? allIds : {});
+                  }}
+                />
+                <label
+                  htmlFor="select-all-suppliers"
+                  className="text-sm font-medium leading-none"
+                >
+                  Selecionar Todos / Desmarcar Todos
                 </label>
-              ))}
+              </div>
+              <div className="space-y-3 mt-4">
+                {allSuppliers.map(supplier => (
+                  <label key={supplier.id} htmlFor={`supplier-${supplier.id}`} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
+                    <Checkbox 
+                      id={`supplier-${supplier.id}`} 
+                      checked={!!selectedSuppliers[supplier.id]}
+                      onCheckedChange={(checked) => handleSupplierSelection(supplier.id, !!checked)}
+                    />
+                    <div className="relative w-10 h-10">
+                      <Image 
+                        src={supplier.fotoUrl && (supplier.fotoUrl.startsWith('http') || supplier.fotoUrl.startsWith('data:')) ? supplier.fotoUrl : 'https://placehold.co/40x40.png'} 
+                        alt={supplier.empresa} 
+                        fill 
+                        className="rounded-full object-cover" 
+                        data-ai-hint={supplier.fotoHint} 
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <p className="font-semibold">{supplier.empresa}</p>
+                      <p className="text-sm text-muted-foreground">{supplier.vendedor}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
@@ -212,7 +230,7 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                     <Label htmlFor="deadline-date">Data Limite</Label>
-                    <Popover>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                           <PopoverTrigger asChild>
                               <Button variant="outline" id="deadline-date" className="w-full justify-start text-left font-normal">
                                   <IconCalendar className="mr-2 h-4 w-4" />
@@ -220,7 +238,16 @@ export default function SelecionarFornecedoresTab({ shoppingListDate, listId, on
                               </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
-                              <Calendar mode="single" selected={deadlineDate} onSelect={setDeadlineDate} initialFocus locale={ptBR} />
+                              <Calendar 
+                                mode="single" 
+                                selected={deadlineDate} 
+                                onSelect={(date) => {
+                                  setDeadlineDate(date);
+                                  setIsCalendarOpen(false);
+                                }} 
+                                initialFocus 
+                                locale={ptBR} 
+                              />
                           </PopoverContent>
                       </Popover>
                 </div>

@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 // Import the new centralized notification actions
 import { sendQuotationInvitation, sendQuotationClosureNotice, sendBuyerQuotationClosureNotice } from './notificationActions';
+import { notifyQuotationStarted, notifyQuotationClosed } from './notificationService';
 
 const QUOTATIONS_COLLECTION = 'quotations';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
@@ -93,6 +94,21 @@ export async function startQuotation(
       } catch (invitationError: any) {
           // Do not throw, just log the error and continue with the next supplier.
       }
+    }
+    
+    // 6. Create notification for quotation start
+    try {
+      const quotationName = `Cotação #${newQuotationRef.id.slice(-6)} de ${format(shoppingListDate, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+      await notifyQuotationStarted({
+        userId: userId,
+        quotationId: newQuotationRef.id,
+        quotationName: quotationName,
+        itemsCount: itemsToInclude.length,
+        suppliersCount: supplierIds.length,
+        deadline: deadline
+      });
+    } catch (notificationError: any) {
+      console.error('❌ Error creating quotation start notification:', notificationError);
     }
     
     return { success: true };
@@ -198,6 +214,30 @@ export async function closeQuotationAndItems(
             }
         } catch (buyerNotificationError: any) {
             // silently ignore
+        }
+
+        // --- Create System Notification ---
+        try {
+            // Count total offers received
+            const quotationDoc = db.collection('quotations').doc(quotationId);
+            const productsSnapshot = await quotationDoc.collection('products').get();
+            let totalOffers = 0;
+            
+            for (const productDoc of productsSnapshot.docs) {
+                const offersSnapshot = await productDoc.ref.collection('offers').get();
+                totalOffers += offersSnapshot.size;
+            }
+            
+            const quotationName = quotationData.name || `Cotação #${quotationId.slice(-6)} de ${format(listDate, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+            await notifyQuotationClosed({
+                userId: quotationData.userId,
+                quotationId: quotationId,
+                quotationName: quotationName,
+                totalOffers: totalOffers,
+                closedItemsCount: updatedItemsCount
+            });
+        } catch (notificationError: any) {
+            console.error('❌ Error creating quotation closure notification:', notificationError);
         }
 
         return { success: true, updatedItemsCount };

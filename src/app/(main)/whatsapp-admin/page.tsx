@@ -9,6 +9,7 @@ import { Loader2, Wifi, WifiOff, QrCode, Clock, AlertTriangle, Send, CloudCog, C
 import { Alert, AlertTitle, AlertDescription as AlertPrimitiveDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
+import Header from '@/components/shared/Header';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { db } from '@/lib/config/firebase';
 import { doc, onSnapshot, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -366,18 +367,11 @@ export default function WhatsAppAdminPage() {
 
   return (
     <div className="flex justify-center items-start pt-10">
+      <Header 
+        title="Conexão com WhatsApp"
+        description="Gerencie a ponte de conexão para envio de notificações em tempo real."
+      />
       <Card className="w-full max-w-2xl card-professional modern-shadow-xl">
-        <CardHeader className="text-center p-8 border-b header-modern">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mb-4 float">
-                <QrCode className="h-8 w-8 text-white" />
-            </div>
-            <CardTitle className="text-3xl font-heading font-bold text-gradient">
-                Conexão com WhatsApp
-            </CardTitle>
-            <CardDescription className="text-lg text-muted-foreground mt-2">
-                Gerencie a ponte de conexão para envio de notificações em tempo real.
-            </CardDescription>
-        </CardHeader>
         <CardContent className="p-6 sm:p-8 space-y-6">
            <div className="flex items-center justify-center">
               <StatusIndicator status={waStatus?.status} lastConnectedAt={waStatus?.readyAt as Timestamp | undefined} />

@@ -18,33 +18,59 @@ import type { PendingBrandRequest } from '@/types';
 export default function BrandApprovalsTab() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [pendingRequests, setPendingRequests] = useState<PendingBrandRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<PendingBrandRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   useEffect(() => {
     if (!user?.uid) return;
 
-    const pendingRequestsQuery = query(
+    console.log('🔍 Querying for all brand requests with userId:', user.uid);
+
+    // Query for ALL requests (not just pending)
+    const allRequestsQuery = query(
       collection(db, 'pending_brand_requests'),
-      where('userId', '==', user.uid),
-      where('status', '==', 'pending')
+      where('userId', '==', user.uid)
     );
 
-    const unsubscribe = onSnapshot(pendingRequestsQuery, (snapshot) => {
-      const requests = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as PendingBrandRequest));
-      
-      setPendingRequests(requests);
-      setIsLoading(false);
-      console.log('📋 Loaded pending requests:', requests);
-    });
+    const unsubscribe = onSnapshot(
+      allRequestsQuery,
+      (snapshot) => {
+        const requests = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as PendingBrandRequest));
+
+        // Sort by createdAt descending (newest first)
+        requests.sort((a, b) => {
+          const aTime = (a.createdAt as any)?.toDate?.() || new Date(0);
+          const bTime = (b.createdAt as any)?.toDate?.() || new Date(0);
+          return bTime.getTime() - aTime.getTime();
+        });
+
+        setAllRequests(requests);
+        setIsLoading(false);
+        console.log('📋 Loaded all brand requests:', requests);
+      },
+      (error) => {
+        console.error('🔴 [BrandApprovalsTab] Error in pending_brand_requests listener:', error);
+        setIsLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [user?.uid]);
+
+  // Filter requests based on status filter
+  const filteredRequests = statusFilter === 'all'
+    ? allRequests
+    : allRequests.filter(req => req.status === statusFilter);
+
+  const pendingCount = allRequests.filter(req => req.status === 'pending').length;
+  const approvedCount = allRequests.filter(req => req.status === 'approved').length;
+  const rejectedCount = allRequests.filter(req => req.status === 'rejected').length;
 
   const toggleCardExpansion = (requestId: string) => {
     setExpandedCards(prev => {
@@ -515,13 +541,13 @@ export default function BrandApprovalsTab() {
     );
   }
 
-  if (pendingRequests.length === 0) {
+  if (allRequests.length === 0) {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Nenhuma aprovação pendente</h3>
+        <h3 className="text-lg font-semibold mb-2">Nenhuma solicitação de marca</h3>
         <p className="text-muted-foreground">
-          Não há solicitações de novas marcas aguardando sua aprovação no momento.
+          Não há solicitações de novas marcas registradas ainda.
         </p>
       </div>
     );
@@ -529,45 +555,85 @@ export default function BrandApprovalsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Aprovações de Marcas</h2>
-          <p className="text-muted-foreground">
-            {pendingRequests.length} solicitação(ões) aguardando sua aprovação
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Histórico de Solicitações de Marcas</h2>
+            <p className="text-muted-foreground">
+              {allRequests.length} solicitação(ões) no total | {pendingCount} aguardando aprovação
+            </p>
+          </div>
         </div>
-        <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
-          {pendingRequests.length} pendente(s)
-        </Badge>
-        
-        {/* Temporary diagnostic buttons - remove after testing */}
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={diagnoseProductMapping}
-            className="bg-purple-50 border-purple-200 text-purple-700"
+
+        {/* Filter tabs */}
+        <div className="flex gap-2 border-b">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              statusFilter === 'all'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            🔍 Diagnosticar IDs
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={fixExistingBrandData}
-            className="bg-blue-50 border-blue-200 text-blue-700"
+            Todas
+            <Badge variant="secondary" className="ml-2">
+              {allRequests.length}
+            </Badge>
+          </button>
+          <button
+            onClick={() => setStatusFilter('pending')}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              statusFilter === 'pending'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            🔧 Corrigir Dados Soya
-          </Button>
+            Pendentes
+            <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-800">
+              {pendingCount}
+            </Badge>
+          </button>
+          <button
+            onClick={() => setStatusFilter('approved')}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              statusFilter === 'approved'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Aprovadas
+            <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+              {approvedCount}
+            </Badge>
+          </button>
+          <button
+            onClick={() => setStatusFilter('rejected')}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              statusFilter === 'rejected'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Rejeitadas
+            <Badge variant="secondary" className="ml-2 bg-red-100 text-red-800">
+              {rejectedCount}
+            </Badge>
+          </button>
         </div>
       </div>
 
       <div className="space-y-4">
-        {pendingRequests.map((request) => {
+        {filteredRequests.map((request) => {
           const isProcessing = processingIds.has(request.id!);
           const isExpanded = expandedCards.has(request.id!);
-          
+          const isPending = request.status === 'pending';
+          const isApproved = request.status === 'approved';
+          const isRejected = request.status === 'rejected';
+
+          const borderColor = isPending ? 'border-l-orange-500' : isApproved ? 'border-l-green-500' : 'border-l-red-500';
+
           return (
-            <Card key={request.id} className="border-l-4 border-l-orange-500 transition-all duration-200">
+            <Card key={request.id} className={`border-l-4 ${borderColor} transition-all duration-200`}>
               {/* Compact Header - Always Visible */}
               <CardHeader 
                 className="cursor-pointer hover:bg-muted/30 transition-colors pb-4"
@@ -606,9 +672,21 @@ export default function BrandApprovalsTab() {
                   </div>
                   
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="border-orange-600 text-orange-700">
-                      Aguardando Aprovação
-                    </Badge>
+                    {isPending && (
+                      <Badge variant="outline" className="border-orange-600 text-orange-700">
+                        Aguardando Aprovação
+                      </Badge>
+                    )}
+                    {isApproved && (
+                      <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50">
+                        ✓ Aprovada
+                      </Badge>
+                    )}
+                    {isRejected && (
+                      <Badge variant="outline" className="border-red-600 text-red-700 bg-red-50">
+                        ✗ Rejeitada
+                      </Badge>
+                    )}
                     {isExpanded ? (
                       <ChevronUp className="h-5 w-5 text-muted-foreground" />
                     ) : (
@@ -652,41 +730,48 @@ export default function BrandApprovalsTab() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApproval(request, false);
-                        }}
-                        disabled={isProcessing}
-                        className="border-red-200 text-red-700 hover:bg-red-50"
-                      >
-                        {isProcessing ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <XCircle className="h-4 w-4 mr-2" />
-                        )}
-                        Rejeitar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApproval(request, true);
-                        }}
-                        disabled={isProcessing}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {isProcessing ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                        )}
-                        Aprovar
-                      </Button>
-                    </div>
+                    {isPending ? (
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproval(request, false);
+                          }}
+                          disabled={isProcessing}
+                          className="border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Rejeitar
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproval(request, true);
+                          }}
+                          disabled={isProcessing}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Aprovar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        {isApproved && `Aprovada em ${format((request.updatedAt as any)?.toDate?.() || new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`}
+                        {isRejected && `Rejeitada em ${format((request.updatedAt as any)?.toDate?.() || new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               )}

@@ -113,7 +113,7 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
       unsubQuotations();
       unsubItems();
     };
-  }, [selectedDate, user, toast]);
+  }, [selectedDate, user]); // Removido toast das dependências
 
   const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
   const handleNextDay = () => onDateChange(addDays(selectedDate, 1));

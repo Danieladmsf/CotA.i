@@ -115,7 +115,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
     } finally {
       setIsLoadingData(false);
     }
-  }, [toast, user]);
+  }, [user]); // Removido toast das dependências
 
   const fetchExistingItemsForDate = useCallback(async (date: Date) => {
       if (!user) {
@@ -205,7 +205,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
       } finally {
         setIsLoadingData(false);
       }
-  }, [toast, user]);
+  }, [user]); // Removido toast das dependências
 
   useEffect(() => {
     if (selectedDate && isValidDate(selectedDate)) {

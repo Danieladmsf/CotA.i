@@ -86,6 +86,7 @@ export interface Quotation {
 
 export interface Offer {
   id?: string; // Firestore document ID
+  quotationId: string; // Added to enable collection group queries
   supplierId: string;
   supplierName: string;
   supplierInitials: string; // Ex: "JG" para Juliana G.
@@ -151,4 +152,36 @@ export interface WhatsAppSessionRequest {
   status: 'requested' | 'processing' | 'active' | 'failed';
   requestedAt: Timestamp | FieldValue;
   processedAt?: Timestamp | FieldValue;
+}
+
+export type NotificationType = 
+  | 'brand_approval_pending'
+  | 'brand_approval_approved' 
+  | 'brand_approval_rejected'
+  | 'quotation_started'
+  | 'quotation_closed'
+  | 'offer_received'
+  | 'offer_outbid'
+  | 'deadline_approaching'
+  | 'system_message';
+
+export interface SystemNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  quotationId?: string;
+  quotationName?: string;
+  productId?: string;
+  productName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  brandName?: string;
+  isRead: boolean;
+  priority: 'low' | 'medium' | 'high';
+  createdAt: Timestamp | FieldValue;
+  readAt?: Timestamp | FieldValue;
+  actionUrl?: string; // URL para navegar quando clicado
+  metadata?: Record<string, any>; // Para dados extras específicos do tipo
 }

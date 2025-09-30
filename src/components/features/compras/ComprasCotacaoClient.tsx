@@ -271,6 +271,7 @@ export default function ComprasCotacaoClient() {
             const offerData = offerDoc.data();
             const offer: Offer = {
               id: offerDoc.id,
+              quotationId: offerData.quotationId || '', // Adicionar campo obrigatório com fallback
               supplierId: offerData.supplierId,
               supplierName: offerData.supplierName,
               supplierInitials: offerData.supplierInitials,

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { db } from "@/lib/config/firebase";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc, updateDoc, arrayUnion, collectionGroup } from "firebase/firestore";
 import type { Quotation, Offer, ShoppingListItem, Fornecedor as SupplierType, UnitOfMeasure, PendingBrandRequest } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -466,9 +466,17 @@ export default function SellerQuotationPage() {
           variant: "destructive" 
         });
       }
-    } finally {
-      setIsSubmittingNewBrand(false);
+    setIsSubmittingBrand(false);
+  };
+
+  const handleBrandPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    if (rawValue === '') {
+      setNewBrandOffer(prev => ({ ...prev, totalPackagingPrice: '' }));
+      return;
     }
+    const numericValue = parseInt(rawValue, 10) / 100;
+    setNewBrandOffer(prev => ({ ...prev, totalPackagingPrice: numericValue.toFixed(2) }));
   };
 
 
@@ -628,8 +636,6 @@ export default function SellerQuotationPage() {
         ...doc.data()
       } as PendingBrandRequest));
 
-      console.log('🔶 Pending brand requests received:', pendingRequests);
-
       // Update products to include pending requests
       setProductsToQuote(prevProducts =>
         prevProducts.map(product => {
@@ -656,8 +662,6 @@ export default function SellerQuotationPage() {
     );
 
     const unsubscribe = onSnapshot(shoppingListItemsQuery, (snapshot) => {
-      console.log('🛒 Shopping list items updated in real-time');
-      
       // Update products with new preferred brands
       setProductsToQuote(prevProducts => {
         const updatedProducts = prevProducts.map(product => {
@@ -685,143 +689,147 @@ export default function SellerQuotationPage() {
   useEffect(() => {
     if (!quotationId || !supplierId || productsToQuote.length === 0 || !currentSupplierDetails || isLoading || !quotation) return ()=>{};
 
+    // Create individual listeners for each product's offers
     const unsubscribers = productsToQuote.map(product => {
-        const offersPath = `quotations/${quotationId}/products/${product.id}/offers`;
-        const offersQuery = query(collection(db, offersPath));
+      const offersPath = `quotations/${quotationId}/products/${product.id}/offers`;
+      const offersQuery = query(collection(db, offersPath));
 
-                return onSnapshot(offersQuery, (offersSnapshot) => {
-                    const processSnapshot = async () => {
-                        const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
-        
-                        const newSupplierIdsToFetch = new Set<string>();
-                        offersData.forEach(offer => {
-                            if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
-                                newSupplierIdsToFetch.add(offer.supplierId);
-                            }
-                        });
-        
-                        if (newSupplierIdsToFetch.size > 0) {
-                            const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
-                                try {
-                                    const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
-                                    if (supplierDoc.exists()) {
-                                        supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
-                                    }
-                                } catch (err) {
-                                    console.error(`Error fetching supplier details for ID ${sid}:`, err);
-                                }
-                            });
-                            await Promise.all(fetchPromises);
-                        }
-                        
-                        const offersGroupedByBrand = new Map<string, Offer[]>();
-                        offersData.forEach(offer => {
-                            if(offer.pricePerUnit > 0) {
-                                if (!offersGroupedByBrand.has(offer.brandOffered)) {
-                                    offersGroupedByBrand.set(offer.brandOffered, []);
-                                }
-                                offersGroupedByBrand.get(offer.brandOffered)!.push(offer);
-                            }
-                        });
-        
-                        const brandDisplays: BestOfferForBrandDisplay[] = [];
-                        offersGroupedByBrand.forEach((offers, brandName) => {
-                            if (offers.length === 0) return;
-                            const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
-                            const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
-                            if (supplierDetails) {
-                                brandDisplays.push({
-                                  brandName,
-                                  pricePerUnit: bestOffer.pricePerUnit,
-                                  supplierId: bestOffer.supplierId,
-                                  supplierName: supplierDetails.empresa,
-                                  supplierInitials: supplierDetails.empresa.substring(0, 2).toUpperCase(),
-                                  supplierFotoUrl: supplierDetails.fotoUrl,
-                                  supplierFotoHint: supplierDetails.fotoHint,
-                                  vendedor: supplierDetails.vendedor,
-                                  cnpj: supplierDetails.cnpj,
-                                  packagingDescription: bestOffer.packagingDescription,
-                                  unitsInPackaging: bestOffer.unitsInPackaging,
-                                  totalPackagingPrice: bestOffer.totalPackagingPrice,
-                                  isSelf: bestOffer.supplierId === supplierId,
-                                  productUnit: product.unit,
-                                });
-                            }
-                        });
-                        brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
-        
-                        const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
-                        const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
-                        
-                        let counterProposalInfo: ProductToQuoteVM['counterProposalInfo'] = null;
-                        let isLockedOut = false;
-                        const myOffersWithPrice = myOffers.filter(o => o.pricePerUnit > 0);
-        
-                        if (myOffersWithPrice.length > 0) {
-                            const myBestOffer = myOffersWithPrice.reduce((prev, curr) => (prev.pricePerUnit < curr.pricePerUnit ? prev : curr));
-                            const myBestPrice = myBestOffer.pricePerUnit;
-        
-                            if(lowestPriceOverall && myBestPrice > lowestPriceOverall) {
-                                const outbidOffer = offersData
-                                    .filter(o => o.supplierId !== supplierId && o.pricePerUnit === lowestPriceOverall && o.updatedAt instanceof Timestamp)
-                                    .sort((a, b) => (b.updatedAt as Timestamp).toMillis() - (a.updatedAt as Timestamp).toMillis())[0];
-                                
-                                const counterProposalMins = quotation.counterProposalTimeInMinutes ?? 15;
-                                
-                                if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
-                                    const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
-        
-                                    if (new Date() < deadline) {
-                                        counterProposalInfo = { 
-                                            deadline, 
-                                            winningBrand: outbidOffer.brandOffered,
-                                            myBrand: myBestOffer.brandOffered,
-                                        };
-                                    } else {
-                                        isLockedOut = true;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        setProductsToQuote(currentProducts => {
-                            const updatedProducts = currentProducts.map(p => {
-                                if (p.id === product.id) {
-                                  // Get local offers that are not yet saved to Firestore
-                                  const localUnsavedOffers = p.supplierOffers.filter(o => !o.id);
+      return onSnapshot(offersQuery, async (offersSnapshot) => {
+        const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
 
-                                  // From the unsaved local offers, filter out any that now exist in Firestore.
-                                  // This prevents duplicates when a local offer is saved and then appears in the `myOffers` list from Firestore.
-                                  const trulyLocalOffers = localUnsavedOffers.filter(localOffer => {
-                                      const hasMatchInFirestore = myOffers.some(firestoreOffer =>
-                                          firestoreOffer.brandOffered === localOffer.brandOffered &&
-                                          firestoreOffer.supplierId === localOffer.supplierId &&
-                                          Number(firestoreOffer.totalPackagingPrice) === Number(localOffer.totalPackagingPrice) &&
-                                          Number(firestoreOffer.unitsInPackaging) === Number(localOffer.unitsInPackaging) &&
-                                          firestoreOffer.packagingDescription === localOffer.packagingDescription
-                                      );
-                                      // Keep the local offer only if it does NOT have a match in Firestore
-                                      return !hasMatchInFirestore;
-                                  });
+        // Fetch new supplier details
+        const newSupplierIdsToFetch = new Set<string>();
+        offersData.forEach(offer => {
+          if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
+            newSupplierIdsToFetch.add(offer.supplierId);
+          }
+        });
 
-                                  // The new list of offers is the one from Firestore plus any truly local ones that haven't been saved.
-                                  const updatedOffers = [...myOffers, ...trulyLocalOffers].sort((a, b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
+        if (newSupplierIdsToFetch.size > 0) {
+          const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
+            try {
+              const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
+              if (supplierDoc.exists()) {
+                supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
+              }
+            } catch (err) {
+              console.error(`Error fetching supplier details for ID ${sid}:`, err);
+            }
+          });
+          await Promise.all(fetchPromises);
+        }
 
+        const offersGroupedByBrand = new Map<string, Offer[]>();
+        offersData.forEach(offer => {
+          if(offer.pricePerUnit > 0) {
+            if (!offersGroupedByBrand.has(offer.brandOffered)) {
+              offersGroupedByBrand.set(offer.brandOffered, []);
+            }
+            offersGroupedByBrand.get(offer.brandOffered)!.push(offer);
+          }
+        });
 
+        const brandDisplays: BestOfferForBrandDisplay[] = [];
+        offersGroupedByBrand.forEach((offers, brandName) => {
+          if (offers.length === 0) return;
+          const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
+          const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
+          if (supplierDetails) {
+            brandDisplays.push({
+              brandName,
+              pricePerUnit: bestOffer.pricePerUnit,
+              supplierId: bestOffer.supplierId,
+              supplierName: supplierDetails.empresa,
+              supplierInitials: supplierDetails.empresa.substring(0, 2).toUpperCase(),
+              supplierFotoUrl: supplierDetails.fotoUrl,
+              supplierFotoHint: supplierDetails.fotoHint,
+              vendedor: supplierDetails.vendedor,
+              cnpj: supplierDetails.cnpj,
+              packagingDescription: bestOffer.packagingDescription,
+              unitsInPackaging: bestOffer.unitsInPackaging,
+              totalPackagingPrice: bestOffer.totalPackagingPrice,
+              isSelf: bestOffer.supplierId === supplierId,
+              productUnit: product.unit,
+            });
+          }
+        });
+        brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
 
-                                  return { ...p, supplierOffers: updatedOffers, bestOffersByBrand: brandDisplays, lowestPriceThisProductHas: lowestPriceOverall, counterProposalInfo, isLockedOut };
-                                }
-                                return p;
-                            });
-                            return updatedProducts;
-                        });
-                    };
-        
-                    processSnapshot();
-                });    });
+        const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
+        const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
+
+        let counterProposalInfo: ProductToQuoteVM['counterProposalInfo'] = null;
+        let isLockedOut = false;
+        const myOffersWithPrice = myOffers.filter(o => o.pricePerUnit > 0);
+
+        if (myOffersWithPrice.length > 0) {
+          const myBestOffer = myOffersWithPrice.reduce((prev, curr) => (prev.pricePerUnit < curr.pricePerUnit ? prev : curr));
+          const myBestPrice = myBestOffer.pricePerUnit;
+
+          if(lowestPriceOverall && myBestPrice > lowestPriceOverall) {
+            const outbidOffer = offersData
+              .filter(o => o.supplierId !== supplierId && o.pricePerUnit === lowestPriceOverall && o.updatedAt instanceof Timestamp)
+              .sort((a, b) => (b.updatedAt as Timestamp).toMillis() - (a.updatedAt as Timestamp).toMillis())[0];
+
+            const counterProposalMins = quotation.counterProposalTimeInMinutes ?? 15;
+
+            if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
+              const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
+
+              if (new Date() < deadline) {
+                counterProposalInfo = {
+                  deadline,
+                  winningBrand: outbidOffer.brandOffered,
+                  myBrand: myBestOffer.brandOffered,
+                };
+              } else {
+                isLockedOut = true;
+              }
+            }
+          }
+        }
+
+        // Update the specific product
+        setProductsToQuote(currentProducts => {
+          return currentProducts.map(p => {
+            if (p.id === product.id) {
+              // Get local offers that are not yet saved to Firestore
+              const localUnsavedOffers = p.supplierOffers.filter(o => !o.id);
+
+              // From the unsaved local offers, filter out any that now exist in Firestore
+              const trulyLocalOffers = localUnsavedOffers.filter(localOffer => {
+                const hasMatchInFirestore = myOffers.some(firestoreOffer =>
+                  firestoreOffer.brandOffered === localOffer.brandOffered &&
+                  firestoreOffer.supplierId === localOffer.supplierId &&
+                  Number(firestoreOffer.totalPackagingPrice) === Number(localOffer.totalPackagingPrice) &&
+                  Number(firestoreOffer.unitsInPackaging) === Number(localOffer.unitsInPackaging) &&
+                  firestoreOffer.packagingDescription === localOffer.packagingDescription
+                );
+                return !hasMatchInFirestore;
+              });
+
+              // The new list of offers is the one from Firestore plus any truly local ones that haven't been saved
+              const updatedOffers = [...myOffers, ...trulyLocalOffers].sort((a, b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
+
+              return {
+                ...p,
+                supplierOffers: updatedOffers,
+                bestOffersByBrand: brandDisplays,
+                lowestPriceThisProductHas: lowestPriceOverall,
+                counterProposalInfo,
+                isLockedOut
+              };
+            }
+            return p;
+          });
+        });
+      }, (error) => {
+        console.error(`🔴 [Portal] Error in offers listener for product ${product.id}:`, error);
+      });
+    });
 
     return () => {
-        unsubscribers.forEach(unsub => unsub());
+      unsubscribers.forEach(unsub => unsub());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotationId, supplierId, currentSupplierDetails, toast, isLoading, quotation]);
@@ -1040,6 +1048,7 @@ export default function SellerQuotationPage() {
             );
             const newOffer: OfferWithUI = {
                 uiId: newOfferUiId,
+                quotationId: quotationId, // Adicionar campo obrigatório
                 supplierId: supplierId,
                 supplierName: currentSupplierDetails.empresa || "N/A",
                 supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase() || "XX",
@@ -1414,6 +1423,7 @@ export default function SellerQuotationPage() {
     }
 
     const offerPayload: Omit<Offer, 'id'> = { 
+      quotationId: quotationId, // Adicionar campo obrigatório
       supplierId: currentSupplierDetails.id, 
       supplierName: currentSupplierDetails.empresa, 
       supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase(), 
@@ -1451,6 +1461,12 @@ export default function SellerQuotationPage() {
         if (!existingOfferSnap.empty) {
           console.log(`[OFFER-DEBUG] Duplicate offer detected, skipping Firestore creation`);
           toast({title: "Oferta Duplicada", description: "Esta oferta já existe.", variant: "destructive"});
+          setIsSaving(prev => ({ ...prev, [savingKey]: false }));
+          setSavingOffers(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(savingKey);
+            return newSet;
+          });
           return;
         }
 
@@ -1738,13 +1754,10 @@ export default function SellerQuotationPage() {
                                 {/* Render pending brand requests with orange cards */}
                                 {(() => {
                                   const hasPendingRequests = product.pendingBrandRequests && product.pendingBrandRequests.length > 0;
-                                  console.log(`🔶 Product ${product.name} - hasPendingRequests:`, hasPendingRequests, product.pendingBrandRequests);
                                   return hasPendingRequests;
                                 })() && (
                                   <div className="flex flex-row flex-wrap gap-2 p-1">
-                                      {product.pendingBrandRequests?.map(request => {
-                                        console.log('🔶 Rendering pending request card:', request);
-                                        return (
+                                      {product.pendingBrandRequests?.map(request => (
                                           <div key={request.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50/50 border-l-4 border-orange-500 min-w-[200px] flex-grow">
                                               <div className="flex items-center gap-3">
                                                   <TooltipProvider>
@@ -1784,8 +1797,7 @@ export default function SellerQuotationPage() {
                                                   </div>
                                               </div>
                                           </div>
-                                        );
-                                      })}
+                                      ))}
                                   </div>
                                 )}
                                 <div className="sm:ml-auto">
@@ -2090,15 +2102,14 @@ export default function SellerQuotationPage() {
             
             <div className="grid gap-2">
               <Label htmlFor="total-price">Preço Total da Emb. (R$) *</Label>
-              <Input
-                id="total-price"
-                type="number"
-                step="0.01"
-                value={newBrandForm.totalPackagingPrice || ''}
-                onChange={(e) => handleNewBrandFormChange('totalPackagingPrice', parseFloat(e.target.value) || 0)}
-                placeholder="Ex: 90.00"
-                className="text-base"
-              />
+                <Input
+                  id="price"
+                  type="text"
+                  value={newBrandOffer.totalPackagingPrice ? `R$ ${newBrandOffer.totalPackagingPrice.replace('.', ',')}` : ''}
+                  onChange={handleBrandPriceChange}
+                  className="col-span-3"
+                  placeholder="R$ 0,00"
+                />
             </div>
             
             <div className="grid gap-2">

@@ -1,7 +1,20 @@
 import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getFirestore, Firestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 import { getAuth, Auth } from "firebase/auth";
+
+// Suppress Firestore transport error warnings in console
+if (typeof window !== 'undefined') {
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    const message = args[0]?.toString() || '';
+    // Suppress specific Firestore warnings that are non-critical
+    if (message.includes('WebChannelConnection RPC') && message.includes('transport errored')) {
+      return; // Silent suppress
+    }
+    originalWarn.apply(console, args);
+  };
+}
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -29,12 +42,11 @@ if (isFirebaseInitialized) {
   db = getFirestore(app);
   storage = getStorage(app);
 } else {
+  console.error('❌ Firebase: Configuração incompleta - verificar variáveis de ambiente');
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;
   storage = {} as FirebaseStorage;
 }
-
-
 
 export { db, storage, auth, app, isFirebaseInitialized };

@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Criar Índices Automaticamente</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        .button { display: block; padding: 15px; margin: 10px 0; background: #4285f4; color: white; text-decoration: none; border-radius: 5px; text-align: center; }
+        .button:hover { background: #3367d6; }
+        .instructions { background: #e8f4fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Criar Todos os Índices Automaticamente</h1>
+        <div class="instructions">
+            <strong>INSTRUÇÕES:</strong><br>
+            1. Clique em cada link abaixo (abre em nova aba)<br>
+            2. Faça login no Firebase se necessário<br>
+            3. Clique em "Criar" em cada aba<br>
+            4. Aguarde 5-15 minutos para construção
+        </div>
+        
+        <a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=shopping_list_items,quotationId:asc" target="_blank" class="button">
+            1. shopping_list_items: quotationId
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=supply_categories,name_lowercase:asc" target="_blank" class="button">
+            2. supply_categories: name_lowercase
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=notifications,userId:asc,isRead:asc" target="_blank" class="button">
+            3. notifications: userId + isRead
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=notifications,userId:asc,quotationId:asc,createdAt:desc" target="_blank" class="button">
+            4. notifications: userId + quotationId + createdAt
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=notifications,userId:asc,type:asc,createdAt:desc" target="_blank" class="button">
+            5. notifications: userId + type + createdAt
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=notifications,userId:asc,isRead:asc,createdAt:desc" target="_blank" class="button">
+            6. notifications: userId + isRead + createdAt
+          </a><a href="https://console.firebase.google.com/project/cotao-online/firestore/indexes?create_composite=pending_brand_requests,userId:asc,status:asc" target="_blank" class="button">
+            7. pending_brand_requests: userId + status
+          </a>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #e8f5e8; border-radius: 5px;">
+            <strong>✅ RESULTADO ESPERADO:</strong><br>
+            - 7 novas abas abertas<br>
+            - 7 índices criados<br>
+            - Sistema 100% otimizado em ~15 minutos
+        </div>
+    </div>
+</body>
+</html>

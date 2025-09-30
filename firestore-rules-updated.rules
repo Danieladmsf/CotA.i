@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow logged-in users to read and write their own documents in most collections
+    match /{collection}/{docId} {
+      allow read, write: if collection in ['supplies', 'supply_categories', 'fornecedores', 'quotations', 'shopping_list_items', 'incoming_messages', 'user_sessions', 'whatsapp_config'] && isOwner(resource.data.userId);
+    }
+    
+    // Allow any authenticated user to create documents in these collections,
+    // as long as they set themselves as the owner.
+    match /{collection}/{docId} {
+      allow create: if collection in ['supplies', 'supply_categories', 'fornecedores', 'quotations', 'shopping_list_items', 'incoming_messages', 'user_sessions', 'whatsapp_config', 'pending_brand_requests'] && isOwner(request.resource.data.userId);
+    }
+
+    // Specific rules for notifications collection
+    match /notifications/{notificationId} {
+      // Allow users to read and update only their own notifications
+      allow read, update: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Allow creating notifications for authenticated users (can be done by server-side functions)
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Allow server-side functions to create notifications (admin SDK bypasses these rules anyway)
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Public access rules for supplier portal and registration
+    match /fornecedores/{supplierId} {
+      allow get: if true; // Allow anyone to read a supplier's public data for the portal
+      allow update: if request.resource.data.status == 'ativo'; // Allow a supplier to complete their own registration
+    }
+    
+    // Allow suppliers to submit offers to a specific quotation's product subcollection
+    match /quotations/{quotationId}/products/{productId}/offers/{offerId} {
+        allow create: if true; // Allow any user (including anonymous portal users) to create an offer
+        allow read, update, delete: if isOwner(get(/databases/$(database)/documents/quotations/$(quotationId)).data.userId);
+    }
+
+    match /pending_brand_requests/{requestId} {
+        allow create: if true;
+        allow read: if request.auth != null;
+        allow update, delete: if isOwner(resource.data.userId);
+    }
+  }
+}

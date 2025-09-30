@@ -5,16 +5,22 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarTrigger, SidebarContent, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import ClientSidebarNavigation from '@/components/shared/ClientSidebarNavigation';
-import NotificationBell from '@/components/shared/NotificationBell';
+import NotificationSystem from '@/components/shared/NotificationSystem';
+import { useNotificationWatcher } from '@/hooks/useNotificationWatcher';
 import { Zap, Loader2, LogOut } from 'lucide-react';
 import { CurrentYear } from '@/components/shared/CurrentYear';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+
+
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+
+  // Initialize notification watcher
+  useNotificationWatcher();
 
   const BYPASS_AUTH = false; // Should be false in production
 
@@ -46,8 +52,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell />
-            <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
+            <SidebarTrigger />
           </div>
         </SidebarHeader>
         <SidebarContent>

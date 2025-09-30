@@ -1,0 +1,126 @@
+🚨 DIAGNÓSTICO REVELOU PROBLEMA DIFERENTE!
+
+📊 RESULTADO INESPERADO:
+✅ 2 inputs de quantidade encontrados
+✅ Input 1: Valor "100" - Válido ✅
+✅ Input 2: Valor "100" - Válido ✅  
+✅ 2 de 2 inputs têm quantidade válida
+❌ MAS BOTÃO AINDA DESABILITADO!
+
+🔍 NOVA INVESTIGAÇÃO NECESSÁRIA:
+
+O problema NÃO é pendingItemsToSaveCount como pensávamos.
+As outras condições que podem desabilitar o botão são:
+- isSaving = true (sistema travado salvando)
+- isLoadingData = true (ainda carregando dados)
+
+🔧 SCRIPT DE DEBUG FINAL:
+
+Execute este no console para descobrir a causa real:
+
+```javascript
+// 🔍 INVESTIGAÇÃO COMPLETA DO BOTÃO
+console.clear();
+console.log('🔧 INVESTIGAÇÃO FINAL - TODAS AS CONDIÇÕES');
+
+// 1. Encontrar o botão e inspecionar
+const saveButton = Array.from(document.querySelectorAll('button')).find(btn => 
+  btn.textContent.includes('Salvar e Avançar')
+);
+
+if (saveButton) {
+  console.log('✅ Botão encontrado:', saveButton.textContent);
+  console.log('❌ Desabilitado?', saveButton.disabled);
+  
+  // 2. Verificar ícones de loading
+  const loadingIcon = saveButton.querySelector('[class*="animate-spin"]');
+  if (loadingIcon) {
+    console.log('⏳ PROBLEMA: Botão mostra ícone de loading - sistema travado salvando');
+    console.log('🔧 SOLUÇÃO: Recarregar página');
+  } else {
+    console.log('✅ Sem ícone de loading no botão');
+  }
+  
+  // 3. Verificar texto do botão
+  if (saveButton.textContent.includes('Salvando') || saveButton.textContent.includes('Carregando')) {
+    console.log('⏳ PROBLEMA: Botão indica que está salvando/carregando');
+  }
+  
+  // 4. Verificar se há loaders na página
+  const pageLoaders = document.querySelectorAll('[class*="animate-spin"]');
+  console.log('🔄 Loaders na página:', pageLoaders.length);
+  
+  if (pageLoaders.length > 0) {
+    console.log('⏳ PROBLEMA: Sistema ainda carregando dados');
+    console.log('🔧 SOLUÇÃO: Aguardar carregamento ou criar índices faltantes');
+  }
+  
+  // 5. Verificar se usuário está logado
+  const userInfo = document.querySelector('[data-user], [class*="user"], [class*="avatar"]');
+  if (!userInfo) {
+    console.log('❌ POSSÍVEL PROBLEMA: Usuário pode não estar logado');
+  }
+  
+  // 6. Verificar erros no console
+  console.log('');
+  console.log('🐛 VERIFICAR ERROS ACIMA (texto vermelho)');
+  console.log('   Se houver erros de "failed-precondition" → Criar índices');
+  console.log('   Se houver erros de rede → Problema de conexão');
+  console.log('   Se houver erros de permissão → Problema de autenticação');
+  
+  // 7. Tentar forçar habilitação (teste)
+  console.log('');
+  console.log('🧪 TESTE: Tentando forçar habilitação do botão...');
+  const originalDisabled = saveButton.disabled;
+  saveButton.disabled = false;
+  
+  setTimeout(() => {
+    if (saveButton.disabled === false) {
+      console.log('✅ Botão pode ser habilitado - problema é no código React');
+      console.log('🔧 Clique no botão AGORA para testar se funciona');
+    }
+    
+    // Restaurar estado original após 10 segundos
+    setTimeout(() => {
+      saveButton.disabled = originalDisabled;
+      console.log('🔄 Estado original restaurado');
+    }, 10000);
+  }, 1000);
+  
+} else {
+  console.log('❌ Botão não encontrado');
+}
+
+// 8. Verificar se há mensagens de erro/toast
+const toasts = document.querySelectorAll('[role="alert"], [class*="toast"], [class*="alert"]');
+if (toasts.length > 0) {
+  console.log('📢 Mensagens de erro/toast encontradas:', toasts.length);
+  toasts.forEach((toast, i) => {
+    console.log(`   Toast ${i + 1}: "${toast.textContent}"`);
+  });
+}
+
+console.log('');
+console.log('🎯 RESUMO DE POSSÍVEIS CAUSAS:');
+console.log('1. Sistema travado salvando (isSaving = true)');
+console.log('2. Sistema ainda carregando (isLoadingData = true)');  
+console.log('3. Erro de autenticação/permissão');
+console.log('4. Índices do Firebase faltando');
+console.log('5. Bug no código React');
+```
+
+🎯 AÇÕES BASEADAS NO RESULTADO:
+
+SE aparecer "loading" ou "animate-spin":
+✅ Sistema travado → Recarregar página
+
+SE aparecer erros vermelhos no console:
+✅ Criar índices faltantes → Use create-indexes-final.html
+
+SE botão funcionar quando forçado:
+✅ Bug no React → Pode usar botão temporariamente
+
+SE nada do acima:
+✅ Problema mais complexo → Preciso mais detalhes
+
+Execute o script e me informe todos os resultados!
