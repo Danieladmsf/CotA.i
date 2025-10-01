@@ -7,13 +7,13 @@ export const voiceMessages = {
   // Mensagens de boas-vindas
   welcome: {
     quotationPage: (supplierName: string, deliveryDate: string, itemCount: number) =>
-      `${supplierName}, na cotação de ${deliveryDate} temos ${itemCount} ${itemCount === 1 ? 'item' : 'itens'}. Por qual quer começar? Clique na seta do item do seu lado direito para expandir o formulário e fazer sua proposta!`,
+      `${supplierName}, nesta cotação temos ${itemCount} ${itemCount === 1 ? 'item' : 'itens'} com entrega para ${deliveryDate}. Por qual quer começar? Clique na seta do item do seu lado direito para expandir o formulário e fazer sua proposta!`,
 
     supplierPortal: (supplierName: string, openQuotations: number) =>
       `Bem-vindo ao seu portal, ${supplierName}! ${openQuotations > 0 ? `Você tem ${openQuotations} ${openQuotations === 1 ? 'cotação aberta' : 'cotações abertas'}.` : 'No momento não há cotações abertas.'}`,
 
-    portalWithTodayQuotation: (supplierName: string) =>
-      `Olá ${supplierName}, existe uma cotação aberta para entrega hoje!`,
+    portalWithTodayQuotation: (supplierName: string, dateStr: string) =>
+      `Olá ${supplierName}! Você tem cotações abertas com entrega prevista para ${dateStr}.`,
   },
 
   // Mensagens de navegação entre abas
@@ -62,6 +62,16 @@ export const voiceMessages = {
 
     itemExpanded: (productName: string, hasDeliveryMismatch: boolean) =>
       `Ok, ${productName}! Vamos lá! ${hasDeliveryMismatch ? 'Atenção: o comprador determinou um dia de entrega que não faz parte da sua grade de entrega. Verifique se consegue entregar na data solicitada. ' : ''}Escolha uma marca inicial em Marcas Sugeridas ou clique em Outra Marca para enviar ao comprador aprovar. Como quer começar?`,
+
+    itemExpandedWithOffer: (productName: string, hasMultipleOffers: boolean, isWinning: boolean, competitorPrice?: string) => {
+      if (isWinning) {
+        return `Ótimo! Você já enviou oferta para ${productName} e está com o melhor preço! ${hasMultipleOffers ? 'Você pode adicionar outra marca clicando em uma das marcas sugeridas ou em Outra Marca.' : ''} Se desejar, pode iniciar uma nova oferta em outro item. Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
+      } else if (competitorPrice) {
+        return `Atenção! Você já enviou oferta para ${productName}, mas outro fornecedor está oferecendo por ${competitorPrice}, um preço menor que o seu. ${hasMultipleOffers ? 'Você pode adicionar outra marca ou' : 'Você pode'} editar sua oferta clicando no botão Editar, ou usar os botões de Cobrir Oferta para superar automaticamente em 1%, 2%, 3%, 4% ou 5%.`;
+      } else {
+        return `Você já enviou oferta para ${productName}. ${hasMultipleOffers ? 'Quer adicionar outra marca? Clique em uma das marcas sugeridas ou em Outra Marca.' : 'Pode iniciar uma nova oferta em outro item.'} Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
+      }
+    },
 
     brandSelected: (brandName: string, unit: string) =>
       `Ok, ${brandName}! Agora você precisa preencher apenas 4 informações. A primeira, Sua Marca Ofertada, já foi preenchida com ${brandName}. A próxima etapa é colocar como o seu item vem embalado: 1 caixa, 1 palete com 10 caixas e 13 garrafas, ou 1 fardo com 5 pacotes de 2 ${unit}?`,

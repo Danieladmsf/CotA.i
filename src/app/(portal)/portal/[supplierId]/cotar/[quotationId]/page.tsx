@@ -973,8 +973,33 @@ export default function SellerQuotationPage() {
     if (!wasExpanded) {
       const product = productsToQuote.find(p => p.id === productId);
       if (product) {
-        const hasDeliveryMismatch = Boolean(product.hasSpecificDate && product.isDeliveryDayMismatch);
-        speak(voiceMessages.actions.itemExpanded(product.name, hasDeliveryMismatch));
+        // Verifica se já tem ofertas salvas do fornecedor atual
+        const myOffers = product.supplierOffers.filter(o => o.id && o.supplierId === supplierId);
+
+        if (myOffers.length > 0) {
+          // Já tem oferta(s) enviada(s)
+          const hasMultipleOffers = myOffers.length > 1;
+
+          // Verifica se está ganhando ou perdendo
+          const myBestPrice = Math.min(...myOffers.map(o => o.pricePerUnit));
+          const competitorBestOffer = product.bestOffersByBrand.find(b => !b.isSelf);
+
+          const isWinning = !competitorBestOffer || myBestPrice < competitorBestOffer.pricePerUnit;
+          const competitorPriceStr = competitorBestOffer
+            ? formatCurrency(competitorBestOffer.pricePerUnit)
+            : undefined;
+
+          speak(voiceMessages.actions.itemExpandedWithOffer(
+            product.name,
+            hasMultipleOffers,
+            isWinning,
+            competitorPriceStr
+          ));
+        } else {
+          // Ainda não tem oferta enviada
+          const hasDeliveryMismatch = Boolean(product.hasSpecificDate && product.isDeliveryDayMismatch);
+          speak(voiceMessages.actions.itemExpanded(product.name, hasDeliveryMismatch));
+        }
       }
     }
   };
