@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from "@/hooks/use-toast";
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { db } from '@/lib/config/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -33,6 +34,8 @@ const fornecedorSchema = z.object({
     .regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{14}$/, "Formato de CNPJ inválido."),
   vendedor: z.string().min(2, "Nome do vendedor é obrigatório (mín. 2 caracteres)."),
   whatsapp: z.string().min(10, "WhatsApp é obrigatório (mín. 10 dígitos).").regex(/^\+?\d{10,15}$/, "Formato de WhatsApp inválido. Use apenas números, incluindo o código do país (ex: 5511999998888)."),
+  email: z.string().email("Formato de email inválido."),
+  password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
   fotoFile: z.instanceof(File).optional().nullable(),
   diasDeEntrega: z.array(z.string()).refine((value) => value.some(Boolean), {
     message: "Selecione pelo menos um dia de entrega.",
@@ -106,34 +109,42 @@ export default function CompleteSupplierRegistrationPage() {
         return;
     }
 
-    const { fotoFile, ...dataForFirestore } = data;
+    form.setValue("empresa", data.empresa, { shouldValidate: true }); // Trigger validation display
 
-    let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
-    let fotoHint = supplier.fotoHint || 'generic logo';
-
-    if (fotoFile) {
-        toast({ title: "Enviando logo...", description: "Aguarde um momento." });
-        try {
-            const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
-              method: 'POST',
-              body: fotoFile,
-            });
-            const newBlob = await response.json();
-            if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
-            fotoUrl = newBlob.url;
-            fotoHint = "custom logo";
-        } catch (uploadError: any) {
-            console.error("FALHA NO UPLOAD DA LOGO:", uploadError);
-            toast({
-                title: "Aviso: Falha no Upload da Logo",
-                description: uploadError.message || "O cadastro continuará com a imagem padrão.",
-                variant: "destructive",
-                duration: 9000,
-            });
-        }
-    }
-    
     try {
+        // 1. Create Firebase Auth user
+        const auth = getAuth();
+        const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        const newUser = userCredential.user;
+
+        // 2. Handle image upload (if any)
+        const { fotoFile, ...dataForFirestore } = data;
+        let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
+        let fotoHint = supplier.fotoHint || 'generic logo';
+
+        if (fotoFile) {
+            toast({ title: "Enviando logo...", description: "Aguarde um momento." });
+            try {
+                const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
+                  method: 'POST',
+                  body: fotoFile,
+                });
+                const newBlob = await response.json();
+                if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
+                fotoUrl = newBlob.url;
+                fotoHint = "custom logo";
+            } catch (uploadError: any) {
+                console.error("FALHA NO UPLOAD DA LOGO:", uploadError);
+                toast({
+                    title: "Aviso: Falha no Upload da Logo",
+                    description: uploadError.message || "O cadastro continuará com a imagem padrão.",
+                    variant: "destructive",
+                    duration: 9000,
+                });
+            }
+        }
+        
+        // 3. Prepare the data to update in Firestore
         const cleanedCnpj = dataForFirestore.cnpj.replace(/[^\d]/g, "");
         const cleanedWhatsapp = dataForFirestore.whatsapp.replace(/[^\d]/g, "");
 
@@ -147,8 +158,10 @@ export default function CompleteSupplierRegistrationPage() {
             fotoHint,
             status: 'ativo' as const,
             updatedAt: serverTimestamp(),
+            userId: newUser.uid, // <-- THE CRITICAL FIX
         };
 
+        // 4. Update the supplier document
         const docRef = doc(db, FORNECEDORES_COLLECTION, supplier.id);
         await updateDoc(docRef, dataToUpdate);
 
@@ -158,13 +171,35 @@ export default function CompleteSupplierRegistrationPage() {
             duration: 7000,
         });
         
+        // 5. Redirect to the supplier portal
         router.push(`/portal/${supplier.id}`);
 
-    } catch (firestoreError: any) {
-        console.error("ERRO AO SALVAR NO FIRESTORE:", firestoreError);
+    } catch (error: any) {
+        // Handle errors (auth or firestore)
+        console.error("ERRO NO CADASTRO:", error);
+        const defaultErrorMessage = "Ocorreu um erro desconhecido. Tente novamente.";
+        let errorMessage = defaultErrorMessage;
+
+        if (error.code) { // Firebase error codes
+            switch (error.code) {
+                case 'auth/email-already-in-use':
+                    errorMessage = 'Este email já está em uso. Por favor, utilize outro.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'O email fornecido é inválido.';
+                    break;
+                case 'auth/weak-password':
+                    errorMessage = 'A senha é muito fraca. Tente uma mais forte.';
+                    break;
+                default:
+                    errorMessage = error.message || defaultErrorMessage;
+                    break;
+            }
+        }
+        
         toast({
-            title: "Erro ao Salvar Dados",
-            description: "Não foi possível salvar seu cadastro no banco de dados. Tente novamente.",
+            title: "Erro ao Finalizar Cadastro",
+            description: errorMessage,
             variant: "destructive",
         });
     }
@@ -239,6 +274,23 @@ export default function CompleteSupplierRegistrationPage() {
                   <FormItem>
                     <FormLabel className="flex items-center gap-2"><Phone className="h-4 w-4 text-primary" /> WhatsApp (com cód. do país) *</FormLabel>
                     <FormControl><Input {...field} placeholder="Ex: 5511999998888" className="text-base"/></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email de Acesso *</FormLabel>
+                    <FormControl><Input {...field} type="email" placeholder="seu@email.com" className="text-base"/></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
+                <FormField control={form.control} name="password" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-key-round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5"/></svg> Senha *</FormLabel>
+                    <FormControl><Input {...field} type="password" placeholder="Mínimo 6 caracteres" className="text-base"/></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>

@@ -255,27 +255,31 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
       // 5. Create notification for the supplier
       try {
-        const supplierDoc = await getDoc(doc(db, 'fornecedores', request.supplierId));
-        if (supplierDoc.exists() && supplierDoc.data().userId) {
-          const sellerUserId = supplierDoc.data().userId;
+        if (request.sellerUserId) {
           const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
           const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
           const notificationMessage = `Sua sugestão da marca "${request.brandName}" foi ${approved ? 'aprovada' : 'recusada'}.`;
 
           await createNotification({
-            userId: sellerUserId, // Notify the seller
+            userId: request.sellerUserId, // Directly use the ID from the request
             type: notificationType,
             title: notificationTitle,
             message: notificationMessage,
             quotationId: request.quotationId,
             brandName: request.brandName,
+            productName: request.productName,
             isRead: false,
             priority: 'high',
             actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
           });
-          console.log(`✅ Notification created for seller ${sellerUserId} about brand ${request.brandName}`);
+          console.log(`✅ Notification created for seller ${request.sellerUserId} about brand ${request.brandName}`);
         } else {
-          console.warn(`Could not find userId for supplier ${request.supplierId} to send notification.`);
+          console.warn(`Could not find sellerUserId on the brand request to send notification. Request ID: ${request.id}`);
+          toast({
+            title: "Falha ao Notificar Vendedor",
+            description: `A ação foi concluída, mas o ID do vendedor não foi encontrado na solicitação. (ID Solicitação: ${request.id})`,
+            variant: "destructive",
+          });
         }
       } catch (notificationError) {
         console.error('⚠️ Error creating notification for supplier:', notificationError);

@@ -53,6 +53,7 @@ import { sendOutbidNotification, sendCounterProposalReminder } from "@/actions/n
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { voiceMessages } from "@/config/voiceMessages";
@@ -196,6 +197,7 @@ const isValidImageUrl = (url?: string): url is string => {
 export default function SellerQuotationPage() {
   const router = useRouter();
   const params = useParams();
+  const { user: sellerUser } = useAuth();
   const { toast } = useToast();
   const { speak, stop } = useVoiceAssistant();
 
@@ -407,6 +409,11 @@ export default function SellerQuotationPage() {
       return;
     }
 
+    if (!sellerUser?.uid) {
+      toast({ title: "Erro de Autenticação", description: "Seu usuário não foi encontrado. Por favor, recarregue a página.", variant: "destructive" });
+      return;
+    }
+
     if (!newBrandForm.brandName.trim() || !newBrandForm.packagingDescription.trim() || 
         newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0) {
       toast({ title: "Erro", description: "Todos os campos são obrigatórios.", variant: "destructive" });
@@ -422,7 +429,6 @@ export default function SellerQuotationPage() {
           imageUrl = await uploadImageToVercelBlob(newBrandForm.imageFile);
         } catch (error: any) {
           console.warn('Image upload failed, continuing without image:', error);
-          // Continue without image if upload fails
         }
       }
 
@@ -441,10 +447,10 @@ export default function SellerQuotationPage() {
         pricePerUnit: pricePerUnit,
         imageUrl: imageUrl,
         imageFileName: newBrandForm.imageFile?.name || '',
-        userId: quotation.userId,
+        buyerUserId: quotation.userId, // ID do comprador
+        sellerUserId: sellerUser.uid, // ID do vendedor (NOVO)
       };
 
-      // Try to create via API route (bypasses Firestore rules)
       const response = await fetch('/api/brand-request', {
         method: 'POST',
         headers: {
@@ -473,7 +479,6 @@ export default function SellerQuotationPage() {
     } catch (error: any) {
       console.error("Error submitting brand request:", error);
       
-      // Check if it's a permission error
       if (error.code === 'permission-denied') {
         toast({ 
           title: "Erro de Permissão", 
@@ -487,10 +492,10 @@ export default function SellerQuotationPage() {
           variant: "destructive" 
         });
       }
-    setIsSubmittingNewBrand(false);
+    } finally {
+      setIsSubmittingNewBrand(false);
+    }
   };
-
-  }
 
 
 

@@ -5,6 +5,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('Received brand request body:', body); // DIAGNOSTIC LOG
     
     const {
       quotationId,
@@ -19,11 +20,12 @@ export async function POST(request: NextRequest) {
       pricePerUnit,
       imageUrl,
       imageFileName,
-      userId
+      buyerUserId, // Changed from userId
+      sellerUserId // Added
     } = body;
 
     // Validate required fields
-    if (!quotationId || !productId || !supplierId || !brandName || !packagingDescription || !userId) {
+    if (!quotationId || !productId || !supplierId || !brandName || !packagingDescription || !buyerUserId || !sellerUserId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -52,7 +54,8 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl || '',
       imageFileName: imageFileName || '',
       status: 'pending',
-      userId,
+      buyerUserId, // Changed from userId
+      sellerUserId, // Added
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };
