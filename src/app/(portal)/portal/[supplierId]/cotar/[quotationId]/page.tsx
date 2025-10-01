@@ -566,7 +566,18 @@ export default function SellerQuotationPage() {
         setProductsToQuote(fetchedProducts);
 
         // Mensagem de boas-vindas quando carregar os dados
-        speak(voiceMessages.welcome.quotationPage(quotationId));
+        const supplierName = fetchedSupplier.empresa?.split(' ')[0] || 'Fornecedor';
+
+        // Pega a data de entrega do primeiro produto (se houver data específica)
+        const firstProductWithDate = fetchedProducts.find(p => p.deliveryDate);
+        const deliveryDateStr = firstProductWithDate?.deliveryDate
+          ? format(firstProductWithDate.deliveryDate.toDate(), "dd/MM/yyyy") === format(new Date(), "dd/MM/yyyy")
+            ? "hoje"
+            : format(firstProductWithDate.deliveryDate.toDate(), "dd 'de' MMMM", { locale: ptBR })
+          : "a data solicitada";
+        const itemCount = fetchedProducts.length;
+
+        speak(voiceMessages.welcome.quotationPage(supplierName, deliveryDateStr, itemCount));
 
       } catch (error: any) {
         console.error("ERROR fetching initial data for seller quotation page:", error);
@@ -949,11 +960,22 @@ export default function SellerQuotationPage() {
   }, [productsToQuote, quotation, currentSupplierDetails]);
 
   const toggleProductExpansion = (productId: string) => {
+    const wasExpanded = expandedProductIds.includes(productId);
+
     setExpandedProductIds(prev =>
       prev.includes(productId)
         ? prev.filter(id => id !== productId)
-        : [productId] 
+        : [productId]
     );
+
+    // Narração ao expandir (não ao colapsar)
+    if (!wasExpanded) {
+      const product = productsToQuote.find(p => p.id === productId);
+      if (product) {
+        const hasDeliveryMismatch = Boolean(product.hasSpecificDate && product.isDeliveryDayMismatch);
+        speak(voiceMessages.actions.itemExpanded(product.name, hasDeliveryMismatch));
+      }
+    }
   };
 
   const handleOfferChange = (productId: string, offerUiId: string, field: keyof OfferWithUI, value: string | number | boolean) => {
@@ -969,6 +991,42 @@ export default function SellerQuotationPage() {
           : p
       )
     );
+  };
+
+  // Handlers de narração para campos do formulário
+  const handlePackagingDescriptionBlur = (productId: string, offerUiId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    const offer = product?.supplierOffers.find(o => o.uiId === offerUiId);
+    if (offer && offer.packagingDescription.trim()) {
+      speak(voiceMessages.formFields.packagingDescriptionFilled);
+    }
+  };
+
+  const handleUnitsInPackagingFocus = (productId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    if (product) {
+      speak(voiceMessages.formFields.unitsInPackagingPrompt(product.unit, product.name || ''));
+    }
+  };
+
+  const handleUnitsInPackagingBlur = () => {
+    speak(voiceMessages.formFields.unitsInPackagingFilled);
+  };
+
+  const handlePriceFocus = (productId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    if (product) {
+      speak(voiceMessages.formFields.pricePrompt(product.unit));
+    }
+  };
+
+  const handlePriceBlur = (productId: string, offerUiId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    const offer = product?.supplierOffers.find(o => o.uiId === offerUiId);
+    if (offer && product && offer.totalPackagingPrice > 0) {
+      const priceFormatted = formatCurrency(offer.totalPackagingPrice);
+      speak(voiceMessages.formFields.priceFilled(product.name, offer.brandOffered, priceFormatted, product.unit));
+    }
   };
 
   const handlePriceChange = (productId: string, offerUiId: string, inputValue: string) => {
@@ -1231,10 +1289,16 @@ export default function SellerQuotationPage() {
           console.log(`[STATE-DEBUG] setProductsToQuote COMPLETED for suggested brand`);
           return result;
         });
+
+        // Narração após selecionar marca
+        speak(voiceMessages.actions.brandSelected(brandName, product.unit));
     } else {
         // There are no unsaved offers, so add a new one.
         console.log(`[OFFER-DEBUG] Adding new offer field with brand: ${brandName} - this is FIRST CLICK`);
         addOfferField(productId, brandName, true); // Mark as suggested brand so it's non-editable
+
+        // Narração após selecionar marca
+        speak(voiceMessages.actions.brandSelected(brandName, product.unit));
     }
   };
 
@@ -1957,11 +2021,27 @@ export default function SellerQuotationPage() {
                                              </div>
                                              <div>
                                                <label htmlFor={`packaging-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Descrição da Embalagem *</label>
-                                               <Input id={`packaging-${product.id}-${offer.uiId}`} value={offer.packagingDescription} onChange={(e) => handleOfferChange(product.id, offer.uiId, 'packagingDescription', e.target.value)} placeholder="Ex: Caixa com 12 Unid." disabled={isOfferDisabled} />
+                                               <Input
+                                                 id={`packaging-${product.id}-${offer.uiId}`}
+                                                 value={offer.packagingDescription}
+                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'packagingDescription', e.target.value)}
+                                                 onBlur={() => handlePackagingDescriptionBlur(product.id, offer.uiId)}
+                                                 placeholder="Ex: Caixa com 12 Unid."
+                                                 disabled={isOfferDisabled}
+                                               />
                                              </div>
                                              <div>
                                                <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Total Un na Emb. *</label>
-                                               <Input id={`units-${product.id}-${offer.uiId}`} type="number" value={offer.unitsInPackaging} onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)} placeholder="Ex: 12" disabled={isOfferDisabled} />
+                                               <Input
+                                                 id={`units-${product.id}-${offer.uiId}`}
+                                                 type="number"
+                                                 value={offer.unitsInPackaging}
+                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
+                                                 onFocus={() => handleUnitsInPackagingFocus(product.id)}
+                                                 onBlur={handleUnitsInPackagingBlur}
+                                                 placeholder="Ex: 12"
+                                                 disabled={isOfferDisabled}
+                                               />
                                              </div>
                                              <div>
                                                <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Preço Total da Emb. (R$) *</label>
@@ -1970,6 +2050,8 @@ export default function SellerQuotationPage() {
                                                  type="text"
                                                  value={offer.totalPackagingPrice > 0 ? formatCurrencyInput(offer.totalPackagingPrice * 100) : ''}
                                                  onChange={(e) => handlePriceChange(product.id, offer.uiId, e.target.value)}
+                                                 onFocus={() => handlePriceFocus(product.id)}
+                                                 onBlur={() => handlePriceBlur(product.id, offer.uiId)}
                                                  placeholder="R$ 0,00"
                                                  disabled={isOfferDisabled}
                                                />

@@ -17,6 +17,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import AddFornecedorModal, { FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
+import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
+import { voiceMessages } from '@/config/voiceMessages';
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
@@ -53,11 +55,13 @@ export default function SupplierPortalPage() {
   const params = useParams();
   const supplierId = params.supplierId as string;
   const { toast } = useToast();
+  const { speak } = useVoiceAssistant();
 
   const [supplier, setSupplier] = useState<Fornecedor | null>(null);
   const [openQuotations, setOpenQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [hasSpokenWelcome, setHasSpokenWelcome] = useState(false);
 
   useEffect(() => {
     if (!supplierId) {
@@ -138,6 +142,18 @@ export default function SupplierPortalPage() {
       unsubQuotations();
     };
   }, [supplierId, toast]);
+
+  // Voice assistant welcome message
+  useEffect(() => {
+    if (!isLoading && supplier && !hasSpokenWelcome) {
+      const supplierName = supplier.empresa || 'Fornecedor';
+      const openQuotationsCount = openQuotations.filter(q => q.status === 'Aberta').length;
+
+      speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsCount));
+
+      setHasSpokenWelcome(true);
+    }
+  }, [isLoading, supplier, openQuotations, hasSpokenWelcome, speak]);
 
   const handleUpdateSupplier = async (data: FornecedorFormValues) => {
     if (!supplierId) return;
