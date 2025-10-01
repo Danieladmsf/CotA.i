@@ -41,6 +41,7 @@ export const voiceMessages = {
     offerSaved: "Oferta salva com sucesso.",
     quotationSent: "Cotação enviada com sucesso! Obrigado pela participação.",
     brandAdded: "Nova marca adicionada com sucesso.",
+    brandRequestSent: "Sua sugestão de marca foi enviada. Observe que sua proposta ficará com o status \"Aguardando Aprovação\". Assim que o comprador confirmar, seu item será liberado para participar da cotação.",
   },
 
   // Mensagens de erro
@@ -140,6 +141,13 @@ export const voiceMessages = {
 
     priceHelp: (unit: string) =>
       `Preço Total da Embalagem: Digite o preço total da embalagem completa que você descreveu. O sistema calculará automaticamente o preço por ${unit}.`,
+
+    // Ajuda para o modal de nova marca
+    newBrand_brandName_prompt: "Primeiro, digite o nome da nova marca que você quer sugerir.",
+    newBrand_packaging_prompt: "Ok. Agora, descreva a embalagem deste novo produto. Por exemplo: caixa com 10 unidades, ou fardo de 5 quilos.",
+    newBrand_units_prompt: "Certo. Quantas unidades, quilos ou litros vêm nesta embalagem que você descreveu?",
+    newBrand_price_prompt: "Para finalizar, qual o preço total desta embalagem?",
+    newBrand_image_prompt: "Opcional: se quiser, pode adicionar uma foto do produto para ajudar o comprador na aprovação.",
   },
 };
 

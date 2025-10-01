@@ -330,6 +330,13 @@ export default function SellerQuotationPage() {
     }
   };
 
+  // Handlers de narração para o modal de nova marca
+  const handleNewBrandBrandNameFocus = () => speak(voiceMessages.formFields.newBrand_brandName_prompt);
+  const handleNewBrandPackagingFocus = () => speak(voiceMessages.formFields.newBrand_packaging_prompt);
+  const handleNewBrandUnitsFocus = () => speak(voiceMessages.formFields.newBrand_units_prompt);
+  const handleNewBrandPriceFocus = () => speak(voiceMessages.formFields.newBrand_price_prompt);
+  const handleNewBrandImageFocus = () => speak(voiceMessages.formFields.newBrand_image_prompt);
+
   // Funções para modal de nova marca
   const openNewBrandModal = (productId: string, productName: string) => {
     setNewBrandModal({
@@ -458,6 +465,8 @@ export default function SellerQuotationPage() {
         description: "Sua nova marca foi enviada para aprovação do comprador.",
         variant: "default"
       });
+
+      speak(voiceMessages.success.brandRequestSent);
 
       closeNewBrandModal();
 
@@ -2281,6 +2290,7 @@ export default function SellerQuotationPage() {
                 id="brand-name"
                 value={newBrandForm.brandName}
                 onChange={(e) => handleNewBrandFormChange('brandName', e.target.value)}
+                onFocus={handleNewBrandBrandNameFocus}
                 placeholder="Ex: Maturatta"
                 className="text-base"
               />
@@ -2292,6 +2302,7 @@ export default function SellerQuotationPage() {
                 id="packaging-desc"
                 value={newBrandForm.packagingDescription}
                 onChange={(e) => handleNewBrandFormChange('packagingDescription', e.target.value)}
+                onFocus={handleNewBrandPackagingFocus}
                 placeholder="Ex: Caixa com 12 Unid."
                 className="text-base"
               />
@@ -2304,6 +2315,7 @@ export default function SellerQuotationPage() {
                 type="number"
                 value={newBrandForm.unitsInPackaging || ''}
                 onChange={(e) => handleNewBrandFormChange('unitsInPackaging', parseInt(e.target.value) || 0)}
+                onFocus={handleNewBrandUnitsFocus}
                 placeholder="Ex: 12"
                 className="text-base"
               />
@@ -2320,6 +2332,7 @@ export default function SellerQuotationPage() {
                   const decimalValue = centavos / 100;
                   handleNewBrandFormChange('totalPackagingPrice', decimalValue);
                 }}
+                onFocus={handleNewBrandPriceFocus}
                 placeholder="R$ 0,00"
                 className="text-base"
               />
@@ -2332,6 +2345,7 @@ export default function SellerQuotationPage() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleNewBrandFormChange('imageFile', e.target.files?.[0] || null)}
+                onFocus={handleNewBrandImageFocus}
                 className="text-base file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
               />
               <p className="text-xs text-muted-foreground">
