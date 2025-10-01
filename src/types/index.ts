@@ -115,7 +115,8 @@ export interface PendingBrandRequest {
   imageUrl?: string; // URL do Vercel Blob Storage
   imageFileName?: string;
   status: 'pending' | 'approved' | 'rejected';
-  userId: string; // ID do comprador que vai aprovar
+  buyerUserId: string; // ID do comprador que vai aprovar
+  sellerUserId: string; // ID do vendedor que sugeriu
   createdAt: Timestamp | FieldValue;
   updatedAt: Timestamp | FieldValue;
   rejectionReason?: string; // Motivo da rejeição, se aplicável
