@@ -114,45 +114,51 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
           if (error.code === 'failed-precondition') {
             console.warn('Missing Firestore index - using fallback approach');
             // Fallback to simpler query without complex filters
-            const simpleQuery = query(
-              collection(db, 'notifications'),
-              where('userId', '==', user.uid),
-              orderBy('createdAt', 'desc'),
-              limit(pageSize)
-            );
-            
-            const fallbackUnsubscribe = onSnapshot(
-              simpleQuery,
-              (snapshot) => {
-                const allNotifications = snapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                } as SystemNotification));
-                
-                // Apply filters client-side
-                let filteredNotifications = allNotifications;
-                if (filters.quotationId) {
-                  filteredNotifications = filteredNotifications.filter(n => n.quotationId === filters.quotationId);
+            if (user?.uid) { // Check if user exists before this query
+              const simpleQuery = query(
+                collection(db, 'notifications'),
+                where('userId', '==', user.uid),
+                orderBy('createdAt', 'desc'),
+                limit(pageSize)
+              );
+              
+              const fallbackUnsubscribe = onSnapshot(
+                simpleQuery,
+                (snapshot) => {
+                  const allNotifications = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  } as SystemNotification));
+                  
+                  // Apply filters client-side
+                  let filteredNotifications = allNotifications;
+                  if (filters.quotationId) {
+                    filteredNotifications = filteredNotifications.filter(n => n.quotationId === filters.quotationId);
+                  }
+                  if (filters.type) {
+                    filteredNotifications = filteredNotifications.filter(n => n.type === filters.type);
+                  }
+                  if (filters.isRead !== undefined) {
+                    filteredNotifications = filteredNotifications.filter(n => n.isRead === filters.isRead);
+                  }
+                  
+                  setNotifications(filteredNotifications);
+                  setHasMore(false); // Disable pagination for fallback
+                  setIsLoading(false);
+                },
+                (fallbackError) => {
+                  console.error('Fallback query also failed:', fallbackError);
+                  setNotifications([]);
+                  setIsLoading(false);
                 }
-                if (filters.type) {
-                  filteredNotifications = filteredNotifications.filter(n => n.type === filters.type);
-                }
-                if (filters.isRead !== undefined) {
-                  filteredNotifications = filteredNotifications.filter(n => n.isRead === filters.isRead);
-                }
-                
-                setNotifications(filteredNotifications);
-                setHasMore(false); // Disable pagination for fallback
-                setIsLoading(false);
-              },
-              (fallbackError) => {
-                console.error('Fallback query also failed:', fallbackError);
-                setNotifications([]);
-                setIsLoading(false);
-              }
-            );
-            
-            return () => fallbackUnsubscribe();
+              );
+              
+              return () => fallbackUnsubscribe();
+            } else {
+              // If no user, cannot perform fallback query
+              setNotifications([]);
+              setIsLoading(false);
+            }
           }
           
           // For other errors, set empty state and stop retrying to prevent infinite loops
@@ -193,31 +199,34 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
             return;
           }
           
-          if (error.code === 'failed-precondition') {
-            console.warn('Missing index for unread notifications - using fallback');
-            // Fallback: get all user notifications and count unread client-side
-            const fallbackQuery = query(
-              collection(db, 'notifications'),
-              where('userId', '==', user.uid),
-              orderBy('createdAt', 'desc'),
-              limit(100) // Limit to recent notifications for performance
-            );
-            
-            const fallbackUnsubscribe = onSnapshot(
-              fallbackQuery,
-              (snapshot) => {
-                const unreadCount = snapshot.docs.filter(doc => !doc.data().isRead).length;
-                setUnreadCount(unreadCount);
-              },
-              (fallbackError) => {
-                console.error('Fallback unread count query failed:', fallbackError);
-                setUnreadCount(0);
-              }
-            );
-            
-            return () => fallbackUnsubscribe();
-          }
-          
+                if (error.code === 'failed-precondition') {
+                  console.warn('Missing index for unread notifications - using fallback');
+                  // Fallback: get all user notifications and count unread client-side
+                  if (user?.uid) { // Check if user exists before this query
+                      const fallbackQuery = query(
+                        collection(db, 'notifications'),
+                        where('userId', '==', user.uid),
+                        orderBy('createdAt', 'desc'),
+                        limit(100) // Limit to recent notifications for performance
+                      );
+                      
+                      const fallbackUnsubscribe = onSnapshot(
+                        fallbackQuery,
+                        (snapshot) => {
+                          const unreadCount = snapshot.docs.filter(doc => !doc.data().isRead).length;
+                          setUnreadCount(unreadCount);
+                        },
+                        (fallbackError) => {
+                          console.error('Fallback unread count query failed:', fallbackError);
+                          setUnreadCount(0);
+                        }
+                      );
+                      
+                      return () => fallbackUnsubscribe();
+                  } else {
+                      setUnreadCount(0); // If no user, no unread count
+                  }
+                }          
           setUnreadCount(0);
         }
       );
