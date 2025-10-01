@@ -9,7 +9,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <Header
         title="Portal do Fornecedor"
         description="Acesse suas cotações e ofertas"
-        showNotifications={false}
+        notificationContext="supplier"
       />
       <div className="p-4 md:p-6 lg:p-8">
         {children}
