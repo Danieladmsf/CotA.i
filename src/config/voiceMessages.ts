@@ -7,7 +7,7 @@ export const voiceMessages = {
   // Mensagens de boas-vindas
   welcome: {
     quotationPage: (supplierName: string, deliveryDate: string, itemCount: number) =>
-      `${supplierName}, nesta cotação temos ${itemCount} ${itemCount === 1 ? 'item' : 'itens'} com entrega para ${deliveryDate}. Por qual quer começar? Clique na seta do item do seu lado direito para expandir o formulário e fazer sua proposta!`,
+      `Olá ${supplierName}! Nesta cotação ${itemCount === 1 ? 'temos 1 item' : `temos ${itemCount} itens`} com entrega para ${deliveryDate}. Por qual quer começar? Clique na seta do item do seu lado direito para expandir o formulário e fazer sua proposta!`,
 
     supplierPortal: (supplierName: string, openQuotations: number) =>
       `Bem-vindo ao seu portal, ${supplierName}! ${openQuotations > 0 ? `Você tem ${openQuotations} ${openQuotations === 1 ? 'cotação aberta' : 'cotações abertas'}.` : 'No momento não há cotações abertas.'}`,
@@ -65,11 +65,11 @@ export const voiceMessages = {
 
     itemExpandedWithOffer: (productName: string, hasMultipleOffers: boolean, isWinning: boolean, competitorPrice?: string) => {
       if (isWinning) {
-        return `Ótimo! Você já enviou oferta para ${productName} e está com o melhor preço! ${hasMultipleOffers ? 'Você pode adicionar outra marca clicando em uma das marcas sugeridas ou em Outra Marca.' : ''} Se desejar, pode iniciar uma nova oferta em outro item. Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
+        return `Ótimo! Você já enviou oferta para ${productName} e está com o melhor preço! ${hasMultipleOffers ? 'Você pode adicionar outra marca clicando em uma das marcas sugeridas ou em Outra Marca.' : ''} Use o botão Editar para alterar sua oferta, ou Parar de Cotar este Item para removê-la. Se desejar, pode iniciar uma nova oferta em outro item. Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
       } else if (competitorPrice) {
-        return `Atenção! Você já enviou oferta para ${productName}, mas outro fornecedor está oferecendo por ${competitorPrice}, um preço menor que o seu. ${hasMultipleOffers ? 'Você pode adicionar outra marca ou' : 'Você pode'} editar sua oferta clicando no botão Editar, ou usar os botões de Cobrir Oferta para superar automaticamente em 1%, 2%, 3%, 4% ou 5%.`;
+        return `Atenção! Você já enviou oferta para ${productName}, mas outro fornecedor está oferecendo por ${competitorPrice}, um preço menor que o seu. ${hasMultipleOffers ? 'Você pode adicionar outra marca ou' : 'Você pode'} editar sua oferta clicando no botão Editar, usar os botões de Cobrir Oferta para superar automaticamente em 1%, 2%, 3%, 4% ou 5%, ou clicar em Parar de Cotar este Item para remover sua oferta.`;
       } else {
-        return `Você já enviou oferta para ${productName}. ${hasMultipleOffers ? 'Quer adicionar outra marca? Clique em uma das marcas sugeridas ou em Outra Marca.' : 'Pode iniciar uma nova oferta em outro item.'} Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
+        return `Você já enviou oferta para ${productName}. ${hasMultipleOffers ? 'Quer adicionar outra marca? Clique em uma das marcas sugeridas ou em Outra Marca.' : 'Pode iniciar uma nova oferta em outro item.'} Use o botão Editar para alterar sua oferta, ou Parar de Cotar este Item para removê-la. Caso sua oferta seja superada, você receberá uma notificação no WhatsApp. Fique atento!`;
       }
     },
 

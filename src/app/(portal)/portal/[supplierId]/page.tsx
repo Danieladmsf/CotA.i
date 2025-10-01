@@ -145,7 +145,7 @@ export default function SupplierPortalPage() {
 
   // Voice assistant welcome message
   useEffect(() => {
-    if (!isLoading && supplier && !hasSpokenWelcome && openQuotations.length > 0) {
+    if (!isLoading && supplier && !hasSpokenWelcome) {
       const supplierName = supplier.empresa || 'Fornecedor';
       const openQuotationsActive = openQuotations.filter(q => q.status === 'Aberta');
 
@@ -173,7 +173,7 @@ export default function SupplierPortalPage() {
                 const isToday = deliveryDate.getTime() === today.getTime();
                 const dateStr = isToday ? 'hoje' : format(deliveryDate, "dd 'de' MMMM", { locale: ptBR });
 
-                speak(`Olá ${supplierName}! Bem-vindo ao seu portal. Você tem ${openQuotationsActive.length} ${openQuotationsActive.length === 1 ? 'cotação aberta' : 'cotações abertas'} com entrega prevista para ${dateStr}.`);
+                speak(`Olá ${supplierName}! Você tem ${openQuotationsActive.length} ${openQuotationsActive.length === 1 ? 'cotação aberta' : 'cotações abertas'} com entrega prevista para ${dateStr}.`);
               } else {
                 speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
               }
