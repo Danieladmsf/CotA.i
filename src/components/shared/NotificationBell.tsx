@@ -17,7 +17,12 @@ import { ptBR } from 'date-fns/locale';
 
 import { useMemo } from 'react';
 
-export default function NotificationBell() {
+interface NotificationBellProps {
+  context?: 'buyer' | 'supplier';
+  supplierId?: string;
+}
+
+export default function NotificationBell({ context = 'buyer', supplierId }: NotificationBellProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
@@ -25,10 +30,35 @@ export default function NotificationBell() {
   const [quotations, setQuotations] = useState<{ id: string; name: string; date: Date }[]>([]);
   const [fallbackPendingCount, setFallbackPendingCount] = useState(0);
   const [hasNotificationAccess, setHasNotificationAccess] = useState(true);
-  
-  const filters = useMemo(() => ({}), []);
-  // Use the notifications hook for recent notifications in dropdown
-  const { notifications: recentNotifications, unreadCount, markAsRead, isLoading } = useNotifications(filters, 5);
+
+  // Use the notifications hook for recent notifications (unfiltered)
+  const { notifications: allNotifications, unreadCount: allUnreadCount, markAsRead, isLoading } = useNotifications({}, 20);
+
+  // Filter notifications based on context
+  const recentNotifications = useMemo(() => {
+    if (context === 'supplier') {
+      // For suppliers: show only approved/rejected brand notifications
+      return allNotifications
+        .filter(n => n.type === 'brand_approval_approved' || n.type === 'brand_approval_rejected')
+        .slice(0, 5);
+    }
+    // For buyers: show only pending brand approval notifications
+    return allNotifications
+      .filter(n => n.type === 'brand_approval_pending')
+      .slice(0, 5);
+  }, [allNotifications, context]);
+
+  // Calculate context-specific unread count
+  const unreadCount = useMemo(() => {
+    if (context === 'supplier') {
+      return allNotifications.filter(n =>
+        !n.isRead && (n.type === 'brand_approval_approved' || n.type === 'brand_approval_rejected')
+      ).length;
+    }
+    return allNotifications.filter(n =>
+      !n.isRead && n.type === 'brand_approval_pending'
+    ).length;
+  }, [allNotifications, context]);
 
   // Fallback to pending brand requests if notifications system is not available
   useEffect(() => {

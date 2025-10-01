@@ -78,14 +78,19 @@ class NotificationErrorBoundary extends React.Component<
   }
 }
 
+interface NotificationSystemProps {
+  context?: 'buyer' | 'supplier';
+  supplierId?: string;
+}
+
 /**
  * Wrapper component that provides error handling for the notification system
  * Falls back gracefully when notifications system encounters errors
  */
-export default function NotificationSystem() {
+export default function NotificationSystem({ context = 'buyer', supplierId }: NotificationSystemProps = {}) {
   return (
     <NotificationErrorBoundary fallback={NotificationErrorFallback}>
-      <NotificationBell />
+      <NotificationBell context={context} supplierId={supplierId} />
     </NotificationErrorBoundary>
   );
 }

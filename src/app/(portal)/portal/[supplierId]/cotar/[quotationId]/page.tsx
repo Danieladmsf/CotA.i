@@ -52,6 +52,8 @@ import { sendOutbidNotification, sendCounterProposalReminder } from "@/actions/n
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { voiceMessages } from "@/config/voiceMessages";
 
 
 const QUOTATIONS_COLLECTION = "quotations";
@@ -193,6 +195,7 @@ export default function SellerQuotationPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { speak } = useVoiceAssistant();
 
   const quotationId = params.quotationId as string;
   const supplierId = params.supplierId as string; // ID of the supplier currently viewing the portal
@@ -562,16 +565,19 @@ export default function SellerQuotationPage() {
         
         setProductsToQuote(fetchedProducts);
 
+        // Mensagem de boas-vindas quando carregar os dados
+        speak(voiceMessages.welcome.quotationPage(quotationId));
 
       } catch (error: any) {
         console.error("ERROR fetching initial data for seller quotation page:", error);
         toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
+        speak(voiceMessages.error.loadFailed);
       } finally {
         setIsLoading(false);
       }
     };
     fetchInitialData();
-  }, [quotationId, supplierId, toast]);
+  }, [quotationId, supplierId, toast, speak]);
 
   useEffect(() => {
     if (countdownIntervalRef.current) {
@@ -854,6 +860,21 @@ export default function SellerQuotationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Effect for voice narration when changing tabs
+  useEffect(() => {
+    const tabMessages: Record<string, string> = {
+      all: voiceMessages.tabs.all,
+      obrigatorios: voiceMessages.tabs.required,
+      opcionais: voiceMessages.tabs.optional,
+      enviados: voiceMessages.tabs.sent,
+    };
+
+    const message = tabMessages[activeCategoryTab];
+    if (message && !isLoading) {
+      speak(message);
+    }
+  }, [activeCategoryTab, isLoading, speak]);
 
   // Effect to schedule and manage counter-proposal reminders
   useEffect(() => {
@@ -1455,6 +1476,7 @@ export default function SellerQuotationPage() {
         await updateDoc(offerRef, offerPayload);
         console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore`);
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
+        speak(voiceMessages.success.offerSaved);
       } else {
         // Check if an offer with the same brand and price already exists for this supplier
         const existingOfferQuery = query(
@@ -1484,6 +1506,7 @@ export default function SellerQuotationPage() {
 
 
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
+        speak(voiceMessages.success.offerSaved);
       }
 
       console.log(`[OFFER-DEBUG] Save completed successfully for offer ${offerUiId}`);
@@ -1492,6 +1515,7 @@ export default function SellerQuotationPage() {
     } catch (error: any) {
       console.log(`[OFFER-DEBUG] ERROR during save:`, error);
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
+      speak(voiceMessages.error.saveFailed);
     } finally {
       setIsSaving(prev => ({ ...prev, [savingKey]: false }));
       // Remove a oferta da lista de ofertas sendo salvas
@@ -1597,27 +1621,27 @@ export default function SellerQuotationPage() {
                 </Badge>
             )}
         </div>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-x-6 gap-y-3">
-          <div className="flex-grow">
-            <h1 className="text-2xl md:text-3xl font-bold text-primary">Responder Cotação</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Fornecedor: <span className="font-semibold">{currentSupplierDetails.empresa}</span></p>
-          </div>
-          <div className={`text-center md:text-right p-3 rounded-lg shadow-sm border min-w-[240px] ${isQuotationEnded ? 'bg-destructive/10 border-destructive text-destructive' : 'bg-card border-border'}`}>
-              <p className={`text-xs font-medium ${isQuotationEnded ? 'text-destructive/80' : 'text-muted-foreground'} uppercase`}>
-                  {isQuotationEnded ? 'Prazo Encerrado' : 'Tempo Restante'}
-              </p>
+        <div className="flex flex-row justify-end items-center gap-4">
+          <div className={`flex items-center gap-3 p-3 rounded-lg shadow-sm border ${isQuotationEnded ? 'bg-destructive/10 border-destructive text-destructive' : 'bg-card border-border'}`}>
               {!isQuotationEnded && (
-                  <div className={`text-xl md:text-2xl font-bold ${isQuotationEnded ? 'text-destructive' : 'text-primary'} flex items-center justify-center md:justify-end gap-1.5 mt-0.5`}>
-                      <Clock className={`h-5 w-5 md:h-6 md:w-6 ${isQuotationEnded ? 'text-destructive' : 'text-primary'}`} />
-                      <span>{timeLeft}</span>
+                  <>
+                    <Clock className={`h-5 w-5 ${isQuotationEnded ? 'text-destructive' : 'text-primary'}`} />
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-bold ${isQuotationEnded ? 'text-destructive' : 'text-primary'}`}>{timeLeft}</span>
+                      <span className="text-xs text-muted-foreground">
+                        (Prazo Final: {quotation.deadline ? format(quotation.deadline.toDate(), "dd/MM/yyyy HH:mm", {locale: ptBR}) : 'N/A'})
+                      </span>
+                    </div>
+                  </>
+              )}
+              {isQuotationEnded && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-destructive">Prazo Encerrado</span>
+                    <span className="text-xs text-destructive/70">
+                      (Prazo Final: {quotation.deadline ? format(quotation.deadline.toDate(), "dd/MM/yyyy HH:mm", {locale: ptBR}) : 'N/A'})
+                    </span>
                   </div>
               )}
-              {isQuotationEnded && timeLeft === 'Prazo Encerrado' && (
-                  <p className="text-xl md:text-2xl font-bold text-destructive mt-0.5">{timeLeft}</p>
-              )}
-              <p className={`text-xs ${isQuotationEnded ? 'text-destructive/70' : 'text-muted-foreground'} mt-0.5`}>
-                  (Prazo Final: {quotation.deadline ? format(quotation.deadline.toDate(), "dd/MM/yyyy HH:mm", {locale: ptBR}) : 'N/A'})
-              </p>
           </div>
         </div>
       </header>
