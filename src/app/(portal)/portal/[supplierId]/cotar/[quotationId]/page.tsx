@@ -868,24 +868,7 @@ export default function SellerQuotationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Effect for voice narration when changing tabs
-  useEffect(() => {
-    if (!isLoading && productsToQuote.length > 0 && !hasSpokenTabMessage) {
-      // Fala a mensagem da aba inicial apenas uma vez após carregar
-      const tabMessages: Record<string, string> = {
-        all: voiceMessages.tabs.all,
-        obrigatorios: voiceMessages.tabs.required,
-        opcionais: voiceMessages.tabs.optional,
-        enviados: voiceMessages.tabs.sent,
-      };
 
-      const message = tabMessages[activeCategoryTab];
-      if (message) {
-        speak(message);
-        setHasSpokenTabMessage(true);
-      }
-    }
-  }, [isLoading, productsToQuote, hasSpokenTabMessage, activeCategoryTab, speak]);
 
   // Effect for voice narration when user actively changes tabs
   useEffect(() => {
