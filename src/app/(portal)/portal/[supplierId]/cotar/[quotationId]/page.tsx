@@ -36,7 +36,7 @@ import {
   Clock,
   Trash2,
   Award,
-  Briefcase, 
+  Briefcase,
   Contact,
   ChevronDown,
   ChevronUp,
@@ -44,6 +44,7 @@ import {
   TrendingDown,
   EyeOff,
   CheckCircle,
+  HelpCircle,
 } from "lucide-react";
 import { format, intervalToDuration } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -2007,7 +2008,17 @@ export default function SellerQuotationPage() {
                                          <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)] gap-2 items-end">
                                              <div>
-                                               <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Sua Marca Ofertada *</label>
+                                               <div className="flex items-center gap-1 mb-1">
+                                                 <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Sua Marca Ofertada *</label>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => speak(voiceMessages.formFields.brandHelp)}
+                                                   className="text-muted-foreground hover:text-primary transition-colors"
+                                                   title="Ajuda sobre este campo"
+                                                 >
+                                                   <HelpCircle className="h-3.5 w-3.5" />
+                                                 </button>
+                                               </div>
                                                <Input
                                                  id={`brand-${product.id}-${offer.uiId}`}
                                                  ref={ref => { brandInputRefs.current[`${product.id}_${offer.uiId}`] = ref; }}
@@ -2020,7 +2031,17 @@ export default function SellerQuotationPage() {
                                                />
                                              </div>
                                              <div>
-                                               <label htmlFor={`packaging-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Descrição da Embalagem *</label>
+                                               <div className="flex items-center gap-1 mb-1">
+                                                 <label htmlFor={`packaging-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Descrição da Embalagem *</label>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => speak(voiceMessages.formFields.packagingHelp)}
+                                                   className="text-muted-foreground hover:text-primary transition-colors"
+                                                   title="Ajuda sobre este campo"
+                                                 >
+                                                   <HelpCircle className="h-3.5 w-3.5" />
+                                                 </button>
+                                               </div>
                                                <Input
                                                  id={`packaging-${product.id}-${offer.uiId}`}
                                                  value={offer.packagingDescription}
@@ -2031,7 +2052,17 @@ export default function SellerQuotationPage() {
                                                />
                                              </div>
                                              <div>
-                                               <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Total Un na Emb. *</label>
+                                               <div className="flex items-center gap-1 mb-1">
+                                                 <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => speak(voiceMessages.formFields.unitsHelp(product.unit))}
+                                                   className="text-muted-foreground hover:text-primary transition-colors"
+                                                   title="Ajuda sobre este campo"
+                                                 >
+                                                   <HelpCircle className="h-3.5 w-3.5" />
+                                                 </button>
+                                               </div>
                                                <Input
                                                  id={`units-${product.id}-${offer.uiId}`}
                                                  type="number"
@@ -2044,7 +2075,17 @@ export default function SellerQuotationPage() {
                                                />
                                              </div>
                                              <div>
-                                               <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground mb-1">Preço Total da Emb. (R$) *</label>
+                                               <div className="flex items-center gap-1 mb-1">
+                                                 <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Preço Total da Emb. (R$) *</label>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => speak(voiceMessages.formFields.priceHelp(product.unit))}
+                                                   className="text-muted-foreground hover:text-primary transition-colors"
+                                                   title="Ajuda sobre este campo"
+                                                 >
+                                                   <HelpCircle className="h-3.5 w-3.5" />
+                                                 </button>
+                                               </div>
                                                <Input
                                                  id={`price-${product.id}-${offer.uiId}`}
                                                  type="text"

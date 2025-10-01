@@ -110,6 +110,17 @@ export const voiceMessages = {
 
     priceFilled: (productName: string, brandName: string, price: string, unit: string) =>
       `Perfeito! O ${productName} ${brandName} custa ${price} por ${unit}. Agora clique no botão Enviar Oferta. Caso você queira adicionar mais ofertas do mesmo item, repita o processo. Se tiver dúvida, clique no ponto de interrogação de cada etapa que irei te ajudar.`,
+
+    // Ajuda dos campos (ao clicar no ícone ?)
+    brandHelp: "Marca Ofertada: Digite ou selecione a marca do produto que você está oferecendo. Se a marca não estiver na lista, clique em Outra Marca para solicitar aprovação.",
+
+    packagingHelp: "Descrição da Embalagem: Descreva como seu produto vem embalado. Por exemplo: 1 caixa com 10 unidades, 1 fardo com 5 pacotes de 2 quilos, ou 1 garrafa de 500 mililitros.",
+
+    unitsHelp: (unit: string) =>
+      `Total de Unidades na Embalagem: Informe quantos ${unit} vêm na embalagem que você descreveu. Por exemplo, se é 1 caixa com 12 quilos, coloque 12.`,
+
+    priceHelp: (unit: string) =>
+      `Preço Total da Embalagem: Digite o preço total da embalagem completa que você descreveu. O sistema calculará automaticamente o preço por ${unit}.`,
   },
 };
 

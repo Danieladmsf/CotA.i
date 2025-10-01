@@ -341,7 +341,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
         quotationId: item.quotationId || null,
         userId: user.uid,
         updatedAt: serverTimestamp(),
-        categoryId: item.categoryId || undefined,
+        categoryId: item.categoryId || '',
         categoryName: category ? category.name : DEFAULT_IMPORT_CATEGORY_NAME,
       };
 

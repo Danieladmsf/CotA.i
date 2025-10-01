@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Loader2, Building, Clock, FileText, Settings } from 'lucide-react';
 import { db } from '@/lib/config/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc, getDocs } from 'firebase/firestore';
 import type { Quotation, Fornecedor } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -145,11 +145,51 @@ export default function SupplierPortalPage() {
 
   // Voice assistant welcome message
   useEffect(() => {
-    if (!isLoading && supplier && !hasSpokenWelcome) {
+    if (!isLoading && supplier && !hasSpokenWelcome && openQuotations.length > 0) {
       const supplierName = supplier.empresa || 'Fornecedor';
-      const openQuotationsCount = openQuotations.filter(q => q.status === 'Aberta').length;
+      const openQuotationsActive = openQuotations.filter(q => q.status === 'Aberta');
 
-      speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsCount));
+      if (openQuotationsActive.length > 0) {
+        // Buscar a data de entrega da primeira cotação aberta
+        const firstQuotation = openQuotationsActive[0];
+
+        // Buscar itens dessa cotação para pegar a data
+        const fetchQuotationItems = async () => {
+          try {
+            const itemsQuery = query(
+              collection(db, "shopping_list_items"),
+              where("quotationId", "==", firstQuotation.id)
+            );
+            const itemsSnapshot = await getDocs(itemsQuery);
+
+            if (!itemsSnapshot.empty) {
+              const firstItem = itemsSnapshot.docs[0].data();
+              if (firstItem.deliveryDate) {
+                const deliveryDate = firstItem.deliveryDate.toDate();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                deliveryDate.setHours(0, 0, 0, 0);
+
+                const isToday = deliveryDate.getTime() === today.getTime();
+                const dateStr = isToday ? 'hoje' : format(deliveryDate, "dd 'de' MMMM", { locale: ptBR });
+
+                speak(`Olá ${supplierName}! Bem-vindo ao seu portal. Você tem ${openQuotationsActive.length} ${openQuotationsActive.length === 1 ? 'cotação aberta' : 'cotações abertas'} para entrega em ${dateStr}.`);
+              } else {
+                speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+              }
+            } else {
+              speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+            }
+          } catch (error) {
+            console.error('Error fetching quotation items:', error);
+            speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+          }
+        };
+
+        fetchQuotationItems();
+      } else {
+        speak(voiceMessages.welcome.supplierPortal(supplierName, 0));
+      }
 
       setHasSpokenWelcome(true);
     }
