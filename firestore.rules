@@ -48,20 +48,14 @@ service cloud.firestore {
 
     // Quotations collection - authenticated users own their quotations, suppliers can read assigned quotations
     match /quotations/{quotationId} {
-      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow get: if true; // Allow unauthenticated supplier portal access to read individual quotations
-      allow list: if request.auth != null && request.auth.uid != null; // Allow authenticated users to list their quotations
-      allow list: if true; // Allow unauthenticated suppliers to list quotations they're assigned to
+      allow read: if true; // Allow unauthenticated supplier portal access
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Shopping list items - authenticated users own, suppliers can read items for their quotations
     match /shopping_list_items/{itemId} {
-      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow get: if true; // Allow unauthenticated supplier portal access to read individual items
-      allow list: if request.auth != null && request.auth.uid != null; // Allow authenticated users to list their items
-      allow list: if true; // Allow unauthenticated suppliers to list items for their quotations
+      allow read: if true; // Allow unauthenticated supplier portal access
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
@@ -79,9 +73,8 @@ service cloud.firestore {
     }
 
     match /pending_brand_requests/{requestId} {
+        allow read: if true; // Allow unauthenticated supplier portal access
         allow create: if true;
-        allow get: if request.auth != null;
-        allow list: if request.auth != null;
         allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
