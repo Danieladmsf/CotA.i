@@ -6,8 +6,8 @@
 export const voiceMessages = {
   // Mensagens de boas-vindas
   welcome: {
-    quotationPage: (supplierName: string, deliveryDate: string, itemCount: number) =>
-      `Olá ${supplierName}! Nesta cotação ${itemCount === 1 ? 'temos 1 item' : `temos ${itemCount} itens`} com entrega para ${deliveryDate}. Por qual quer começar? Clique na seta do item do seu lado direito para expandir o formulário e fazer sua proposta!`,
+    quotationPage: (supplierName: string, itemCount: number) =>
+      `${supplierName}, logo abaixo já está disponível a lista de cotação com ${itemCount === 1 ? '1 item' : `${itemCount} itens`}. Clique na seta próximo do nome, que eu te ajudarei a preencher corretamente.`,
 
     supplierPortal: (supplierName: string, openQuotations: number) =>
       `Bem-vindo ao seu portal, ${supplierName}! ${openQuotations > 0 ? `Você tem ${openQuotations} ${openQuotations === 1 ? 'cotação aberta' : 'cotações abertas'}.` : 'No momento não há cotações abertas.'}`,

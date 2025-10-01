@@ -570,16 +570,10 @@ export default function SellerQuotationPage() {
         // Mensagem de boas-vindas quando carregar os dados
         const supplierName = fetchedSupplier.empresa?.split(' ')[0] || 'Fornecedor';
 
-        // Pega a data de entrega do primeiro produto (se houver data específica)
-        const firstProductWithDate = fetchedProducts.find(p => p.deliveryDate);
-        const deliveryDateStr = firstProductWithDate?.deliveryDate
-          ? format(firstProductWithDate.deliveryDate.toDate(), "dd/MM/yyyy") === format(new Date(), "dd/MM/yyyy")
-            ? "hoje"
-            : format(firstProductWithDate.deliveryDate.toDate(), "dd 'de' MMMM", { locale: ptBR })
-          : "a data solicitada";
         const itemCount = fetchedProducts.length;
 
-        speak(voiceMessages.welcome.quotationPage(supplierName, deliveryDateStr, itemCount));
+        speak(voiceMessages.welcome.quotationPage(supplierName, itemCount));
+        setHasSpokenTabMessage(true); // Impede que a mensagem da aba seja falada na inicialização
 
       } catch (error: any) {
         console.error("ERROR fetching initial data for seller quotation page:", error);
