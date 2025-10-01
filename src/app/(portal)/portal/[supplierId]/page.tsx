@@ -291,7 +291,7 @@ export default function SupplierPortalPage() {
                           <div className="p-6">
                               <CardTitle className="text-xl flex items-center justify-between">
                                   <span>
-                                      Cotação para Entrega em: {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
+                                      {actualStatus === 'Aberta' ? 'Cotação para:' : 'Cotação encerrada:'} {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
                                   </span>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className={style.badgeClass}>{actualStatus}</Badge>

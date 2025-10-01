@@ -214,6 +214,7 @@ export default function SellerQuotationPage() {
   const [editingOffers, setEditingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
   const [savingOffers, setSavingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
+  const [hasSpokenTabMessage, setHasSpokenTabMessage] = useState(false);
 
   // Estados para o modal de nova marca
   const [newBrandModal, setNewBrandModal] = useState({
@@ -875,18 +876,39 @@ export default function SellerQuotationPage() {
 
   // Effect for voice narration when changing tabs
   useEffect(() => {
-    const tabMessages: Record<string, string> = {
-      all: voiceMessages.tabs.all,
-      obrigatorios: voiceMessages.tabs.required,
-      opcionais: voiceMessages.tabs.optional,
-      enviados: voiceMessages.tabs.sent,
-    };
+    if (!isLoading && productsToQuote.length > 0 && !hasSpokenTabMessage) {
+      // Fala a mensagem da aba inicial apenas uma vez após carregar
+      const tabMessages: Record<string, string> = {
+        all: voiceMessages.tabs.all,
+        obrigatorios: voiceMessages.tabs.required,
+        opcionais: voiceMessages.tabs.optional,
+        enviados: voiceMessages.tabs.sent,
+      };
 
-    const message = tabMessages[activeCategoryTab];
-    if (message && !isLoading) {
-      speak(message);
+      const message = tabMessages[activeCategoryTab];
+      if (message) {
+        speak(message);
+        setHasSpokenTabMessage(true);
+      }
     }
-  }, [activeCategoryTab, isLoading, speak]);
+  }, [isLoading, productsToQuote, hasSpokenTabMessage, activeCategoryTab, speak]);
+
+  // Effect for voice narration when user actively changes tabs
+  useEffect(() => {
+    if (hasSpokenTabMessage) {
+      const tabMessages: Record<string, string> = {
+        all: voiceMessages.tabs.all,
+        obrigatorios: voiceMessages.tabs.required,
+        opcionais: voiceMessages.tabs.optional,
+        enviados: voiceMessages.tabs.sent,
+      };
+
+      const message = tabMessages[activeCategoryTab];
+      if (message) {
+        speak(message);
+      }
+    }
+  }, [activeCategoryTab, hasSpokenTabMessage, speak]);
 
   // Effect to schedule and manage counter-proposal reminders
   useEffect(() => {
