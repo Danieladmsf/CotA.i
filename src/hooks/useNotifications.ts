@@ -20,6 +20,7 @@ import {
 import type { SystemNotification } from '@/types';
 
 export interface NotificationFilters {
+  targetSupplierId?: string; // For anonymous supplier portal access
   quotationId?: string;
   type?: string;
   isRead?: boolean;
@@ -37,34 +38,45 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
 
   // Load notifications with filters
   useEffect(() => {
-    if (!user?.uid) {
+    const canQueryByUser = user?.uid;
+    const canQueryBySupplier = filters.targetSupplierId;
+
+    if (!canQueryByUser && !canQueryBySupplier) {
       setIsLoading(false);
+      setNotifications([]);
       return;
     }
 
     try {
-      // Build base query
-      let queryConstraints: any[] = [
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(pageSize)
-      ];
+      let queryConstraints: any[] = [];
 
-      // Apply filters - build separate queries for complex filter combinations
+      // Determine the primary query filter
+      if (canQueryBySupplier) {
+        console.log(`[useNotifications] Querying by targetSupplierId: ${filters.targetSupplierId}`);
+        queryConstraints.push(where('targetSupplierId', '==', filters.targetSupplierId));
+      } else if (canQueryByUser) {
+        console.log(`[useNotifications] Querying by userId: ${user.uid}`);
+        queryConstraints.push(where('userId', '==', user.uid));
+      }
+      
+      queryConstraints.push(orderBy('createdAt', 'desc'));
+
+      // Apply other filters
       if (filters.quotationId) {
-        queryConstraints.splice(2, 0, where('quotationId', '==', filters.quotationId));
+        queryConstraints.push(where('quotationId', '==', filters.quotationId));
       }
       if (filters.type) {
-        queryConstraints.splice(2, 0, where('type', '==', filters.type));
+        queryConstraints.push(where('type', '==', filters.type));
       }
       if (filters.isRead !== undefined) {
-        queryConstraints.splice(2, 0, where('isRead', '==', filters.isRead));
+        queryConstraints.push(where('isRead', '==', filters.isRead));
       }
 
-      // Add pagination
+      // Add pagination and limit
       if (lastDoc) {
         queryConstraints.push(startAfter(lastDoc));
       }
+      queryConstraints.push(limit(pageSize));
 
       const notificationQuery = query(collection(db, 'notifications'), ...queryConstraints);
 

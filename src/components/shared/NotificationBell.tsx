@@ -31,8 +31,15 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
   const [fallbackPendingCount, setFallbackPendingCount] = useState(0);
   const [hasNotificationAccess, setHasNotificationAccess] = useState(true);
 
+  const notificationFilters = useMemo(() => {
+    if (context === 'supplier' && supplierId) {
+      return { targetSupplierId: supplierId };
+    }
+    return {}; // For buyer, it will use the default userId logic
+  }, [context, supplierId]);
+
   // Use the notifications hook for recent notifications (unfiltered)
-  const { notifications: allNotifications, unreadCount: allUnreadCount, markAsRead, isLoading } = useNotifications({}, 20);
+  const { notifications: allNotifications, unreadCount: allUnreadCount, markAsRead, isLoading } = useNotifications(notificationFilters, 20);
 
   // Filter notifications based on context
   const recentNotifications = useMemo(() => {

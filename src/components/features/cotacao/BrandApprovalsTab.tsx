@@ -255,34 +255,39 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
       // 5. Create notification for the supplier
       try {
-        if (request.sellerUserId) {
-          const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
-          const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
-          const notificationMessage = `Sua sugestão da marca "${request.brandName}" foi ${approved ? 'aprovada' : 'recusada'}.`;
-
-          await createNotification({
-            userId: request.sellerUserId, // Directly use the ID from the request
-            type: notificationType,
-            title: notificationTitle,
-            message: notificationMessage,
-            quotationId: request.quotationId,
-            brandName: request.brandName,
-            productName: request.productName,
-            isRead: false,
-            priority: 'high',
-            actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
-          });
-          console.log(`✅ Notification created for seller ${request.sellerUserId} about brand ${request.brandName}`);
-        } else {
-          console.warn(`Could not find sellerUserId on the brand request to send notification. Request ID: ${request.id}`);
-          toast({
-            title: "Falha ao Notificar Vendedor",
-            description: `A ação foi concluída, mas o ID do vendedor não foi encontrado na solicitação. (ID Solicitação: ${request.id})`,
-            variant: "destructive",
-          });
+        const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
+        const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
+        
+        // Fetch product name for a more descriptive message
+        let productNameForNotif = request.productName || 'Produto desconhecido';
+        if (!request.productName) {
+            try {
+                const productDoc = await getDoc(doc(db, 'shopping_list_items', request.productId));
+                if (productDoc.exists()) {
+                    productNameForNotif = productDoc.data().name || productNameForNotif;
+                }
+            } catch (e) { console.error("Could not fetch product name for notification", e); }
         }
+        const notificationMessage = `Sua sugestão da marca "${request.brandName}" para o produto "${productNameForNotif}" foi ${approved ? 'aprovada' : 'recusada'}.`;
+
+        await createNotification({
+          targetSupplierId: request.supplierId, // <-- THE FIX: Target the supplier directly
+          userId: request.buyerUserId, // Keep buyerId for reference/scoping if needed
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          quotationId: request.quotationId,
+          brandName: request.brandName,
+          productName: productNameForNotif,
+          isRead: false,
+          priority: 'high',
+          actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
+        });
+        console.log(`✅ Notification created for supplier ${request.supplierId} about brand ${request.brandName}`);
+        
       } catch (notificationError) {
         console.error('⚠️ Error creating notification for supplier:', notificationError);
+        // Non-critical, so we don't show a toast to the buyer for this
       }
 
       // Mark the associated notification as read, regardless of outcome

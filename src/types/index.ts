@@ -169,7 +169,8 @@ export type NotificationType =
 
 export interface SystemNotification {
   id: string;
-  userId: string;
+  userId: string; // The user who the notification is for (e.g., the buyer)
+  targetSupplierId?: string; // The supplier this notification is for (for anonymous portal access)
   type: NotificationType;
   title: string;
   message: string;
