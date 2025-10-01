@@ -344,7 +344,7 @@ export default function SellerQuotationPage() {
       totalPackagingPrice: 0,
       imageFile: null
     });
-    speak(voiceMessages.actions.openingNewBrandModal);
+    speak("Ok, vamos solicitar uma nova marca. Sua sugestão será enviada para o comprador analisar. Preencha os dados do produto e, assim que você enviar, eu avisarei o comprador imediatamente e retornarei com a resposta de aprovação.");
   };
 
   const closeNewBrandModal = () => {
