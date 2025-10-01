@@ -196,7 +196,7 @@ export default function SellerQuotationPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  const { speak } = useVoiceAssistant();
+  const { speak, stop } = useVoiceAssistant();
 
   const quotationId = params.quotationId as string;
   const supplierId = params.supplierId as string; // ID of the supplier currently viewing the portal
@@ -984,6 +984,10 @@ export default function SellerQuotationPage() {
 
   const toggleProductExpansion = (productId: string) => {
     const wasExpanded = expandedProductIds.includes(productId);
+
+    if (wasExpanded) {
+      stop(); // Interrompe a fala se o card estiver sendo fechado
+    }
 
     setExpandedProductIds(prev =>
       prev.includes(productId)
