@@ -593,8 +593,8 @@ export default function SellerQuotationPage() {
         return;
     }
 
-    const brandApprovalNotification = notifications.find(n => n.type === 'brand_approved');
-    const brandRejectionNotification = notifications.find(n => n.type === 'brand_rejected');
+    const brandApprovalNotification = notifications.find(n => n.type === 'brand_approval_approved');
+    const brandRejectionNotification = notifications.find(n => n.type === 'brand_approval_rejected');
 
     if (brandApprovalNotification) {
         speak(voiceMessages.actions.brandApproved(brandApprovalNotification.brandName || ''));
