@@ -199,13 +199,13 @@ export default function SellerQuotationPage() {
   const { toast } = useToast();
   const { speak, stop } = useVoiceAssistant();
 
-  const { notifications, markAsRead, isLoading: notificationsLoading } = useNotifications({ 
-    quotationId: quotationId, 
-    isRead: false 
-  });
-
   const quotationId = params.quotationId as string;
   const supplierId = params.supplierId as string; // ID of the supplier currently viewing the portal
+
+  const { notifications, markAsRead, isLoading: notificationsLoading } = useNotifications({
+    quotationId: quotationId,
+    isRead: false
+  });
 
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [currentSupplierDetails, setCurrentSupplierDetails] = useState<SupplierType | null>(null);
