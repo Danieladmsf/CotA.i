@@ -258,7 +258,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         const supplierDoc = await getDoc(doc(db, 'fornecedores', request.supplierId));
         if (supplierDoc.exists() && supplierDoc.data().userId) {
           const sellerUserId = supplierDoc.data().userId;
-          const notificationType = approved ? 'brand_approved' : 'brand_rejected';
+          const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
           const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
           const notificationMessage = `Sua sugestão da marca "${request.brandName}" foi ${approved ? 'aprovada' : 'recusada'}.`;
 
