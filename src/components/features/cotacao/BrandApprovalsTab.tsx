@@ -13,6 +13,7 @@ import { CheckCircle, XCircle, AlertCircle, Package, Calendar, User, DollarSign,
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
+import { createNotification } from '@/hooks/useNotifications';
 import type { PendingBrandRequest } from '@/types';
 
 export default function BrandApprovalsTab({ quotationId }: { quotationId: string }) {
@@ -250,6 +251,35 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           description: `A proposta da marca "${request.brandName}" foi rejeitada.`,
           variant: "destructive"
         });
+      }
+
+      // 5. Create notification for the supplier
+      try {
+        const supplierDoc = await getDoc(doc(db, 'fornecedores', request.supplierId));
+        if (supplierDoc.exists() && supplierDoc.data().userId) {
+          const sellerUserId = supplierDoc.data().userId;
+          const notificationType = approved ? 'brand_approved' : 'brand_rejected';
+          const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
+          const notificationMessage = `Sua sugestão da marca "${request.brandName}" foi ${approved ? 'aprovada' : 'recusada'}.`;
+
+          await createNotification({
+            userId: sellerUserId, // Notify the seller
+            type: notificationType,
+            title: notificationTitle,
+            message: notificationMessage,
+            quotationId: request.quotationId,
+            brandName: request.brandName,
+            productName: request.productName,
+            isRead: false,
+            priority: 'high',
+            actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
+          });
+          console.log(`✅ Notification created for seller ${sellerUserId} about brand ${request.brandName}`);
+        } else {
+          console.warn(`Could not find userId for supplier ${request.supplierId} to send notification.`);
+        }
+      } catch (notificationError) {
+        console.error('⚠️ Error creating notification for supplier:', notificationError);
       }
 
       // Mark the associated notification as read, regardless of outcome
