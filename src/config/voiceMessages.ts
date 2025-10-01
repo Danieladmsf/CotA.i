@@ -58,7 +58,16 @@ export const voiceMessages = {
     offerRemoved: (productName: string) =>
       `Oferta removida de ${productName}.`,
 
+    brandApproved: (brandName: string) =>
+      `Sua sugestão da marca ${brandName} foi aceita e agora faz parte desta cotação.`,
+
+    brandRejected: (brandName: string) =>
+      `Sua sugestão da marca ${brandName} foi recusada pelo comprador.`,
+
+
     addingNewBrand: "Abrindo formulário para adicionar nova marca.",
+
+    openingNewBrandModal: "Ok, vamos solicitar uma nova marca. Sua sugestão será enviada para o comprador analisar. Preencha os dados do produto e, assim que você enviar, eu avisarei o comprador imediatamente e retornarei com a resposta de aprovação.",
 
     itemExpanded: (productName: string, hasDeliveryMismatch: boolean) =>
       `Ok, ${productName}! Vamos lá! ${hasDeliveryMismatch ? 'Atenção: o comprador determinou um dia de entrega que não faz parte da sua grade de entrega. Verifique se consegue entregar na data solicitada. ' : ''}Escolha uma marca inicial em Marcas Sugeridas ou clique em Outra Marca para enviar ao comprador aprovar. Como quer começar?`,

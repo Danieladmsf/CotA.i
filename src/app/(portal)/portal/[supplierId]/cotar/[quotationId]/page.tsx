@@ -53,6 +53,7 @@ import { sendOutbidNotification, sendCounterProposalReminder } from "@/actions/n
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { voiceMessages } from "@/config/voiceMessages";
 
@@ -198,6 +199,11 @@ export default function SellerQuotationPage() {
   const { toast } = useToast();
   const { speak, stop } = useVoiceAssistant();
 
+  const { notifications, markAsRead, isLoading: notificationsLoading } = useNotifications({ 
+    quotationId: quotationId, 
+    isRead: false 
+  });
+
   const quotationId = params.quotationId as string;
   const supplierId = params.supplierId as string; // ID of the supplier currently viewing the portal
 
@@ -338,6 +344,7 @@ export default function SellerQuotationPage() {
       totalPackagingPrice: 0,
       imageFile: null
     });
+    speak(voiceMessages.actions.openingNewBrandModal);
   };
 
   const closeNewBrandModal = () => {
@@ -567,13 +574,7 @@ export default function SellerQuotationPage() {
         
         setProductsToQuote(fetchedProducts);
 
-        // Mensagem de boas-vindas quando carregar os dados
-        const supplierName = fetchedSupplier.empresa?.split(' ')[0] || 'Fornecedor';
 
-        const itemCount = fetchedProducts.length;
-
-        speak(voiceMessages.welcome.quotationPage(supplierName, itemCount));
-        setHasSpokenTabMessage(true); // Impede que a mensagem da aba seja falada na inicialização
 
       } catch (error: any) {
         console.error("ERROR fetching initial data for seller quotation page:", error);
@@ -585,6 +586,32 @@ export default function SellerQuotationPage() {
     };
     fetchInitialData();
   }, [quotationId, supplierId, toast, speak]);
+
+  // Effect for handling priority notifications and welcome speech
+  useEffect(() => {
+    if (isLoading || notificationsLoading || hasSpokenTabMessage || !productsToQuote.length || !currentSupplierDetails) {
+        return;
+    }
+
+    const brandApprovalNotification = notifications.find(n => n.type === 'brand_approved');
+    const brandRejectionNotification = notifications.find(n => n.type === 'brand_rejected');
+
+    if (brandApprovalNotification) {
+        speak(voiceMessages.actions.brandApproved(brandApprovalNotification.brandName || ''));
+        markAsRead(brandApprovalNotification.id);
+        setHasSpokenTabMessage(true);
+    } else if (brandRejectionNotification) {
+        speak(voiceMessages.actions.brandRejected(brandRejectionNotification.brandName || ''));
+        markAsRead(brandRejectionNotification.id);
+        setHasSpokenTabMessage(true);
+    } else {
+        // If no priority message was spoken, speak the normal welcome message
+        const supplierName = currentSupplierDetails.empresa?.split(' ')[0] || 'Fornecedor';
+        const itemCount = productsToQuote.length;
+        speak(voiceMessages.welcome.quotationPage(supplierName, itemCount));
+        setHasSpokenTabMessage(true);
+    }
+  }, [isLoading, notificationsLoading, hasSpokenTabMessage, notifications, productsToQuote, currentSupplierDetails, markAsRead, speak]);
 
   useEffect(() => {
     if (countdownIntervalRef.current) {
