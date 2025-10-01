@@ -18,7 +18,7 @@ export const voiceMessages = {
 
   // Mensagens de navegação entre abas
   tabs: {
-    all: "Você está visualizando todos os itens da cotação.",
+    all: "",
     required: "Você está na aba de itens obrigatórios. Complete todos os campos para prosseguir.",
     optional: "Você está na aba de itens opcionais.",
     sent: "Você está visualizando os itens já enviados.",
