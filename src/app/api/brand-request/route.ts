@@ -5,11 +5,12 @@ import { Timestamp } from 'firebase-admin/firestore';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('Received brand request body:', body); // DIAGNOSTIC LOG
+    console.log('Received brand request body:', body);
     
     const {
       quotationId,
       productId,
+      productName, // ADDED
       supplierId,
       supplierName,
       supplierInitials,
@@ -20,12 +21,12 @@ export async function POST(request: NextRequest) {
       pricePerUnit,
       imageUrl,
       imageFileName,
-      buyerUserId, // Changed from userId
-      sellerUserId // Added
+      buyerUserId,
+      sellerUserId
     } = body;
 
     // Validate required fields
-    if (!quotationId || !productId || !supplierId || !brandName || !packagingDescription || !buyerUserId || !sellerUserId) {
+    if (!quotationId || !productId || !productName || !supplierId || !brandName || !packagingDescription || !buyerUserId || !sellerUserId) { // ADDED productName
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
     const brandRequest = {
       quotationId,
       productId,
+      productName, // ADDED
       supplierId,
       supplierName,
       supplierInitials,
@@ -54,13 +56,13 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl || '',
       imageFileName: imageFileName || '',
       status: 'pending',
-      buyerUserId, // Changed from userId
-      sellerUserId, // Added
+      buyerUserId,
+      sellerUserId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };
 
-    // Save to Firestore using admin SDK (bypasses security rules)
+    // Save to Firestore using admin SDK
     const db = adminDb();
     const docRef = await db.collection('pending_brand_requests').add(brandRequest);
 

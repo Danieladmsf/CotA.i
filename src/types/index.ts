@@ -104,6 +104,7 @@ export interface PendingBrandRequest {
   id?: string; // Firestore document ID
   quotationId: string;
   productId: string;
+  productName: string; // Denormalized from ShoppingListItem for convenience
   supplierId: string;
   supplierName: string;
   supplierInitials: string;

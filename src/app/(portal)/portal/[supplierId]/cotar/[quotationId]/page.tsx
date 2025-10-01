@@ -437,6 +437,7 @@ export default function SellerQuotationPage() {
       const brandRequestData = {
         quotationId: quotation.id,
         productId: newBrandModal.productId,
+        productName: newBrandModal.productName, // Added for notification context
         supplierId: supplierId,
         supplierName: currentSupplierDetails.empresa,
         supplierInitials: currentSupplierDetails.vendedor.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
