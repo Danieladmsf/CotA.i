@@ -146,15 +146,15 @@ export default function SupplierPortalPage() {
   // Voice assistant welcome message
   useEffect(() => {
     if (!isLoading && supplier && !hasSpokenWelcome) {
+      console.log('[Voice] Portal welcome - triggering speech');
       const supplierName = supplier.empresa || 'Fornecedor';
       const openQuotationsActive = openQuotations.filter(q => q.status === 'Aberta');
 
-      if (openQuotationsActive.length > 0) {
-        // Buscar a data de entrega da primeira cotação aberta
-        const firstQuotation = openQuotationsActive[0];
+      const speakWelcome = async () => {
+        if (openQuotationsActive.length > 0) {
+          // Buscar a data de entrega da primeira cotação aberta
+          const firstQuotation = openQuotationsActive[0];
 
-        // Buscar itens dessa cotação para pegar a data
-        const fetchQuotationItems = async () => {
           try {
             const itemsQuery = query(
               collection(db, "shopping_list_items"),
@@ -184,13 +184,12 @@ export default function SupplierPortalPage() {
             console.error('Error fetching quotation items:', error);
             speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
           }
-        };
+        } else {
+          speak(voiceMessages.welcome.supplierPortal(supplierName, 0));
+        }
+      };
 
-        fetchQuotationItems();
-      } else {
-        speak(voiceMessages.welcome.supplierPortal(supplierName, 0));
-      }
-
+      speakWelcome();
       setHasSpokenWelcome(true);
     }
   }, [isLoading, supplier, openQuotations, hasSpokenWelcome, speak]);
