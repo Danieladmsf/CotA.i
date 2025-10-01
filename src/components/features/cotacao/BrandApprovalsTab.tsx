@@ -269,7 +269,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             message: notificationMessage,
             quotationId: request.quotationId,
             brandName: request.brandName,
-            productName: request.productName,
             isRead: false,
             priority: 'high',
             actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
