@@ -1036,6 +1036,39 @@ export default function CotacaoClient() {
                           Prazo: {format(activeQuotationDetails.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm")}
                         </div>
                       )}
+                      {activeQuotationDetails.deadline && (
+                        <Button
+                          onClick={async () => {
+                            if (!activeQuotationDetails.id) return;
+                            try {
+                              const currentDeadline = activeQuotationDetails.deadline.toDate();
+                              const newDeadline = new Date(currentDeadline.getTime() + 24 * 60 * 60 * 1000);
+
+                              await updateDoc(doc(db, FIREBASE_COLLECTIONS.QUOTATIONS, activeQuotationDetails.id), {
+                                deadline: Timestamp.fromDate(newDeadline)
+                              });
+
+                              toast({
+                                title: "Prazo Estendido",
+                                description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}`,
+                              });
+                            } catch (error) {
+                              console.error("Error extending deadline:", error);
+                              toast({
+                                title: "Erro",
+                                description: "Não foi possível estender o prazo.",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Estender Prazo (+24h)
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

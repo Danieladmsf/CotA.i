@@ -843,13 +843,17 @@ export default function SellerQuotationPage() {
             if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
               const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
 
+              // Check if there are multiple competing suppliers (not just first offer)
+              const competingSuppliersCount = new Set(offersData.filter(o => o.pricePerUnit > 0).map(o => o.supplierId)).size;
+
               if (new Date() < deadline) {
                 counterProposalInfo = {
                   deadline,
                   winningBrand: outbidOffer.brandOffered,
                   myBrand: myBestOffer.brandOffered,
                 };
-              } else {
+              } else if (competingSuppliersCount > 1) {
+                // Only lock out if there are actually competing offers
                 isLockedOut = true;
               }
             }
