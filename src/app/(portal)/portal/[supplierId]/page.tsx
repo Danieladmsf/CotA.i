@@ -19,6 +19,8 @@ import Image from 'next/image';
 import AddFornecedorModal, { FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { voiceMessages } from '@/config/voiceMessages';
+import { useSupplierAuth } from '@/hooks/useSupplierAuth';
+import SupplierPinModal from '@/components/features/portal/SupplierPinModal';
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
@@ -56,6 +58,9 @@ export default function SupplierPortalPage() {
   const supplierId = params.supplierId as string;
   const { toast } = useToast();
   const { speak } = useVoiceAssistant();
+
+  // PIN Authentication
+  const { isAuthenticated, isLoading: authLoading, supplier: authSupplier, showPinModal, verifyPin } = useSupplierAuth(supplierId);
 
   const [supplier, setSupplier] = useState<Fornecedor | null>(null);
   const [openQuotations, setOpenQuotations] = useState<Quotation[]>([]);
@@ -214,11 +219,34 @@ export default function SupplierPortalPage() {
     }
   };
 
-  if (isLoading) {
+  // Show PIN modal if not authenticated
+  if (showPinModal && authSupplier) {
+    return (
+      <SupplierPinModal
+        isOpen={true}
+        supplierName={authSupplier.empresa}
+        onVerify={verifyPin}
+      />
+    );
+  }
+
+  // Show loading while checking authentication or loading data
+  if (authLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Carregando portal do fornecedor...</p>
+        <p className="text-lg text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  // Block access if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <div className="text-center">
+          <p className="text-lg text-muted-foreground">Autenticação necessária</p>
+        </div>
       </div>
     );
   }

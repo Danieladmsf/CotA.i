@@ -59,6 +59,8 @@ export interface Fornecedor {
   cnpj: string;
   vendedor: string;
   whatsapp: string;
+  email?: string; // Email do vendedor (opcional)
+  pin?: string; // PIN de acesso ao portal (4-6 dígitos, hasheado)
   fotoUrl: string;
   fotoHint: string;
   status?: 'ativo' | 'pendente';
@@ -169,7 +171,7 @@ export type NotificationType =
 
 export interface SystemNotification {
   id: string;
-  userId: string; // The user who the notification is for (e.g., the buyer)
+  userId?: string; // The user who the notification is for (e.g., the buyer) - optional for supplier notifications
   targetSupplierId?: string; // The supplier this notification is for (for anonymous portal access)
   type: NotificationType;
   title: string;
@@ -187,4 +189,5 @@ export interface SystemNotification {
   readAt?: Timestamp | FieldValue;
   actionUrl?: string; // URL para navegar quando clicado
   metadata?: Record<string, any>; // Para dados extras específicos do tipo
+  entityId?: string; // ID da entidade relacionada (ex: brand request ID)
 }

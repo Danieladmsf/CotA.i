@@ -255,7 +255,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
       // 5. Create notification for the supplier
       try {
-        const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
+        const notificationType: 'brand_approval_approved' | 'brand_approval_rejected' = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
         const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
 
         // Fetch product name for a more descriptive message
@@ -279,7 +279,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           brandName: request.brandName,
           productName: productNameForNotif,
           isRead: false,
-          priority: 'high',
+          priority: 'high' as const,
           actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
         };
 

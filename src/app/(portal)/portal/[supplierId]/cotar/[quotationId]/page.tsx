@@ -57,6 +57,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { voiceMessages } from "@/config/voiceMessages";
+import { useSupplierAuth } from "@/hooks/useSupplierAuth";
+import SupplierPinModal from "@/components/features/portal/SupplierPinModal";
 
 
 const QUOTATIONS_COLLECTION = "quotations";
@@ -204,11 +206,14 @@ export default function SellerQuotationPage() {
   const quotationId = params.quotationId as string;
   const supplierId = params.supplierId as string; // ID of the supplier currently viewing the portal
 
-    const { notifications, markAsRead, isLoading: notificationsLoading } = useNotifications({ 
-      targetSupplierId: supplierId,
-      quotationId: quotationId, 
-      isRead: false 
-    });
+  // PIN Authentication
+  const { isAuthenticated, isLoading: authLoading, supplier, showPinModal, verifyPin } = useSupplierAuth(supplierId);
+
+  const { notifications, markAsRead, isLoading: notificationsLoading } = useNotifications({
+    targetSupplierId: supplierId,
+    quotationId: quotationId,
+    isRead: false
+  });
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [currentSupplierDetails, setCurrentSupplierDetails] = useState<SupplierType | null>(null);
   const [productsToQuote, setProductsToQuote] = useState<ProductToQuoteVM[]>([]);
@@ -1710,11 +1715,34 @@ export default function SellerQuotationPage() {
     });
   };
 
-  if (isLoading) {
+  // Show PIN modal if not authenticated
+  if (showPinModal && supplier) {
+    return (
+      <SupplierPinModal
+        isOpen={true}
+        supplierName={supplier.empresa}
+        onVerify={verifyPin}
+      />
+    );
+  }
+
+  // Show loading while checking authentication or loading data
+  if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Carregando cotação...</p>
+        <p className="ml-4 text-lg">Carregando...</p>
+      </div>
+    );
+  }
+
+  // Block access if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-lg text-muted-foreground">Autenticação necessária</p>
+        </div>
       </div>
     );
   }

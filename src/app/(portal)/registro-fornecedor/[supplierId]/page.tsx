@@ -10,7 +10,6 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from "@/hooks/use-toast";
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { db } from '@/lib/config/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -34,8 +33,11 @@ const fornecedorSchema = z.object({
     .regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{14}$/, "Formato de CNPJ inválido."),
   vendedor: z.string().min(2, "Nome do vendedor é obrigatório (mín. 2 caracteres)."),
   whatsapp: z.string().min(10, "WhatsApp é obrigatório (mín. 10 dígitos).").regex(/^\+?\d{10,15}$/, "Formato de WhatsApp inválido. Use apenas números, incluindo o código do país (ex: 5511999998888)."),
-  email: z.string().email("Formato de email inválido."),
-  password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
+  email: z.string().email("Formato de email inválido.").optional().or(z.literal('')),
+  pin: z.string()
+    .min(4, "O PIN deve ter entre 4 e 6 dígitos.")
+    .max(6, "O PIN deve ter entre 4 e 6 dígitos.")
+    .regex(/^\d{4,6}$/, "O PIN deve conter apenas números."),
   fotoFile: z.instanceof(File).optional().nullable(),
   diasDeEntrega: z.array(z.string()).refine((value) => value.some(Boolean), {
     message: "Selecione pelo menos um dia de entrega.",
@@ -63,6 +65,8 @@ export default function CompleteSupplierRegistrationPage() {
       cnpj: '',
       vendedor: '',
       whatsapp: '',
+      email: '',
+      pin: '',
       fotoFile: null,
       diasDeEntrega: [],
     },
@@ -103,6 +107,15 @@ export default function CompleteSupplierRegistrationPage() {
     fetchSupplier();
   }, [supplierId, form]);
 
+  // Simple hash function for PIN (using SHA-256)
+  const hashPin = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   const onSubmit: SubmitHandler<FornecedorFormValues> = async (data) => {
     if (!supplier) {
         toast({ title: "Erro Interno", description: "Dados do fornecedor não encontrados.", variant: "destructive"});
@@ -112,13 +125,8 @@ export default function CompleteSupplierRegistrationPage() {
     form.setValue("empresa", data.empresa, { shouldValidate: true }); // Trigger validation display
 
     try {
-        // 1. Create Firebase Auth user
-        const auth = getAuth();
-        const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-        const newUser = userCredential.user;
-
-        // 2. Handle image upload (if any)
-        const { fotoFile, ...dataForFirestore } = data;
+        // 1. Handle image upload (if any)
+        const { fotoFile, pin, email, ...dataForFirestore } = data;
         let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
         let fotoHint = supplier.fotoHint || 'generic logo';
 
@@ -143,23 +151,31 @@ export default function CompleteSupplierRegistrationPage() {
                 });
             }
         }
-        
+
+        // 2. Hash the PIN for security
+        const hashedPin = await hashPin(pin);
+
         // 3. Prepare the data to update in Firestore
         const cleanedCnpj = dataForFirestore.cnpj.replace(/[^\d]/g, "");
         const cleanedWhatsapp = dataForFirestore.whatsapp.replace(/[^\d]/g, "");
 
-        const dataToUpdate = {
+        const dataToUpdate: any = {
             empresa: dataForFirestore.empresa.trim(),
             cnpj: cleanedCnpj,
             vendedor: dataForFirestore.vendedor.trim(),
             whatsapp: cleanedWhatsapp,
             diasDeEntrega: dataForFirestore.diasDeEntrega,
+            pin: hashedPin,
             fotoUrl,
             fotoHint,
             status: 'ativo' as const,
             updatedAt: serverTimestamp(),
-            userId: newUser.uid, // <-- THE CRITICAL FIX
         };
+
+        // Add email if provided
+        if (email && email.trim()) {
+            dataToUpdate.email = email.trim();
+        }
 
         // 4. Update the supplier document
         const docRef = doc(db, FORNECEDORES_COLLECTION, supplier.id);
@@ -170,7 +186,7 @@ export default function CompleteSupplierRegistrationPage() {
             description: `Bem-vindo(a), ${data.empresa}! Seu cadastro foi concluído.`,
             duration: 7000,
         });
-        
+
         // 5. Redirect to the supplier portal
         router.push(`/portal/${supplier.id}`);
 
@@ -282,16 +298,17 @@ export default function CompleteSupplierRegistrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="email" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email de Acesso *</FormLabel>
+                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email (Opcional)</FormLabel>
                     <FormControl><Input {...field} type="email" placeholder="seu@email.com" className="text-base"/></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
-                <FormField control={form.control} name="password" render={({ field }) => (
+                <FormField control={form.control} name="pin" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-key-round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5"/></svg> Senha *</FormLabel>
-                    <FormControl><Input {...field} type="password" placeholder="Mínimo 6 caracteres" className="text-base"/></FormControl>
+                    <FormLabel className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary lucide lucide-key-round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5"/></svg> Senha de Acesso *</FormLabel>
+                    <FormControl><Input {...field} type="password" inputMode="numeric" placeholder="Digite 4-6 números" maxLength={6} className="text-base"/></FormControl>
                     <FormMessage />
+                    <p className="text-xs text-muted-foreground">Esta senha será usada para acessar o portal do fornecedor</p>
                   </FormItem>
                 )}/>
             </div>
