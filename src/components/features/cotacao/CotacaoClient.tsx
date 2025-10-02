@@ -32,6 +32,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KeepAliveTabsContent } from "@/components/ui/keep-alive-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   FileBarChart,
   Loader2,
@@ -160,6 +163,9 @@ export default function CotacaoClient() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
   const [filterByBrand, setFilterByBrand] = useState<string>("all");
+  const [isExtendDeadlineModalOpen, setIsExtendDeadlineModalOpen] = useState(false);
+  const [newDeadlineDate, setNewDeadlineDate] = useState<Date | undefined>(undefined);
+  const [newDeadlineTime, setNewDeadlineTime] = useState<string>("");
 
   // Update activeTab when URL params change
   useEffect(() => {
@@ -1037,37 +1043,125 @@ export default function CotacaoClient() {
                         </div>
                       )}
                       {activeQuotationDetails.deadline && (
-                        <Button
-                          onClick={async () => {
-                            if (!activeQuotationDetails.id) return;
-                            try {
-                              const currentDeadline = activeQuotationDetails.deadline.toDate();
-                              const newDeadline = new Date(currentDeadline.getTime() + 24 * 60 * 60 * 1000);
+                        <Dialog open={isExtendDeadlineModalOpen} onOpenChange={setIsExtendDeadlineModalOpen}>
+                          <DialogTrigger asChild>
+                            <Button
+                              onClick={() => {
+                                const currentDeadline = activeQuotationDetails.deadline.toDate();
+                                setNewDeadlineDate(currentDeadline);
+                                setNewDeadlineTime(format(currentDeadline, "HH:mm"));
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                            >
+                              <Clock className="h-4 w-4 mr-2" />
+                              Estender Prazo
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[500px]">
+                            <DialogHeader>
+                              <DialogTitle>Estender Prazo da Cotação</DialogTitle>
+                              <DialogDescription>
+                                Defina a nova data e hora de encerramento para esta cotação.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-6 py-4">
+                              <div className="grid gap-2">
+                                <Label htmlFor="deadline-date">Data</Label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-start text-left font-normal"
+                                    >
+                                      <CalendarDays className="mr-2 h-4 w-4" />
+                                      {newDeadlineDate ? format(newDeadlineDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione uma data"}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={newDeadlineDate}
+                                      onSelect={setNewDeadlineDate}
+                                      locale={ptBR}
+                                      disabled={(date) => {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const compareDate = new Date(date);
+                                        compareDate.setHours(0, 0, 0, 0);
+                                        return compareDate < today;
+                                      }}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="deadline-time">Hora</Label>
+                                <Input
+                                  id="deadline-time"
+                                  type="time"
+                                  value={newDeadlineTime}
+                                  onChange={(e) => setNewDeadlineTime(e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => setIsExtendDeadlineModalOpen(false)}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  if (!activeQuotationDetails.id || !newDeadlineDate || !newDeadlineTime) {
+                                    toast({
+                                      title: "Erro",
+                                      description: "Por favor, selecione data e hora.",
+                                      variant: "destructive"
+                                    });
+                                    return;
+                                  }
 
-                              await updateDoc(doc(db, FIREBASE_COLLECTIONS.QUOTATIONS, activeQuotationDetails.id), {
-                                deadline: Timestamp.fromDate(newDeadline)
-                              });
+                                  try {
+                                    const [hours, minutes] = newDeadlineTime.split(':');
+                                    const newDeadline = new Date(newDeadlineDate);
+                                    newDeadline.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-                              toast({
-                                title: "Prazo Estendido",
-                                description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}`,
-                              });
-                            } catch (error) {
-                              console.error("Error extending deadline:", error);
-                              toast({
-                                title: "Erro",
-                                description: "Não foi possível estender o prazo.",
-                                variant: "destructive"
-                              });
-                            }
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                        >
-                          <Clock className="h-4 w-4 mr-2" />
-                          Estender Prazo (+24h)
-                        </Button>
+                                    // Update deadline and reopen quotation if closed
+                                    const updateData: any = {
+                                      deadline: Timestamp.fromDate(newDeadline)
+                                    };
+
+                                    // If quotation is closed, reopen it
+                                    if (activeQuotationDetails.status === 'Fechada') {
+                                      updateData.status = 'Aberta';
+                                    }
+
+                                    await updateDoc(doc(db, FIREBASE_COLLECTIONS.QUOTATIONS, activeQuotationDetails.id), updateData);
+
+                                    toast({
+                                      title: activeQuotationDetails.status === 'Fechada' ? "Cotação Reaberta" : "Prazo Estendido",
+                                      description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}`,
+                                    });
+
+                                    setIsExtendDeadlineModalOpen(false);
+                                  } catch (error) {
+                                    console.error("Error extending deadline:", error);
+                                    toast({
+                                      title: "Erro",
+                                      description: "Não foi possível estender o prazo.",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }}
+                              >
+                                Confirmar
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       )}
                     </div>
                   </CardContent>
