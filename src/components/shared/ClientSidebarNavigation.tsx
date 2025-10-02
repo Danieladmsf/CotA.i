@@ -30,10 +30,8 @@ const navItems = [
 export default function ClientSidebarNavigation() {
   const pathname = usePathname();
 
-  console.log('🧭 [NAVIGATION] Current pathname:', pathname);
-
   const handleClick = (href: string, label: string) => {
-    console.log('🖱️ [NAVIGATION] Click detected on:', { href, label, currentPath: pathname });
+    // Navigation click handler
   };
 
   return (
@@ -43,13 +41,6 @@ export default function ClientSidebarNavigation() {
         const isActive = item.exact
           ? pathname === item.href
           : pathname.startsWith(item.href);
-
-        console.log('📍 [NAVIGATION] Item:', {
-          label: item.label,
-          href: item.href,
-          isActive,
-          pathname
-        });
 
         return (
           <SidebarMenuItem key={item.href}>

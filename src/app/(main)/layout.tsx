@@ -59,12 +59,8 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
   const BYPASS_AUTH = false; // Should be false in production
 
-  console.log('🔐 [LAYOUT] Auth state:', { user: !!user, loading, pathname });
-
   useEffect(() => {
-    console.log('🔄 [LAYOUT] useEffect triggered:', { BYPASS_AUTH, loading, user: !!user, pathname });
     if (!BYPASS_AUTH && !loading && !user) {
-      console.log('⚠️ [LAYOUT] Redirecting to login - user not authenticated');
       router.push('/login');
     }
   }, [user, loading, router, pathname]);

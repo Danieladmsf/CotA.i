@@ -48,37 +48,30 @@ export const useSupplierAuth = (supplierId: string) => {
   // Check if there's a valid session
   useEffect(() => {
     const checkSession = () => {
-      console.log('🔐 [useSupplierAuth] Checking session for supplier:', supplierId);
       const sessionKey = `${SESSION_KEY_PREFIX}${supplierId}`;
       const sessionData = localStorage.getItem(sessionKey);
 
       if (sessionData) {
-        console.log('🔐 [useSupplierAuth] Found session data');
         try {
           const session: SupplierAuthSession = JSON.parse(sessionData);
           const now = Date.now();
 
           // Check if session is still valid
           if (now - session.timestamp < SESSION_DURATION) {
-            console.log('🔐 [useSupplierAuth] Session is valid');
             setIsAuthenticated(true);
             setIsLoading(false);
             return;
           } else {
-            console.log('🔐 [useSupplierAuth] Session expired');
             // Session expired, remove it
             localStorage.removeItem(sessionKey);
           }
         } catch (error) {
-          console.error('🔐 [useSupplierAuth] Error parsing session data:', error);
+          console.error('Error parsing session data:', error);
           localStorage.removeItem(sessionKey);
         }
-      } else {
-        console.log('🔐 [useSupplierAuth] No session found');
       }
 
       // No valid session, need to authenticate
-      console.log('🔐 [useSupplierAuth] Showing PIN modal');
       setShowPinModal(true);
       setIsLoading(false);
     };
@@ -90,22 +83,16 @@ export const useSupplierAuth = (supplierId: string) => {
   useEffect(() => {
     const loadSupplier = async () => {
       try {
-        console.log('🔐 [useSupplierAuth] Loading supplier data:', supplierId);
         const supplierDoc = await getDoc(doc(db, 'fornecedores', supplierId));
 
         if (supplierDoc.exists()) {
           const supplierData = { id: supplierDoc.id, ...supplierDoc.data() } as Fornecedor;
-          console.log('🔐 [useSupplierAuth] Supplier loaded:', {
-            id: supplierData.id,
-            empresa: supplierData.empresa,
-            hasPIN: !!supplierData.pin
-          });
           setSupplier(supplierData);
         } else {
-          console.error('🔐 [useSupplierAuth] Supplier not found');
+          console.error('Supplier not found');
         }
       } catch (error) {
-        console.error('🔐 [useSupplierAuth] Error loading supplier:', error);
+        console.error('Error loading supplier:', error);
       }
     };
 

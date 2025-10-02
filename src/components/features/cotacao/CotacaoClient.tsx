@@ -166,8 +166,6 @@ export default function CotacaoClient() {
     const tab = searchParams.get('tab');
     const quotation = searchParams.get('quotation');
 
-    console.log('🔄 [CotacaoClient] URL params changed:', { tab, quotation });
-
     if (tab === 'aprovacoes') {
       setActiveTab('aprovacoes');
     }

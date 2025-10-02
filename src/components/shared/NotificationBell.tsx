@@ -43,55 +43,29 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
 
   // Filter notifications based on context
   const recentNotifications = useMemo(() => {
-    console.log('🔔 [NotificationBell] Filtering notifications:', {
-      context,
-      totalNotifications: allNotifications.length,
-      allTypes: allNotifications.map(n => n.type)
-    });
-
     if (context === 'supplier') {
       // For suppliers: show only approved/rejected brand notifications
-      const filtered = allNotifications
+      return allNotifications
         .filter(n => n.type === 'brand_approval_approved' || n.type === 'brand_approval_rejected')
         .slice(0, 5);
-      console.log('🔔 [NotificationBell] Supplier filtered:', filtered.length);
-      return filtered;
     }
     // For buyers: show only pending brand approval notifications
-    const filtered = allNotifications
+    return allNotifications
       .filter(n => n.type === 'brand_approval_pending')
       .slice(0, 5);
-    console.log('🔔 [NotificationBell] Buyer filtered:', {
-      totalFiltered: filtered.length,
-      notifications: filtered.map(n => ({ id: n.id, type: n.type, title: n.title }))
-    });
-    return filtered;
   }, [allNotifications, context]);
 
   // Calculate context-specific unread count
   const unreadCount = useMemo(() => {
-    const unreadNotifications = allNotifications.filter(n => !n.isRead);
-
-    console.log('🔢 [NotificationBell] Calculating unread count:', {
-      context,
-      totalNotifications: allNotifications.length,
-      totalUnread: unreadNotifications.length,
-      unreadDetails: unreadNotifications.map(n => ({ id: n.id, type: n.type, isRead: n.isRead }))
-    });
-
     if (context === 'supplier') {
-      const count = allNotifications.filter(n =>
+      return allNotifications.filter(n =>
         !n.isRead && (n.type === 'brand_approval_approved' || n.type === 'brand_approval_rejected')
       ).length;
-      console.log('🔢 [NotificationBell] Supplier unread count:', count);
-      return count;
     }
 
-    const count = allNotifications.filter(n =>
+    return allNotifications.filter(n =>
       !n.isRead && n.type === 'brand_approval_pending'
     ).length;
-    console.log('🔢 [NotificationBell] Buyer unread count:', count);
-    return count;
   }, [allNotifications, context]);
 
   // Fallback to pending brand requests if notifications system is not available
@@ -177,16 +151,6 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
   }, [user?.uid]);
 
   const handleNotificationClick = async (notification: SystemNotification) => {
-    console.log('🔔 [NotificationBell] Notification clicked:', {
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      actionUrl: notification.actionUrl,
-      quotationId: notification.quotationId,
-      context: context,
-      currentPath: window.location.pathname
-    });
-
     if (!notification.isRead) {
       await markAsRead(notification.id);
     }
@@ -194,7 +158,6 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
     setShowDropdown(false);
 
     if (notification.actionUrl) {
-      console.log('🔔 [NotificationBell] Using actionUrl:', notification.actionUrl);
       router.push(notification.actionUrl);
     } else {
       // Default navigation based on type
@@ -218,7 +181,6 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
         default:
           targetUrl = '/cotacao';
       }
-      console.log('🔔 [NotificationBell] Using default URL for type:', notification.type, '→', targetUrl);
       router.push(targetUrl);
     }
   };
@@ -251,16 +213,7 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
   return (
     <>
       <div className="relative">
-        <Popover open={showDropdown} onOpenChange={(open) => {
-          console.log('🔔 [NotificationBell] Dropdown toggled:', {
-            open,
-            context,
-            recentNotifications: recentNotifications.length,
-            unreadCount,
-            displayCount
-          });
-          setShowDropdown(open);
-        }}>
+        <Popover open={showDropdown} onOpenChange={setShowDropdown}>
           <PopoverTrigger asChild>
             <Button 
               variant="ghost" 
@@ -317,11 +270,6 @@ export default function NotificationBell({ context = 'buyer', supplierId }: Noti
                   <div className="divide-y">
                     {(() => {
                       const notificationsToDisplay = recentNotifications.slice(0, 5);
-                      console.log('📋 [NotificationBell] Rendering notifications:', {
-                        total: recentNotifications.length,
-                        displaying: notificationsToDisplay.length,
-                        ids: notificationsToDisplay.map(n => n.id)
-                      });
                       return notificationsToDisplay.map((notification) => {
                         const createdAt = (notification.createdAt as any).toDate();
                         return (

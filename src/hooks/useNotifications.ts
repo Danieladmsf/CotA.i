@@ -52,10 +52,8 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
 
       // Determine the primary query filter
       if (canQueryBySupplier) {
-        console.log(`[useNotifications] Querying by targetSupplierId: ${filters.targetSupplierId}`);
         queryConstraints.push(where('targetSupplierId', '==', filters.targetSupplierId));
       } else if (canQueryByUser) {
-        console.log(`[useNotifications] Querying by userId: ${user.uid}`);
         queryConstraints.push(where('userId', '==', user.uid));
       }
       
@@ -83,16 +81,6 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
       const unsubscribe = onSnapshot(
         notificationQuery,
         (snapshot) => {
-          console.log('🔔 [useNotifications] Snapshot received:', {
-            size: snapshot.size,
-            docChanges: snapshot.docChanges().length,
-            changes: snapshot.docChanges().map(change => ({
-              type: change.type,
-              id: change.doc.id,
-              data: change.doc.data()
-            }))
-          });
-
           const newNotifications = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
@@ -302,16 +290,13 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
 // Helper function to create notifications
 export const createNotification = async (notification: Omit<SystemNotification, 'id' | 'createdAt'>) => {
   try {
-    console.log('📝 [createNotification] Attempting to create notification:', notification);
-
     const docRef = await addDoc(collection(db, 'notifications'), {
       ...notification,
       createdAt: Timestamp.now()
     });
-
-    console.log('✅ [createNotification] Notification created with ID:', docRef.id);
+    return docRef.id;
   } catch (error) {
-    console.error('❌ [createNotification] Error creating notification:', error);
+    console.error('Error creating notification:', error);
     throw error;
   }
 };
