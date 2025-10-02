@@ -1659,6 +1659,30 @@ export default function SellerQuotationPage() {
       console.log(`[OFFER-DEBUG] Save completed successfully for offer ${offerUiId}`);
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
       handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false); // Reset the flag after saving
+
+      // Force local update to show the saved offer immediately
+      if (offerData.id) {
+        setProductsToQuote(currentProducts => {
+          return currentProducts.map(p => {
+            if (p.id === productId) {
+              const updatedOffers = p.supplierOffers.map(o => {
+                if (o.uiId === offerUiId) {
+                  return {
+                    ...o,
+                    ...offerPayload,
+                    id: offerData.id,
+                    uiId: offerData.id,
+                  };
+                }
+                return o;
+              });
+              return { ...p, supplierOffers: updatedOffers };
+            }
+            return p;
+          });
+        });
+      }
+
       return true;
     } catch (error: any) {
       console.log(`[OFFER-DEBUG] ERROR during save:`, error);
