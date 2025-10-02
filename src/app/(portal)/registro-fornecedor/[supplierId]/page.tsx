@@ -80,30 +80,43 @@ export default function CompleteSupplierRegistrationPage() {
     }
 
     const fetchSupplier = async () => {
-      const docRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
-      const docSnap = await getDoc(docRef);
+      try {
+        const docRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
+        const docSnap = await getDoc(docRef);
 
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Fornecedor;
-        if (data.status === 'ativo') {
-          setError("Este convite já foi utilizado. O cadastro já está ativo.");
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Fornecedor;
+          if (data.status === 'ativo') {
+            // Cadastro já ativo, redirecionar para o portal
+            toast({
+              title: "Cadastro já ativo",
+              description: "Você já completou seu cadastro. Redirecionando para o portal...",
+            });
+            setTimeout(() => {
+              router.push(`/portal/${supplierId}`);
+            }, 1500);
+          } else {
+            setSupplier({ ...data, id: docSnap.id });
+            form.reset({
+              empresa: data.empresa || '',
+              cnpj: data.cnpj || '',
+              vendedor: data.vendedor || '',
+              whatsapp: data.whatsapp || '',
+              email: data.email || '',
+              pin: '',
+              fotoFile: null,
+              diasDeEntrega: data.diasDeEntrega || [],
+            });
+          }
         } else {
-          setSupplier({ ...data, id: docSnap.id });
-          form.reset({
-            empresa: data.empresa || '',
-            cnpj: data.cnpj || '',
-            vendedor: data.vendedor || '',
-            whatsapp: data.whatsapp || '',
-            email: data.email || '',
-            pin: '',
-            fotoFile: null,
-            diasDeEntrega: data.diasDeEntrega || [],
-          });
+          setError("Convite inválido ou não encontrado.");
         }
-      } else {
-        setError("Convite inválido ou não encontrado.");
+      } catch (error) {
+        console.error("Erro ao buscar fornecedor:", error);
+        setError("Erro ao carregar dados. Tente novamente.");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchSupplier();
