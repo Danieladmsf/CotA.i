@@ -457,7 +457,11 @@ export default function FornecedoresPage() {
       navigator.clipboard.writeText(link)
         .then(() => {
           toast({ title: "Link Copiado!", description: "O link foi copiado para a área de transferência." });
-          setIsLinkModalOpen(false);
+          // Fechar ambos os modais após pequeno delay para garantir que o toast apareça
+          setTimeout(() => {
+            setIsLinkModalOpen(false);
+            setGeneratedLinkInfo(null);
+          }, 300);
         })
         .catch(err => {
           fallbackCopyTextToClipboard(link);
@@ -492,7 +496,11 @@ export default function FornecedoresPage() {
       const successful = document.execCommand('copy');
       if (successful) {
         toast({ title: "Link Copiado!", description: "O link foi copiado para a área de transferência." });
-        setIsLinkModalOpen(false);
+        // Fechar ambos os modais após pequeno delay para garantir que o toast apareça
+        setTimeout(() => {
+          setIsLinkModalOpen(false);
+          setGeneratedLinkInfo(null);
+        }, 300);
       } else {
         toast({
           title: "Use Ctrl+V para colar",
