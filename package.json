@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:external": "./dev-external.sh",
     "dev:tunnel": "./start-dev.sh",
+    "health": "./health-check.sh",
     "build": "next build",
     "start": "next start",
     "deploy": "npm run build && firebase deploy --project cotao-online",

@@ -31,10 +31,25 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow list: if request.auth != null && request.auth.uid != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Allow reading notifications if you're the owner OR if it's targeted to a supplier (anonymous access)
+      allow get: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.targetSupplierId != null
+      );
+      // Allow listing for authenticated users (they'll filter by userId or targetSupplierId in queries)
+      allow list: if true; // Allow unauthenticated supplier portal access
+      // Allow creating notifications for yourself OR for suppliers (with targetSupplierId)
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.targetSupplierId != null
+      );
+      // Allow updating supplier notifications (anonymous) OR user notifications (authenticated)
+      allow update: if (
+        resource.data.targetSupplierId != null || // Supplier notifications (anonymous)
+        (request.auth != null && resource.data.userId == request.auth.uid) // User notifications (authenticated)
+      );
+      // Allow deleting only if you're the authenticated owner
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     match /fornecedores/{supplierId} {
@@ -75,7 +90,7 @@ service cloud.firestore {
     match /pending_brand_requests/{requestId} {
         allow read: if true; // Allow unauthenticated supplier portal access
         allow create: if true;
-        allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+        allow update, delete: if request.auth != null && resource.data.buyerUserId == request.auth.uid;
     }
 
     // WhatsApp queue - authenticated users can create and read their messages

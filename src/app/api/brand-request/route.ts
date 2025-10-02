@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!quotationId || !productId || !productName || !supplierId || !brandName || !packagingDescription || !buyerUserId || !sellerUserId) { // ADDED productName
+    if (!quotationId || !productId || !productName || !supplierId || !brandName || !packagingDescription || !buyerUserId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       imageFileName: imageFileName || '',
       status: 'pending',
       buyerUserId,
-      sellerUserId,
+      sellerUserId: sellerUserId || supplierId, // Fallback to supplierId if sellerUserId not provided
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };
@@ -66,10 +66,42 @@ export async function POST(request: NextRequest) {
     const db = adminDb();
     const docRef = await db.collection('pending_brand_requests').add(brandRequest);
 
-    return NextResponse.json({ 
-      success: true, 
+    // Create notification for the buyer
+    try {
+      const notificationData = {
+        userId: buyerUserId,
+        type: 'brand_approval_pending',
+        title: 'Nova marca para aprovação',
+        message: `${supplierName} enviou a marca "${brandName}" para aprovação no produto "${productName}".`,
+        quotationId,
+        productId,
+        brandName,
+        productName,
+        supplierId,
+        entityId: docRef.id, // Link to the brand request
+        isRead: false,
+        priority: 'high',
+        actionUrl: `/cotacao?quotation=${quotationId}&tab=aprovacoes`,
+        createdAt: Timestamp.now()
+      };
+
+      const notificationRef = await db.collection('notifications').add(notificationData);
+      console.log('✅ Notification created for buyer:', {
+        buyerUserId,
+        notificationId: notificationRef.id,
+        type: 'brand_approval_pending',
+        brandName,
+        productName
+      });
+    } catch (notificationError) {
+      console.error('⚠️ Error creating notification for buyer:', notificationError);
+      // Don't fail the whole request if notification fails
+    }
+
+    return NextResponse.json({
+      success: true,
       id: docRef.id,
-      message: 'Brand request created successfully' 
+      message: 'Brand request created successfully'
     });
 
   } catch (error: any) {

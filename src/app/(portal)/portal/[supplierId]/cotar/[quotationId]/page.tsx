@@ -449,7 +449,7 @@ export default function SellerQuotationPage() {
         imageUrl: imageUrl,
         imageFileName: newBrandForm.imageFile?.name || '',
         buyerUserId: quotation.userId, // ID do comprador
-        sellerUserId: sellerUser.uid, // ID do vendedor (NOVO)
+        sellerUserId: sellerUser?.uid || supplierId, // ID do vendedor (usa supplierId se não autenticado)
       };
 
       const response = await fetch('/api/brand-request', {

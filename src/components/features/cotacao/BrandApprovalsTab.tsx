@@ -28,11 +28,11 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
   useEffect(() => {
     if (!user?.uid || !quotationId) return;
 
-    console.log('🔍 Querying for brand requests with userId:', user.uid, 'and quotationId:', quotationId);
+    console.log('🔍 Querying for brand requests with buyerUserId:', user.uid, 'and quotationId:', quotationId);
 
     const allRequestsQuery = query(
       collection(db, 'pending_brand_requests'),
-      where('userId', '==', user.uid),
+      where('buyerUserId', '==', user.uid),
       where('quotationId', '==', quotationId)
     );
 
@@ -257,7 +257,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
       try {
         const notificationType = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
         const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
-        
+
         // Fetch product name for a more descriptive message
         let productNameForNotif = request.productName || 'Produto desconhecido';
         if (!request.productName) {
@@ -270,9 +270,8 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         }
         const notificationMessage = `Sua sugestão da marca "${request.brandName}" para o produto "${productNameForNotif}" foi ${approved ? 'aprovada' : 'recusada'}.`;
 
-        await createNotification({
-          targetSupplierId: request.supplierId, // <-- THE FIX: Target the supplier directly
-          userId: request.buyerUserId, // Keep buyerId for reference/scoping if needed
+        const notificationPayload = {
+          targetSupplierId: request.supplierId,
           type: notificationType,
           title: notificationTitle,
           message: notificationMessage,
@@ -282,11 +281,21 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           isRead: false,
           priority: 'high',
           actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
+        };
+
+        console.log('📤 [BrandApprovalsTab] Creating notification for supplier:', {
+          supplierId: request.supplierId,
+          buyerUserId: request.buyerUserId,
+          type: notificationType,
+          payload: notificationPayload
         });
-        console.log(`✅ Notification created for supplier ${request.supplierId} about brand ${request.brandName}`);
-        
+
+        await createNotification(notificationPayload);
+
+        console.log(`✅ [BrandApprovalsTab] Notification created successfully for supplier ${request.supplierId}`);
+
       } catch (notificationError) {
-        console.error('⚠️ Error creating notification for supplier:', notificationError);
+        console.error('❌ [BrandApprovalsTab] Error creating notification for supplier:', notificationError);
         // Non-critical, so we don't show a toast to the buyer for this
       }
 

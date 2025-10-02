@@ -161,6 +161,21 @@ export default function CotacaoClient() {
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
   const [filterByBrand, setFilterByBrand] = useState<string>("all");
 
+  // Update activeTab when URL params change
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const quotation = searchParams.get('quotation');
+
+    console.log('🔄 [CotacaoClient] URL params changed:', { tab, quotation });
+
+    if (tab === 'aprovacoes') {
+      setActiveTab('aprovacoes');
+    }
+    if (quotation) {
+      setSelectedQuotationId(quotation);
+    }
+  }, [searchParams]);
+
   const supplierDataCacheRef = useRef(new Map<string, Fornecedor>());
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const closingQuotationsRef = useRef(new Set<string>());
