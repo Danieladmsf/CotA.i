@@ -1670,9 +1670,9 @@ export default function SellerQuotationPage() {
                   return {
                     ...o,
                     ...offerPayload,
-                    id: offerData.id,
-                    uiId: offerData.id,
-                  };
+                    id: offerData.id!,
+                    uiId: offerData.id!,
+                  } as OfferWithUI;
                 }
                 return o;
               });
