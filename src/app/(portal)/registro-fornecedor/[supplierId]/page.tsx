@@ -32,7 +32,7 @@ const fornecedorSchema = z.object({
     .max(18, "CNPJ inválido (máx. 18 caracteres com pontuação).")
     .regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{14}$/, "Formato de CNPJ inválido."),
   vendedor: z.string().min(2, "Nome do vendedor é obrigatório (mín. 2 caracteres)."),
-  whatsapp: z.string().min(10, "WhatsApp é obrigatório (mín. 10 dígitos).").regex(/^\+?\d{10,15}$/, "Formato de WhatsApp inválido. Use apenas números, incluindo o código do país (ex: 5511999998888)."),
+  whatsapp: z.string().min(10, "WhatsApp é obrigatório (mín. 10 dígitos).").regex(/^\+?\d{10,15}$/, "Formato de WhatsApp inválido. Use apenas números (ex: 11999998888). O código do país (55) será adicionado automaticamente."),
   email: z.string().email("Formato de email inválido.").optional().or(z.literal('')),
   pin: z.string()
     .min(4, "O PIN deve ter entre 4 e 6 dígitos.")
@@ -175,7 +175,12 @@ export default function CompleteSupplierRegistrationPage() {
 
         // 3. Prepare the data to update in Firestore
         const cleanedCnpj = data.cnpj.replace(/[^\d]/g, "");
-        const cleanedWhatsapp = data.whatsapp.replace(/[^\d]/g, "");
+        let cleanedWhatsapp = data.whatsapp.replace(/[^\d]/g, "");
+
+        // Automatically add '55' prefix if not present
+        if (!cleanedWhatsapp.startsWith('55')) {
+            cleanedWhatsapp = '55' + cleanedWhatsapp;
+        }
 
         const dataToUpdate: any = {
             empresa: data.empresa.trim(),
@@ -307,8 +312,8 @@ export default function CompleteSupplierRegistrationPage() {
                 )}/>
                 <FormField control={form.control} name="whatsapp" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2"><Phone className="h-4 w-4 text-primary" /> WhatsApp (com cód. do país) *</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ex: 5511999998888" className="text-base"/></FormControl>
+                    <FormLabel className="flex items-center gap-2"><Phone className="h-4 w-4 text-primary" /> WhatsApp *</FormLabel>
+                    <FormControl><Input {...field} placeholder="Ex: 11999998888 (55 será adicionado automaticamente)" className="text-base"/></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
