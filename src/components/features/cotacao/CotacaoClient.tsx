@@ -1141,9 +1141,22 @@ export default function CotacaoClient() {
 
                                     await updateDoc(doc(db, FIREBASE_COLLECTIONS.QUOTATIONS, activeQuotationDetails.id), updateData);
 
+                                    // Reopen all shopping list items for this quotation
+                                    const itemsQuery = query(
+                                      collection(db, FIREBASE_COLLECTIONS.SHOPPING_LIST_ITEMS),
+                                      where('quotationId', '==', activeQuotationDetails.id),
+                                      where('status', '==', 'Encerrado')
+                                    );
+                                    const itemsSnapshot = await getDocs(itemsQuery);
+
+                                    const reopenPromises = itemsSnapshot.docs.map(itemDoc =>
+                                      updateDoc(itemDoc.ref, { status: 'Aberto' })
+                                    );
+                                    await Promise.all(reopenPromises);
+
                                     toast({
                                       title: activeQuotationDetails.status === 'Fechada' ? "Cotação Reaberta" : "Prazo Estendido",
-                                      description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}`,
+                                      description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}${itemsSnapshot.docs.length > 0 ? ` • ${itemsSnapshot.docs.length} itens reabertos` : ''}`,
                                     });
 
                                     setIsExtendDeadlineModalOpen(false);
