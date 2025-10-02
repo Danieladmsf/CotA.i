@@ -1476,23 +1476,23 @@ export default function SellerQuotationPage() {
     return null;
   };
 
-  const handleSaveProductOffer = async (productId: string, offerUiId: string) => {
+  const handleSaveProductOffer = async (productId: string, offerUiId: string): Promise<boolean> => {
     // Debounce rapid save clicks
     const now = Date.now();
     const actionKey = `save-${productId}-${offerUiId}`;
     if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 1000) {
       console.log(`[OFFER-DEBUG] Debouncing save request for ${actionKey}`);
-      return;
+      return false;
     }
     lastClickRef.current = { action: actionKey, timestamp: now };
 
     console.log(`[OFFER-DEBUG] handleSaveProductOffer called:`, { productId, offerUiId });
     if (!currentSupplierDetails || !quotation || !quotation.userId) {
         toast({title: "Erro Interno", description: "Dados do fornecedor, cotação ou ID do comprador ausentes.", variant: "destructive"});
-        return;
+        return false;
     }
     const product = productsToQuote.find(p => p.id === productId);
-    if (!product) return;
+    if (!product) return false;
 
     console.log(`[OFFER-DEBUG] Before save - ${product.name} has ${product.supplierOffers.length} offers:`,
       product.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
@@ -1502,7 +1502,7 @@ export default function SellerQuotationPage() {
     if (offerToSaveIndex === -1) {
         console.log(`[OFFER-DEBUG] ERROR: Offer with uiId ${offerUiId} not found!`);
         toast({title: "Erro", description: "Oferta não encontrada para salvar.", variant: "destructive"});
-        return;
+        return false;
     }
     const offerData = product.supplierOffers[offerToSaveIndex];
     console.log(`[OFFER-DEBUG] Found offer to save:`, {
@@ -1517,7 +1517,7 @@ export default function SellerQuotationPage() {
 
     if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0 || !offerData.brandOffered.trim() || !offerData.packagingDescription.trim()) {
       toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Marca, Embalagem, Unidades > 0, Preço > 0).", variant: "destructive", duration: 7e3});
-      return;
+      return false;
     }
 
     const pricePerUnit = totalPackagingPrice / unitsInPackaging;
@@ -1530,7 +1530,7 @@ export default function SellerQuotationPage() {
             description: `Sua oferta deve ser pelo menos 1% menor que a melhor oferta atual de ${formatCurrency(bestCompetitorOffer.pricePerUnit)}. O valor mínimo para cobrir esta oferta é de ${formatCurrency(bestCompetitorOffer.pricePerUnit * 0.99)}. `,
             variant: "destructive",
         });
-        return;
+        return false;
     }
 
     const isDuplicatePrice = product.bestOffersByBrand.some(
@@ -1543,7 +1543,7 @@ export default function SellerQuotationPage() {
             description: "Este preço já foi ofertado por outro fornecedor. Por favor, insira um valor diferente.",
             variant: "destructive",
         });
-        return;
+        return false;
     }
 
     const brandName = offerData.brandOffered.trim();
@@ -1643,7 +1643,7 @@ export default function SellerQuotationPage() {
             newSet.delete(savingKey);
             return newSet;
           });
-          return;
+          return false;
         }
 
         console.log(`[OFFER-DEBUG] Creating new offer in Firestore`);
@@ -1659,10 +1659,12 @@ export default function SellerQuotationPage() {
       console.log(`[OFFER-DEBUG] Save completed successfully for offer ${offerUiId}`);
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
       handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false); // Reset the flag after saving
+      return true;
     } catch (error: any) {
       console.log(`[OFFER-DEBUG] ERROR during save:`, error);
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
       speak(voiceMessages.error.saveFailed);
+      return false;
     } finally {
       setIsSaving(prev => ({ ...prev, [savingKey]: false }));
       // Remove a oferta da lista de ofertas sendo salvas
@@ -2266,15 +2268,15 @@ export default function SellerQuotationPage() {
                                                  </Button>
                                                )}
                                                <Button
-                                                 onClick={() => {
+                                                 onClick={async () => {
                                                    if (offer.id && !isInEditMode(product.id, offer.uiId)) {
                                                      // Se está salva e não está editando, ativar modo edição
                                                      toggleEditMode(product.id, offer.uiId);
                                                    } else {
                                                      // Se está editando ou é nova, salvar
-                                                     handleSaveProductOffer(product.id, offer.uiId);
-                                                     // Depois de salvar, sair do modo edição
-                                                     if (isInEditMode(product.id, offer.uiId)) {
+                                                     const success = await handleSaveProductOffer(product.id, offer.uiId);
+                                                     // Depois de salvar com sucesso, sair do modo edição
+                                                     if (success && isInEditMode(product.id, offer.uiId)) {
                                                        toggleEditMode(product.id, offer.uiId);
                                                      }
                                                    }
