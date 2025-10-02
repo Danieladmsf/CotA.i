@@ -684,16 +684,15 @@ export default function FornecedoresPage() {
                         <TableCell className="hidden lg:table-cell">{fornecedor.vendedor || "N/A"}</TableCell>
                         <TableCell className="hidden sm:table-cell">{fornecedor.whatsapp || "N/A"}</TableCell>
                         <TableCell className="text-center">
-                          {/* O botão do portal só fica ativo para fornecedores não pendentes */}
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkModal(fornecedor)} disabled={isPending} className="hover-lift">
-                             {isPending ? <MailX className="h-5 w-5 text-muted-foreground" /> : <Link2 className="h-5 w-5 text-primary rotate-hover" />}
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkModal(fornecedor)} className="hover-lift">
+                             <Link2 className="h-5 w-5 text-primary rotate-hover" />
                             <span className="sr-only">Link do Portal</span>
                           </Button>
                         </TableCell>
                         <TableCell className="text-right pr-4 md:pr-6">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={isPending} className="hover-lift">
+                              <Button variant="ghost" size="icon" className="hover-lift">
                                 <MoreHorizontal className="h-5 w-5 rotate-hover" />
                                 <span className="sr-only">Ações</span>
                               </Button>
