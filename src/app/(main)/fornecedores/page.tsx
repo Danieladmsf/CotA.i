@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/config/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 import type { Fornecedor } from '@/types';
 import AddFornecedorModal, { type FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
@@ -122,9 +122,14 @@ export default function FornecedoresPage() {
   };
 
   // Retorna o link único do portal para um fornecedor específico.
-  const getSupplierPortalLink = (supplierId: string) => {
+  // Se o fornecedor está pendente, retorna o link de registro, senão retorna o link do portal.
+  const getSupplierPortalLink = (fornecedor: Fornecedor) => {
     if (!baseUrl) return "Carregando link...";
-    return `${baseUrl}/portal/${supplierId}`;
+    const isPending = !fornecedor.cnpj || !fornecedor.vendedor || !fornecedor.whatsapp;
+    if (isPending) {
+      return `${baseUrl}/registro-fornecedor/${fornecedor.id}`;
+    }
+    return `${baseUrl}/portal/${fornecedor.id}`;
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -371,11 +376,30 @@ export default function FornecedoresPage() {
     }
   };
 
-  const handleDeleteFornecedor = (id: string, nome: string) => {
-     toast({
-        title: "Funcionalidade Pendente",
-        description: `A exclusão do fornecedor ${nome} (${id}) ainda será implementada.`,
-    });
+  const handleDeleteFornecedor = async (id: string, nome: string) => {
+    // Confirmação antes de excluir
+    const confirmar = window.confirm(`Tem certeza que deseja excluir o fornecedor "${nome}"?\n\nEsta ação não pode ser desfeita.`);
+
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      // Excluir o documento do fornecedor
+      await deleteDoc(doc(db, FORNECEDORES_COLLECTION, id));
+
+      toast({
+        title: "Fornecedor Excluído",
+        description: `O fornecedor ${nome} foi excluído com sucesso.`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao excluir fornecedor:", error);
+      toast({
+        title: "Erro ao Excluir",
+        description: error.message || "Não foi possível excluir o fornecedor.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportFornecedores = () => {
@@ -732,44 +756,51 @@ export default function FornecedoresPage() {
         />
       )}
 
-      {isLinkModalOpen && selectedSupplierForLink && (
-        <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
-          <DialogContent>
-            <div className="card-professional modern-shadow-xl p-6 space-y-4">
-              <DialogHeader className="fade-in text-center">
-                <DialogTitle className="text-gradient">Link de Acesso ao Portal</DialogTitle>
-                <DialogDescription>
-                  Envie este link para o fornecedor <span className="font-bold">{selectedSupplierForLink.empresa}</span> para que ele possa acessar o portal de cotações.
-                </DialogDescription>
-              </DialogHeader>
+      {isLinkModalOpen && selectedSupplierForLink && (() => {
+        const isPending = !selectedSupplierForLink.cnpj || !selectedSupplierForLink.vendedor || !selectedSupplierForLink.whatsapp;
+        return (
+          <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+            <DialogContent>
+              <div className="card-professional modern-shadow-xl p-6 space-y-4">
+                <DialogHeader className="fade-in text-center">
+                  <DialogTitle className="text-gradient">
+                    {isPending ? 'Link de Convite Gerado!' : 'Link de Acesso ao Portal'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {isPending
+                      ? `Envie este link para ${selectedSupplierForLink.empresa} para que completem o cadastro.`
+                      : `Envie este link para o fornecedor ${selectedSupplierForLink.empresa} para que ele possa acessar o portal de cotações.`
+                    }
+                  </DialogDescription>
+                </DialogHeader>
               <div className="flex items-center space-x-2 slide-in-up">
                 <Input
                   id="link"
-                  value={getSupplierPortalLink(selectedSupplierForLink.id)}
+                  value={getSupplierPortalLink(selectedSupplierForLink)}
                   readOnly
                   className="input-modern"
                 />
               </div>
               <DialogFooter className="slide-in-up grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Button 
-                  onClick={() => handleSendLinkViaWhatsApp(selectedSupplierForLink, getSupplierPortalLink(selectedSupplierForLink.id))} 
+                <Button
+                  onClick={() => handleSendLinkViaWhatsApp(selectedSupplierForLink, getSupplierPortalLink(selectedSupplierForLink))}
                   disabled={isSendingLink || !baseUrl || !selectedSupplierForLink.whatsapp}
                   className="w-full button-modern"
                 >
                   {isSendingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4 rotate-hover" />}
                   WhatsApp
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={() => handleCopyLink(getSupplierPortalLink(selectedSupplierForLink.id))} 
+                  onClick={() => handleCopyLink(getSupplierPortalLink(selectedSupplierForLink))}
                   disabled={!baseUrl}
                 >
                   <Copy className="mr-2 h-4 w-4 rotate-hover" />
                   Copiar Link
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={() => handleOpenLinkInNewTab(getSupplierPortalLink(selectedSupplierForLink.id))} 
+                  onClick={() => handleOpenLinkInNewTab(getSupplierPortalLink(selectedSupplierForLink))}
                   disabled={!baseUrl}
                 >
                   <ExternalLink className="mr-2 h-4 w-4 rotate-hover" />
@@ -779,7 +810,8 @@ export default function FornecedoresPage() {
             </div>
           </DialogContent>
         </Dialog>
-      )}
+        );
+      })()}
 
       <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
           <DialogContent>
