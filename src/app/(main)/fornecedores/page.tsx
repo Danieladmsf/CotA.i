@@ -4,7 +4,7 @@
 import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
-import { MoreHorizontal, PlusCircle, Search, Upload, Download, Edit, Trash2 as DeleteIcon, Loader2, Link2, Copy, ExternalLink, UserPlus, MailX, CheckCircle, Send } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, Upload, Download, Edit, Trash2 as DeleteIcon, Loader2, Link2, Copy, ExternalLink, UserPlus, MailX, CheckCircle, Send, KeyRound } from "lucide-react";
 import Papa from "papaparse";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -77,6 +77,11 @@ export default function FornecedoresPage() {
   const [viewImage, setViewImage] = useState<string | null>(null);
 
   const [baseUrl, setBaseUrl] = useState("");
+
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [selectedSupplierForReset, setSelectedSupplierForReset] = useState<Fornecedor | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -399,6 +404,88 @@ export default function FornecedoresPage() {
         description: error.message || "Não foi possível excluir o fornecedor.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Hash function for PIN (same as registration page)
+  const hashPin = async (pin: string): Promise<string> => {
+    try {
+      if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(pin);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {
+      console.warn('Web Crypto API not available, using fallback hash');
+    }
+
+    // Fallback hash
+    let hash = 0;
+    for (let i = 0; i < pin.length; i++) {
+      const char = pin.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0');
+  };
+
+  const handleOpenResetPassword = (fornecedor: Fornecedor) => {
+    setSelectedSupplierForReset(fornecedor);
+    setNewPassword("");
+    setResetPasswordModalOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedSupplierForReset) return;
+
+    if (!newPassword || newPassword.length < 4 || newPassword.length > 6) {
+      toast({
+        title: "Senha Inválida",
+        description: "A senha deve ter entre 4 e 6 dígitos numéricos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/^\d{4,6}$/.test(newPassword)) {
+      toast({
+        title: "Senha Inválida",
+        description: "A senha deve conter apenas números.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResettingPassword(true);
+
+    try {
+      const hashedPin = await hashPin(newPassword);
+      const docRef = doc(db, FORNECEDORES_COLLECTION, selectedSupplierForReset.id);
+
+      await updateDoc(docRef, {
+        pin: hashedPin,
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "Senha Redefinida!",
+        description: `A senha de ${selectedSupplierForReset.empresa} foi redefinida com sucesso.`,
+      });
+
+      setResetPasswordModalOpen(false);
+      setNewPassword("");
+      setSelectedSupplierForReset(null);
+    } catch (error: any) {
+      console.error("Erro ao redefinir senha:", error);
+      toast({
+        title: "Erro ao Redefinir Senha",
+        description: error.message || "Não foi possível redefinir a senha.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -733,6 +820,9 @@ export default function FornecedoresPage() {
                               <DropdownMenuItem onClick={() => handleEditFornecedorClick(fornecedor)} className="hover-lift">
                                   <Edit className="mr-2 h-4 w-4" /> Editar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenResetPassword(fornecedor)} className="hover-lift">
+                                  <KeyRound className="mr-2 h-4 w-4" /> Redefinir Senha
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteFornecedor(fornecedor.id, fornecedor.empresa)} className="text-destructive hover:!bg-destructive hover:!text-destructive-foreground hover-lift">
                                   <DeleteIcon className="mr-2 h-4 w-4" /> Excluir
                               </DropdownMenuItem>
@@ -892,6 +982,63 @@ export default function FornecedoresPage() {
           </DialogHeader>
           <div className="max-w-3xl p-0">
             <img src={viewImage || ''} alt="Visualização Ampliada" className="w-full h-auto rounded-lg" />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Redefinir Senha */}
+      <Dialog open={resetPasswordModalOpen} onOpenChange={setResetPasswordModalOpen}>
+        <DialogContent>
+          <div className="card-professional modern-shadow-xl">
+            <DialogHeader className="fade-in">
+              <DialogTitle className="flex items-center gap-2 text-gradient">
+                <KeyRound className="h-5 w-5" />
+                Redefinir Senha
+              </DialogTitle>
+              <DialogDescription>
+                Digite uma nova senha de 4 a 6 dígitos numéricos para <span className="font-semibold">{selectedSupplierForReset?.empresa}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4 slide-in-up">
+              <div>
+                <label htmlFor="new-password" className="block text-sm font-medium mb-2">
+                  Nova Senha *
+                </label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="Digite 4-6 números"
+                  maxLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input-modern text-center text-2xl tracking-widest"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  A senha será hasheada e armazenada de forma segura.
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="slide-in-up mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordModalOpen(false);
+                  setNewPassword("");
+                }}
+                disabled={isResettingPassword}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={isResettingPassword}
+                className="button-modern"
+              >
+                {isResettingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Redefinir Senha
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
