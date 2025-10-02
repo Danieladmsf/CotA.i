@@ -1715,6 +1715,16 @@ export default function SellerQuotationPage() {
     });
   };
 
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Carregando...</p>
+      </div>
+    );
+  }
+
   // Show PIN modal if not authenticated
   if (showPinModal && supplier) {
     return (
@@ -1726,23 +1736,22 @@ export default function SellerQuotationPage() {
     );
   }
 
-  // Show loading while checking authentication or loading data
-  if (authLoading || isLoading) {
+  // Block access if not authenticated (and supplier has PIN)
+  if (!isAuthenticated && supplier?.pin) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Carregando...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Aguardando autenticação...</p>
       </div>
     );
   }
 
-  // Block access if not authenticated
-  if (!isAuthenticated) {
+  // If supplier has no PIN, allow access (backward compatibility)
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-lg text-muted-foreground">Autenticação necessária</p>
-        </div>
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Carregando cotação...</p>
       </div>
     );
   }

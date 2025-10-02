@@ -219,6 +219,16 @@ export default function SupplierPortalPage() {
     }
   };
 
+  // Show loading while checking authentication or loading data
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
   // Show PIN modal if not authenticated
   if (showPinModal && authSupplier) {
     return (
@@ -230,23 +240,22 @@ export default function SupplierPortalPage() {
     );
   }
 
-  // Show loading while checking authentication or loading data
-  if (authLoading || isLoading) {
+  // Block access if not authenticated (and supplier has PIN)
+  if (!isAuthenticated && authSupplier?.pin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Carregando...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Aguardando autenticação...</p>
       </div>
     );
   }
 
-  // Block access if not authenticated
-  if (!isAuthenticated) {
+  // If supplier has no PIN, allow access (backward compatibility)
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <div className="text-center">
-          <p className="text-lg text-muted-foreground">Autenticação necessária</p>
-        </div>
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Carregando portal...</p>
       </div>
     );
   }

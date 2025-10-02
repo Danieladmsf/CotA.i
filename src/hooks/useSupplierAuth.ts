@@ -6,7 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import type { Fornecedor } from '@/types';
 
 const SESSION_KEY_PREFIX = 'supplier_auth_';
-const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
 interface SupplierAuthSession {
   supplierId: string;
@@ -16,11 +16,27 @@ interface SupplierAuthSession {
 
 // Simple hash function for PIN (using SHA-256)
 const hashPin = async (pin: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pin);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    // Try using Web Crypto API first (works in HTTPS and localhost)
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(pin);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {
+    console.warn('Web Crypto API not available, using fallback hash');
+  }
+
+  // Fallback: Simple hash for development (not cryptographically secure, but works)
+  let hash = 0;
+  for (let i = 0; i < pin.length; i++) {
+    const char = pin.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
 };
 
 export const useSupplierAuth = (supplierId: string) => {
@@ -32,30 +48,37 @@ export const useSupplierAuth = (supplierId: string) => {
   // Check if there's a valid session
   useEffect(() => {
     const checkSession = () => {
+      console.log('🔐 [useSupplierAuth] Checking session for supplier:', supplierId);
       const sessionKey = `${SESSION_KEY_PREFIX}${supplierId}`;
-      const sessionData = sessionStorage.getItem(sessionKey);
+      const sessionData = localStorage.getItem(sessionKey);
 
       if (sessionData) {
+        console.log('🔐 [useSupplierAuth] Found session data');
         try {
           const session: SupplierAuthSession = JSON.parse(sessionData);
           const now = Date.now();
 
           // Check if session is still valid
           if (now - session.timestamp < SESSION_DURATION) {
+            console.log('🔐 [useSupplierAuth] Session is valid');
             setIsAuthenticated(true);
             setIsLoading(false);
             return;
           } else {
+            console.log('🔐 [useSupplierAuth] Session expired');
             // Session expired, remove it
-            sessionStorage.removeItem(sessionKey);
+            localStorage.removeItem(sessionKey);
           }
         } catch (error) {
-          console.error('Error parsing session data:', error);
-          sessionStorage.removeItem(sessionKey);
+          console.error('🔐 [useSupplierAuth] Error parsing session data:', error);
+          localStorage.removeItem(sessionKey);
         }
+      } else {
+        console.log('🔐 [useSupplierAuth] No session found');
       }
 
       // No valid session, need to authenticate
+      console.log('🔐 [useSupplierAuth] Showing PIN modal');
       setShowPinModal(true);
       setIsLoading(false);
     };
@@ -67,15 +90,22 @@ export const useSupplierAuth = (supplierId: string) => {
   useEffect(() => {
     const loadSupplier = async () => {
       try {
+        console.log('🔐 [useSupplierAuth] Loading supplier data:', supplierId);
         const supplierDoc = await getDoc(doc(db, 'fornecedores', supplierId));
 
         if (supplierDoc.exists()) {
-          setSupplier({ id: supplierDoc.id, ...supplierDoc.data() } as Fornecedor);
+          const supplierData = { id: supplierDoc.id, ...supplierDoc.data() } as Fornecedor;
+          console.log('🔐 [useSupplierAuth] Supplier loaded:', {
+            id: supplierData.id,
+            empresa: supplierData.empresa,
+            hasPIN: !!supplierData.pin
+          });
+          setSupplier(supplierData);
         } else {
-          console.error('Supplier not found');
+          console.error('🔐 [useSupplierAuth] Supplier not found');
         }
       } catch (error) {
-        console.error('Error loading supplier:', error);
+        console.error('🔐 [useSupplierAuth] Error loading supplier:', error);
       }
     };
 
@@ -102,7 +132,7 @@ export const useSupplierAuth = (supplierId: string) => {
         };
 
         const sessionKey = `${SESSION_KEY_PREFIX}${supplierId}`;
-        sessionStorage.setItem(sessionKey, JSON.stringify(session));
+        localStorage.setItem(sessionKey, JSON.stringify(session));
 
         setIsAuthenticated(true);
         setShowPinModal(false);
@@ -118,7 +148,7 @@ export const useSupplierAuth = (supplierId: string) => {
 
   const logout = () => {
     const sessionKey = `${SESSION_KEY_PREFIX}${supplierId}`;
-    sessionStorage.removeItem(sessionKey);
+    localStorage.removeItem(sessionKey);
     setIsAuthenticated(false);
     setShowPinModal(true);
   };

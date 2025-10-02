@@ -94,6 +94,8 @@ export default function CompleteSupplierRegistrationPage() {
             cnpj: data.cnpj || '',
             vendedor: data.vendedor || '',
             whatsapp: data.whatsapp || '',
+            email: data.email || '',
+            pin: '',
             fotoFile: null,
             diasDeEntrega: data.diasDeEntrega || [],
           });
@@ -109,11 +111,27 @@ export default function CompleteSupplierRegistrationPage() {
 
   // Simple hash function for PIN (using SHA-256)
   const hashPin = async (pin: string): Promise<string> => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    try {
+      // Try using Web Crypto API first (works in HTTPS and localhost)
+      if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(pin);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {
+      console.warn('Web Crypto API not available, using fallback hash');
+    }
+
+    // Fallback: Simple hash for development (not cryptographically secure, but works)
+    let hash = 0;
+    for (let i = 0; i < pin.length; i++) {
+      const char = pin.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0');
   };
 
   const onSubmit: SubmitHandler<FornecedorFormValues> = async (data) => {
@@ -126,7 +144,7 @@ export default function CompleteSupplierRegistrationPage() {
 
     try {
         // 1. Handle image upload (if any)
-        const { fotoFile, pin, email, ...dataForFirestore } = data;
+        const { fotoFile, pin, email } = data;
         let fotoUrl = supplier.fotoUrl || 'https://placehold.co/40x40.png';
         let fotoHint = supplier.fotoHint || 'generic logo';
 
@@ -156,15 +174,15 @@ export default function CompleteSupplierRegistrationPage() {
         const hashedPin = await hashPin(pin);
 
         // 3. Prepare the data to update in Firestore
-        const cleanedCnpj = dataForFirestore.cnpj.replace(/[^\d]/g, "");
-        const cleanedWhatsapp = dataForFirestore.whatsapp.replace(/[^\d]/g, "");
+        const cleanedCnpj = data.cnpj.replace(/[^\d]/g, "");
+        const cleanedWhatsapp = data.whatsapp.replace(/[^\d]/g, "");
 
         const dataToUpdate: any = {
-            empresa: dataForFirestore.empresa.trim(),
+            empresa: data.empresa.trim(),
             cnpj: cleanedCnpj,
-            vendedor: dataForFirestore.vendedor.trim(),
+            vendedor: data.vendedor.trim(),
             whatsapp: cleanedWhatsapp,
-            diasDeEntrega: dataForFirestore.diasDeEntrega,
+            diasDeEntrega: data.diasDeEntrega,
             pin: hashedPin,
             fotoUrl,
             fotoHint,
@@ -172,12 +190,13 @@ export default function CompleteSupplierRegistrationPage() {
             updatedAt: serverTimestamp(),
         };
 
-        // Add email if provided
-        if (email && email.trim()) {
+        // Add email if provided (not File object!)
+        if (email && typeof email === 'string' && email.trim()) {
             dataToUpdate.email = email.trim();
         }
 
         // 4. Update the supplier document
+        console.log('📝 [Registration] Data to update:', dataToUpdate);
         const docRef = doc(db, FORNECEDORES_COLLECTION, supplier.id);
         await updateDoc(docRef, dataToUpdate);
 
