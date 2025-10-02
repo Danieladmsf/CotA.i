@@ -846,14 +846,17 @@ export default function SellerQuotationPage() {
               // Check if there are multiple competing suppliers (not just first offer)
               const competingSuppliersCount = new Set(offersData.filter(o => o.pricePerUnit > 0).map(o => o.supplierId)).size;
 
+              // Check if main quotation is still open
+              const isQuotationOpen = quotation.status === 'Aberta' && quotation.deadline && new Date() < quotation.deadline.toDate();
+
               if (new Date() < deadline) {
                 counterProposalInfo = {
                   deadline,
                   winningBrand: outbidOffer.brandOffered,
                   myBrand: myBestOffer.brandOffered,
                 };
-              } else if (competingSuppliersCount > 1) {
-                // Only lock out if there are actually competing offers
+              } else if (competingSuppliersCount > 1 && !isQuotationOpen) {
+                // Only lock out if there are competing offers AND main quotation is closed
                 isLockedOut = true;
               }
             }
