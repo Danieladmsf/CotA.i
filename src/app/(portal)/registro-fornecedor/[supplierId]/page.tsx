@@ -140,6 +140,12 @@ export default function CompleteSupplierRegistrationPage() {
         return;
     }
 
+    console.log('📝 [Registration] Dados do formulário recebidos:', {
+        empresa: data.empresa,
+        hasFotoFile: !!data.fotoFile,
+        fotoFileName: data.fotoFile?.name
+    });
+
     form.setValue("empresa", data.empresa, { shouldValidate: true }); // Trigger validation display
 
     try {
@@ -149,18 +155,29 @@ export default function CompleteSupplierRegistrationPage() {
         let fotoHint = supplier.fotoHint || 'generic logo';
 
         if (fotoFile) {
+            console.log('📸 [Upload] Iniciando upload do arquivo:', {
+                name: fotoFile.name,
+                type: fotoFile.type,
+                size: fotoFile.size
+            });
             toast({ title: "Enviando logo...", description: "Aguarde um momento." });
             try {
-                const response = await fetch(`/api/upload?filename=${fotoFile.name}`, {
+                const response = await fetch(`/api/upload?filename=${encodeURIComponent(fotoFile.name)}`, {
                   method: 'POST',
                   body: fotoFile,
                 });
+                console.log('📸 [Upload] Resposta da API:', {
+                    status: response.status,
+                    ok: response.ok
+                });
                 const newBlob = await response.json();
+                console.log('📸 [Upload] Blob retornado:', newBlob);
                 if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
                 fotoUrl = newBlob.url;
                 fotoHint = "custom logo";
+                console.log('✅ [Upload] Upload concluído com sucesso:', fotoUrl);
             } catch (uploadError: any) {
-                console.error("FALHA NO UPLOAD DA LOGO:", uploadError);
+                console.error("❌ [Upload] FALHA NO UPLOAD DA LOGO:", uploadError);
                 toast({
                     title: "Aviso: Falha no Upload da Logo",
                     description: uploadError.message || "O cadastro continuará com a imagem padrão.",
@@ -168,6 +185,8 @@ export default function CompleteSupplierRegistrationPage() {
                     duration: 9000,
                 });
             }
+        } else {
+            console.log('⚠️ [Upload] Nenhum arquivo selecionado');
         }
 
         // 2. Hash the PIN for security
