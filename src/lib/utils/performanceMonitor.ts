@@ -12,7 +12,6 @@ export class FirebasePerformanceMonitor {
 
   startQuery(queryId: string, details: any) {
     const startTime = Date.now();
-    console.log(`🏁 [Performance] Iniciando query: ${queryId}`, details);
     return {
       queryId,
       startTime,
@@ -41,14 +40,6 @@ export class FirebasePerformanceMonitor {
       this.metrics.set(queryId, []);
     }
     this.metrics.get(queryId)!.push(metric);
-
-    // Log detalhado
-    console.log(`✅ [Performance] Query concluída: ${queryId}`, {
-      duration: `${duration}ms`,
-      performance: metric.performance,
-      resultCount: result?.count || 0,
-      details
-    });
 
     // Alertas para performance ruim
     if (duration > 10000) {
@@ -99,8 +90,8 @@ export class FirebasePerformanceMonitor {
 
   // Método para exibir relatório de performance no console
   printPerformanceReport() {
-    console.group('📊 Firebase Performance Report');
-    
+    console.group('Firebase Performance Report');
+
     for (const [queryId, metrics] of this.metrics) {
       console.group(`Query: ${queryId}`);
       console.log(`Execuções: ${metrics.length}`);

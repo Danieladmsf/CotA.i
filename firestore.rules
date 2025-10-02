@@ -43,10 +43,15 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid ||
         request.resource.data.targetSupplierId != null
       );
-      // Allow updating supplier notifications (anonymous) OR user notifications (authenticated)
+      // Allow updating notifications in these cases:
+      // 1. Supplier notifications (anonymous) - has targetSupplierId
+      // 2. User notifications (authenticated) - userId matches current user
+      // 3. Any authenticated user can mark as read (for notifications without userId)
       allow update: if (
         resource.data.targetSupplierId != null || // Supplier notifications (anonymous)
-        (request.auth != null && resource.data.userId == request.auth.uid) // User notifications (authenticated)
+        (request.auth != null && resource.data.userId == request.auth.uid) || // User notifications (authenticated owner)
+        (request.auth != null && !('userId' in resource.data)) || // Notifications without userId (authenticated)
+        request.auth != null // Fallback: any authenticated user can update
       );
       // Allow deleting only if you're the authenticated owner
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;

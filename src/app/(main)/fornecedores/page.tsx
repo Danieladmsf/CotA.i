@@ -274,42 +274,22 @@ export default function FornecedoresPage() {
     const { fotoFile, ...dataForFirestore } = data;
 
     if (fotoFile) {
-      console.log('🖼️ [FORNECEDORES] Iniciando upload de foto:', {
-          fileName: fotoFile.name,
-          fileSize: fotoFile.size,
-          fileType: fotoFile.type
-      });
-
       try {
         toast({ title: "Fazendo upload da imagem...", description: "Aguarde um momento." });
 
         const uploadUrl = `/api/upload?filename=${fotoFile.name}`;
-        console.log('📡 [FORNECEDORES] Fazendo request para:', uploadUrl);
 
         const response = await fetch(uploadUrl, {
           method: 'POST',
           body: fotoFile,
         });
 
-        console.log('📥 [FORNECEDORES] Response recebido:', {
-            ok: response.ok,
-            status: response.status,
-            statusText: response.statusText,
-            contentType: response.headers.get('content-type')
-        });
-
         const newBlob = await response.json();
-        console.log('📄 [FORNECEDORES] Response JSON:', newBlob);
 
         if (!response.ok) {
             console.error('❌ [FORNECEDORES] Response não OK:', newBlob);
             throw new Error(newBlob.message || 'Falha no upload da imagem.');
         }
-
-        console.log('✅ [FORNECEDORES] Upload realizado com sucesso:', {
-            url: newBlob.url,
-            originalFileName: fotoFile.name
-        });
 
         fotoUrl = newBlob.url;
         fotoHint = "custom logo";
@@ -328,15 +308,6 @@ export default function FornecedoresPage() {
       }
     }
 
-    // Debug: verificar se dataForFirestore contém fotoFile
-    console.log('🔍 [FORNECEDORES DEBUG] Dados após desestruturação:', {
-        hasFotoFile: !!fotoFile,
-        fotoFileName: fotoFile?.name,
-        dataForFirestoreKeys: Object.keys(dataForFirestore),
-        hasFotoFileInDataForFirestore: 'fotoFile' in dataForFirestore,
-        dataForFirestoreContainsFile: Object.values(dataForFirestore).some(value => value instanceof File)
-    });
-
     const fornecedorData = {
       empresa: dataForFirestore.empresa.trim(),
       cnpj: cleanedCnpj,
@@ -349,19 +320,8 @@ export default function FornecedoresPage() {
       updatedAt: serverTimestamp(),
     };
 
-    // Debug: verificar dados que vão para o Firebase
-    console.log('🔥 [FORNECEDORES FIREBASE] Dados que serão enviados:', {
-        fornecedorDataKeys: Object.keys(fornecedorData),
-        hasFileObject: Object.values(fornecedorData).some(value => value instanceof File),
-        fornecedorData: JSON.stringify(fornecedorData, (key, value) => {
-            if (value instanceof File) return `[FILE: ${value.name}]`;
-            return value;
-        })
-    });
-
     try {
       if (editingFornecedor) {
-        console.log('🔄 [FORNECEDORES] Atualizando fornecedor existente:', editingFornecedor.id);
         await updateDoc(doc(db, FORNECEDORES_COLLECTION, editingFornecedor.id), fornecedorData);
         toast({ title: "Fornecedor Atualizado!", description: `O fornecedor ${data.empresa} foi atualizado.` });
       } else {

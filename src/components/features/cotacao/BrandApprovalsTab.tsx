@@ -28,8 +28,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
   useEffect(() => {
     if (!user?.uid || !quotationId) return;
 
-    console.log('🔍 Querying for brand requests with buyerUserId:', user.uid, 'and quotationId:', quotationId);
-
     const allRequestsQuery = query(
       collection(db, 'pending_brand_requests'),
       where('buyerUserId', '==', user.uid),
@@ -52,7 +50,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
         setAllRequests(requests);
         setIsLoading(false);
-        console.log('📋 Loaded brand requests for quotation:', requests);
       },
       (error) => {
         console.error('🔴 [BrandApprovalsTab] Error in pending_brand_requests listener:', error);
@@ -100,8 +97,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
         // 2. Add brand to supplies collection (handle both string and array formats)
         try {
-          console.log('🔍 Starting supplies update for productId:', request.productId);
-          
           // First, check shopping_list_items to get the correct supplyId
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
@@ -112,22 +107,16 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             const shoppingListData = shoppingListSnap.data();
             if (shoppingListData.supplyId) {
               actualSupplyId = shoppingListData.supplyId;
-              console.log('🔗 Using supplyId from shopping_list_items:', actualSupplyId);
             }
           }
           
           const suppliesRef = doc(db, 'supplies', actualSupplyId);
           const suppliesSnap = await getDoc(suppliesRef);
-          
+
           if (suppliesSnap.exists()) {
             const suppliesData = suppliesSnap.data();
             const currentBrands = suppliesData.preferredBrands;
-            console.log('📊 Current supplies data:', { 
-              actualSupplyId, 
-              currentBrands, 
-              type: typeof currentBrands 
-            });
-            
+
             let updatedBrands;
             if (typeof currentBrands === 'string') {
               const brandsArray = currentBrands.split(',').map(b => b.trim()).filter(b => b.length > 0);
@@ -143,19 +132,11 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             
             // Remove duplicates
             updatedBrands = [...new Set(updatedBrands)];
-            
-            console.log('💾 Updating supplies document with:', { preferredBrands: updatedBrands });
+
             await updateDoc(suppliesRef, {
               preferredBrands: updatedBrands,
               updatedAt: new Date()
             });
-            
-            console.log('💾 Updating supplies document with:', { preferredBrands: updatedBrands });
-            await updateDoc(suppliesRef, {
-              preferredBrands: updatedBrands,
-              updatedAt: new Date()
-            });
-            console.log('✅ Supplies update completed successfully');
           } else {
             console.error('❌ Supplies document not found for actualSupplyId:', actualSupplyId);
           }
@@ -163,9 +144,8 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           console.error('❌ Error updating supplies collection:', error);
         }
 
-        // 3. Add brand to shopping_list_items collection  
+        // 3. Add brand to shopping_list_items collection
         try {
-          console.log('🔍 Starting shopping_list_items update for productId:', request.productId);
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
           
@@ -193,7 +173,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
               preferredBrands: updatedBrands,
               updatedAt: new Date()
             });
-            console.log('✅ Shopping list update completed successfully');
           } else {
             console.error('❌ Shopping list document not found for productId:', request.productId);
           }
@@ -203,7 +182,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
         // 4. Create the actual offer now that the brand is approved
         try {
-          console.log('➕ Creating offer for newly approved brand:', request.brandName);
           const offersCollectionRef = collection(db, 'quotations', request.quotationId, 'products', request.productId, 'offers');
           
           const offerPayload = {
@@ -220,7 +198,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           };
 
           await addDoc(offersCollectionRef, offerPayload);
-          console.log('✅ Offer created successfully in Firestore.');
 
         } catch (error) {
           console.error('❌ Error creating offer for approved brand:', error);
@@ -283,16 +260,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
         };
 
-        console.log('📤 [BrandApprovalsTab] Creating notification for supplier:', {
-          supplierId: request.supplierId,
-          buyerUserId: request.buyerUserId,
-          type: notificationType,
-          payload: notificationPayload
-        });
-
         await createNotification(notificationPayload);
-
-        console.log(`✅ [BrandApprovalsTab] Notification created successfully for supplier ${request.supplierId}`);
 
       } catch (notificationError) {
         console.error('❌ [BrandApprovalsTab] Error creating notification for supplier:', notificationError);
@@ -301,7 +269,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
       // Mark the associated notification as read, regardless of outcome
       try {
-        console.log(`🔔 Attempting to mark notification as read for request ID: ${request.id}`);
         const notificationsQuery = query(
           collection(db, 'notifications'),
           where('entityId', '==', request.id),
@@ -315,10 +282,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
               isRead: true,
               readAt: new Date()
             });
-            console.log(`✅ Notification ${notificationDoc.id} marked as read.`);
           }
-        } else {
-          console.log(`🤷 No matching notification found for request ID: ${request.id}`);
         }
       } catch (notificationError) {
         console.error('⚠️ Error marking notification as read:', notificationError);

@@ -41,9 +41,8 @@ export function useOptimizedSuppliers(userId: string | null): UseOptimizedSuppli
     if (useCache) {
       const cachedData = localStorage.getItem(getCacheKey());
       const cacheExpiry = localStorage.getItem(getExpiryCacheKey());
-      
+
       if (cachedData && cacheExpiry && Date.now() < parseInt(cacheExpiry)) {
-        console.log('📦 [useOptimizedSuppliers] Usando dados do cache');
         setSuppliers(JSON.parse(cachedData));
         setIsLoading(false);
         setError(null);
@@ -53,18 +52,12 @@ export function useOptimizedSuppliers(userId: string | null): UseOptimizedSuppli
 
     setIsLoading(true);
     setError(null);
-    
+
     // Iniciar monitoramento de performance
     const monitor = performanceMonitor.startQuery('suppliers-fetch', {
       userId,
       useCache,
       timestamp: new Date().toISOString()
-    });
-
-    console.log('🔍 [useOptimizedSuppliers] Iniciando busca de fornecedores...', {
-      userId,
-      timestamp: new Date().toISOString(),
-      useCache
     });
 
     // Timeout para detectar queries lentas
