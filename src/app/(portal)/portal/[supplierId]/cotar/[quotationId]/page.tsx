@@ -762,7 +762,9 @@ export default function SellerQuotationPage() {
       const offersQuery = query(collection(db, offersPath));
 
       return onSnapshot(offersQuery, async (offersSnapshot) => {
+        console.log(`[LISTENER-DEBUG] Offers snapshot received for product ${product.id} (${product.name}): ${offersSnapshot.docs.length} offers`);
         const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
+        console.log(`[LISTENER-DEBUG] Offers data:`, offersData.map(o => ({ supplier: o.supplierId, brand: o.brandOffered, price: o.pricePerUnit })));
 
         // Fetch new supplier details
         const newSupplierIdsToFetch = new Set<string>();
@@ -1670,9 +1672,11 @@ export default function SellerQuotationPage() {
     try {
       if (offerData.id) {
         console.log(`[OFFER-DEBUG] Updating existing offer in Firestore with ID: ${offerData.id}`);
+        console.log(`[OFFER-DEBUG] Update path: quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
+        console.log(`[OFFER-DEBUG] Update payload:`, offerPayload);
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
         await updateDoc(offerRef, offerPayload);
-        console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore`);
+        console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore - listener should fire now`);
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
         speak(voiceMessages.success.offerSaved);
       } else {
