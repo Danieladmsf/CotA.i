@@ -762,9 +762,7 @@ export default function SellerQuotationPage() {
       const offersQuery = query(collection(db, offersPath));
 
       return onSnapshot(offersQuery, async (offersSnapshot) => {
-        console.log(`[LISTENER-DEBUG] Offers snapshot received for product ${product.id} (${product.name}): ${offersSnapshot.docs.length} offers`);
         const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
-        console.log(`[LISTENER-DEBUG] Offers data:`, offersData.map(o => ({ supplier: o.supplierId, brand: o.brandOffered, price: o.pricePerUnit })));
 
         // Fetch new supplier details
         const newSupplierIdsToFetch = new Set<string>();
@@ -801,18 +799,13 @@ export default function SellerQuotationPage() {
         const brandDisplays: BestOfferForBrandDisplay[] = [];
         const myOfferBrands = new Set<string>();
 
-        console.log(`[CARD-DEBUG] Product ${product.name}: Processing ${offersGroupedByBrand.size} brands, supplierId=${supplierId}`);
-
         offersGroupedByBrand.forEach((offers, brandName) => {
           if (offers.length === 0) return;
-          console.log(`[CARD-DEBUG] Brand ${brandName}: ${offers.length} offers`, offers.map(o => ({ supplier: o.supplierId, price: o.pricePerUnit })));
 
           const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
-          console.log(`[CARD-DEBUG] Best offer for ${brandName}: supplier=${bestOffer.supplierId}, price=${bestOffer.pricePerUnit}`);
 
           const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
           if (supplierDetails) {
-            console.log(`[CARD-DEBUG] Adding best offer card for ${brandName}`);
             brandDisplays.push({
               brandName,
               pricePerUnit: bestOffer.pricePerUnit,
@@ -833,20 +826,14 @@ export default function SellerQuotationPage() {
             if (bestOffer.supplierId === supplierId) {
               myOfferBrands.add(brandName);
             }
-          } else {
-            console.log(`[CARD-DEBUG] No supplier details found for ${bestOffer.supplierId}`);
           }
 
           // If my offer is not the best for this brand, add it separately
           const myOfferForBrand = offers.find(o => o.supplierId === supplierId);
-          console.log(`[CARD-DEBUG] My offer for ${brandName}:`, myOfferForBrand ? { price: myOfferForBrand.pricePerUnit, id: myOfferForBrand.id } : 'none');
-          console.log(`[CARD-DEBUG] Best offer id: ${bestOffer.id}, My offer id: ${myOfferForBrand?.id}`);
 
           if (myOfferForBrand && myOfferForBrand.id !== bestOffer.id) {
-            console.log(`[CARD-DEBUG] My offer is NOT the best, adding separate card`);
             const mySupplierDetails = supplierDetailsCache.current.get(supplierId);
             if (mySupplierDetails) {
-              console.log(`[CARD-DEBUG] Adding my losing offer card for ${brandName}`);
               brandDisplays.push({
                 brandName,
                 pricePerUnit: myOfferForBrand.pricePerUnit,
@@ -864,16 +851,10 @@ export default function SellerQuotationPage() {
                 productUnit: product.unit,
               });
               myOfferBrands.add(brandName);
-            } else {
-              console.log(`[CARD-DEBUG] No supplier details found for myself (${supplierId})`);
             }
-          } else {
-            console.log(`[CARD-DEBUG] My offer IS the best or doesn't exist separately`);
           }
         });
         brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
-
-        console.log(`[CARD-DEBUG] Final brandDisplays for ${product.name}:`, brandDisplays.map(b => ({ brand: b.brandName, supplier: b.supplierName, price: b.pricePerUnit, isSelf: b.isSelf })));
 
         const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
         const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
@@ -1672,11 +1653,9 @@ export default function SellerQuotationPage() {
     try {
       if (offerData.id) {
         console.log(`[OFFER-DEBUG] Updating existing offer in Firestore with ID: ${offerData.id}`);
-        console.log(`[OFFER-DEBUG] Update path: quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
-        console.log(`[OFFER-DEBUG] Update payload:`, offerPayload);
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
         await updateDoc(offerRef, offerPayload);
-        console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore - listener should fire now`);
+        console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore`);
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
         speak(voiceMessages.success.offerSaved);
       } else {
@@ -1969,7 +1948,7 @@ export default function SellerQuotationPage() {
                                     </div>
                                 )}
                                 {hasMyOffers && product.bestOffersByBrand && product.bestOffersByBrand.length > 0 && (
-                                  <div className="flex flex-row flex-wrap gap-2 p-1">
+                                  <div className="flex flex-row flex-wrap gap-4 p-2">
                                       {product.bestOffersByBrand.map(offer => {
                                           let variantClasses = "border-muted-foreground/20";
                                           let textPriceClass = "text-foreground";
