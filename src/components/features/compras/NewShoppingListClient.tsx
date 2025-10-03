@@ -77,7 +77,17 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
     }
     if (searchTermSupplies) {
       const lowercasedFilter = searchTermSupplies.toLowerCase();
-      suppliesToFilter = suppliesToFilter.filter(s => s.name.toLowerCase().includes(lowercasedFilter) || (s.preferredBrands && s.preferredBrands.toLowerCase().includes(lowercasedFilter)));
+      suppliesToFilter = suppliesToFilter.filter(s => {
+        const nameMatch = s.name.toLowerCase().includes(lowercasedFilter);
+        let brandsMatch = false;
+        if (s.preferredBrands) {
+          const brandsStr = Array.isArray(s.preferredBrands)
+            ? s.preferredBrands.join(',')
+            : String(s.preferredBrands);
+          brandsMatch = brandsStr.toLowerCase().includes(lowercasedFilter);
+        }
+        return nameMatch || brandsMatch;
+      });
     }
     return suppliesToFilter;
   }, [activeSelectionTab, allSupplies, searchTermSupplies]);
