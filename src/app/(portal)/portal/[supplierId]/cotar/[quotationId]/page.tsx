@@ -799,11 +799,18 @@ export default function SellerQuotationPage() {
         const brandDisplays: BestOfferForBrandDisplay[] = [];
         const myOfferBrands = new Set<string>();
 
+        console.log(`[CARD-DEBUG] Product ${product.name}: Processing ${offersGroupedByBrand.size} brands, supplierId=${supplierId}`);
+
         offersGroupedByBrand.forEach((offers, brandName) => {
           if (offers.length === 0) return;
+          console.log(`[CARD-DEBUG] Brand ${brandName}: ${offers.length} offers`, offers.map(o => ({ supplier: o.supplierId, price: o.pricePerUnit })));
+
           const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
+          console.log(`[CARD-DEBUG] Best offer for ${brandName}: supplier=${bestOffer.supplierId}, price=${bestOffer.pricePerUnit}`);
+
           const supplierDetails = supplierDetailsCache.current.get(bestOffer.supplierId);
           if (supplierDetails) {
+            console.log(`[CARD-DEBUG] Adding best offer card for ${brandName}`);
             brandDisplays.push({
               brandName,
               pricePerUnit: bestOffer.pricePerUnit,
@@ -824,13 +831,20 @@ export default function SellerQuotationPage() {
             if (bestOffer.supplierId === supplierId) {
               myOfferBrands.add(brandName);
             }
+          } else {
+            console.log(`[CARD-DEBUG] No supplier details found for ${bestOffer.supplierId}`);
           }
 
           // If my offer is not the best for this brand, add it separately
           const myOfferForBrand = offers.find(o => o.supplierId === supplierId);
+          console.log(`[CARD-DEBUG] My offer for ${brandName}:`, myOfferForBrand ? { price: myOfferForBrand.pricePerUnit, id: myOfferForBrand.id } : 'none');
+          console.log(`[CARD-DEBUG] Best offer id: ${bestOffer.id}, My offer id: ${myOfferForBrand?.id}`);
+
           if (myOfferForBrand && myOfferForBrand.id !== bestOffer.id) {
+            console.log(`[CARD-DEBUG] My offer is NOT the best, adding separate card`);
             const mySupplierDetails = supplierDetailsCache.current.get(supplierId);
             if (mySupplierDetails) {
+              console.log(`[CARD-DEBUG] Adding my losing offer card for ${brandName}`);
               brandDisplays.push({
                 brandName,
                 pricePerUnit: myOfferForBrand.pricePerUnit,
@@ -848,10 +862,16 @@ export default function SellerQuotationPage() {
                 productUnit: product.unit,
               });
               myOfferBrands.add(brandName);
+            } else {
+              console.log(`[CARD-DEBUG] No supplier details found for myself (${supplierId})`);
             }
+          } else {
+            console.log(`[CARD-DEBUG] My offer IS the best or doesn't exist separately`);
           }
         });
         brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
+
+        console.log(`[CARD-DEBUG] Final brandDisplays for ${product.name}:`, brandDisplays.map(b => ({ brand: b.brandName, supplier: b.supplierName, price: b.pricePerUnit, isSelf: b.isSelf })));
 
         const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
         const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
