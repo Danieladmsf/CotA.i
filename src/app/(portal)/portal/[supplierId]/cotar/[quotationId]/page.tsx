@@ -797,6 +797,8 @@ export default function SellerQuotationPage() {
         });
 
         const brandDisplays: BestOfferForBrandDisplay[] = [];
+        const myOfferBrands = new Set<string>();
+
         offersGroupedByBrand.forEach((offers, brandName) => {
           if (offers.length === 0) return;
           const bestOffer = offers.reduce((prev, curr) => prev.pricePerUnit < curr.pricePerUnit ? prev : curr);
@@ -818,6 +820,35 @@ export default function SellerQuotationPage() {
               isSelf: bestOffer.supplierId === supplierId,
               productUnit: product.unit,
             });
+
+            if (bestOffer.supplierId === supplierId) {
+              myOfferBrands.add(brandName);
+            }
+          }
+
+          // If my offer is not the best for this brand, add it separately
+          const myOfferForBrand = offers.find(o => o.supplierId === supplierId);
+          if (myOfferForBrand && myOfferForBrand.id !== bestOffer.id) {
+            const mySupplierDetails = supplierDetailsCache.current.get(supplierId);
+            if (mySupplierDetails) {
+              brandDisplays.push({
+                brandName,
+                pricePerUnit: myOfferForBrand.pricePerUnit,
+                supplierId,
+                supplierName: mySupplierDetails.empresa,
+                supplierInitials: mySupplierDetails.empresa.substring(0, 2).toUpperCase(),
+                supplierFotoUrl: mySupplierDetails.fotoUrl,
+                supplierFotoHint: mySupplierDetails.fotoHint,
+                vendedor: mySupplierDetails.vendedor,
+                cnpj: mySupplierDetails.cnpj,
+                packagingDescription: myOfferForBrand.packagingDescription,
+                unitsInPackaging: myOfferForBrand.unitsInPackaging,
+                totalPackagingPrice: myOfferForBrand.totalPackagingPrice,
+                isSelf: true,
+                productUnit: product.unit,
+              });
+              myOfferBrands.add(brandName);
+            }
           }
         });
         brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
