@@ -1948,7 +1948,7 @@ export default function SellerQuotationPage() {
                                     </div>
                                 )}
                                 {hasMyOffers && product.bestOffersByBrand && product.bestOffersByBrand.length > 0 && (
-                                  <div className="flex flex-row flex-wrap gap-4 p-2">
+                                  <div className="flex flex-row flex-wrap gap-6 p-3">
                                       {product.bestOffersByBrand.map(offer => {
                                           let variantClasses = "border-muted-foreground/20";
                                           let textPriceClass = "text-foreground";
