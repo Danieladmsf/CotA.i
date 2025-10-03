@@ -1963,7 +1963,7 @@ export default function SellerQuotationPage() {
                                           }
       
                                           return (
-                                              <div key={offer.brandName + offer.supplierId} className={`flex items-center justify-between p-2 rounded-md bg-muted/20 border-l-4 min-w-[200px] flex-grow ${variantClasses}`}>
+                                              <div key={offer.brandName + offer.supplierId} className={`flex items-center justify-between p-2 rounded-md bg-muted/20 border-l-4 min-w-[200px] ${variantClasses}`}>
                                                   <div className="flex items-center gap-3">
                                                       <TooltipProvider>
                                                           <Tooltip>
