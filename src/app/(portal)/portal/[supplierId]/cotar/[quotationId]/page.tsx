@@ -60,7 +60,6 @@ import { voiceMessages } from "@/config/voiceMessages";
 import { useSupplierAuth } from "@/hooks/useSupplierAuth";
 import SupplierPinModal from "@/components/features/portal/SupplierPinModal";
 
-
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
 const SHOPPING_LIST_ITEMS_COLLECTION = "shopping_list_items";
@@ -72,7 +71,6 @@ const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined)
   if (Array.isArray(preferredBrands)) return preferredBrands;
   return preferredBrands.split(',').map(b => b.trim());
 };
-
 
 const dayMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
@@ -86,18 +84,77 @@ interface BestOfferForBrandDisplay {
   brandName: string;
   pricePerUnit: number;
   supplierId: string;
-  supplierName: string; 
+  supplierName: string;
   supplierInitials: string;
   supplierFotoUrl?: string;
   supplierFotoHint?: string;
-  vendedor?: string; 
+  vendedor?: string;
   cnpj?: string;
   packagingDescription?: string;
   unitsInPackaging?: number;
+  unitWeight?: number;
   totalPackagingPrice?: number;
-  isSelf: boolean; 
+  isSelf: boolean;
   productUnit: UnitOfMeasure;
 }
+
+// Dynamic label and placeholder functions based on product unit
+const getDynamicWeightLabel = (unit: string): string => {
+  switch (unit) {
+    case 'Kilograma(s)':
+      return 'Peso (Kg)';
+    case 'Litro(s)':
+      return 'Volume (ml)';
+    case 'Grama(s)':
+      return 'Peso (gr)';
+    case 'Mililitro(s)':
+      return 'Volume (ml)';
+    case 'Unidade(s)':
+      return 'Qtd por Emb.';
+    case 'Pacote(s)':
+      return 'Qtd por Emb.';
+    default:
+      return `Qtd (${abbreviateUnit(unit)})`;
+  }
+};
+
+const getDynamicWeightPlaceholder = (unit: string): string => {
+  switch (unit) {
+    case 'Kilograma(s)':
+      return 'Ex: 5Kg';
+    case 'Litro(s)':
+      return 'Ex: 500ml';
+    case 'Grama(s)':
+      return 'Ex: 250gr';
+    case 'Mililitro(s)':
+      return 'Ex: 350ml';
+    case 'Unidade(s)':
+      return 'Ex: 1 unid';
+    case 'Pacote(s)':
+      return 'Ex: 1 pct';
+    default:
+      return `Ex: 1 ${abbreviateUnit(unit)}`;
+  }
+};
+
+const getUnitSuffix = (unit: string): string => {
+  switch (unit) {
+    case 'Kilograma(s)':
+      return 'Kg';
+    case 'Litro(s)':
+      return 'ml';
+    case 'Grama(s)':
+      return 'gr';
+    case 'Mililitro(s)':
+      return 'ml';
+    case 'Unidade(s)':
+      return 'unid';
+    case 'Pacote(s)':
+      return 'pct';
+    default:
+      return abbreviateUnit(unit);
+  }
+};
 
 interface ProductToQuoteVM extends ShoppingListItem {
   supplierOffers: OfferWithUI[]; 
@@ -114,7 +171,6 @@ interface ProductToQuoteVM extends ShoppingListItem {
   categoryName?: string;
   pendingBrandRequests?: PendingBrandRequest[]; // Nova propriedade para solicitações pendentes
 }
-
 
 const abbreviateUnit = (unit: UnitOfMeasure | string): string => {
   switch (unit) {
@@ -157,6 +213,68 @@ const parseCurrencyInput = (value: string): number => {
 const handleCurrencyInputChange = (value: string): string => {
   const centavos = parseCurrencyInput(value);
   return formatCurrencyInput(centavos);
+};
+
+// Funções para formatação de peso (Kg/L)
+const formatWeightInputForKg = (gramas: number): string => {
+  const kg = gramas / 1000;
+  return kg.toFixed(3).replace('.', ',');
+};
+
+const parseWeightInputForKg = (value: string): number => {
+  const numbersOnly = value.replace(/[^\d]/g, '');
+  return parseInt(numbersOnly) || 0;
+};
+
+const handleWeightInputChangeForKg = (value: string): string => {
+  const gramas = parseWeightInputForKg(value);
+  return formatWeightInputForKg(gramas);
+};
+
+// Formatação inteligente de peso para títulos
+const formatSmartWeight = (weight: number, unit: UnitOfMeasure | string): string => {
+  if ((unit === 'Kilograma(s)' || unit === 'Kg') && weight < 1 && weight > 0) {
+    const gramas = Math.round(weight * 1000);
+    return `${gramas}g`;
+  }
+  if ((unit === 'Litro(s)' || unit === 'Lt' || unit === 'L') && weight < 1 && weight > 0) {
+    const ml = Math.round(weight * 1000);
+    return `${ml}ml`;
+  }
+  const formattedWeight = weight % 1 === 0 ? weight.toFixed(0) : weight;
+  return `${formattedWeight}${abbreviateUnit(unit)}`;
+};
+
+const formatPackaging = (quantity: number, weight: number, unit: UnitOfMeasure | string): string => {
+  return `${quantity}×${formatSmartWeight(weight, unit)}`;
+};
+
+// Gera título dinâmico do produto baseado na oferta do fornecedor
+const buildDynamicTitle = (
+  productName: string,
+  offer: OfferWithUI | undefined,
+  productUnit: UnitOfMeasure
+): string => {
+  if (!offer) return productName;
+
+  let title = productName;
+
+  // Adiciona marca com hífen se preenchida
+  if (offer.brandOffered && offer.brandOffered.trim()) {
+    title += ` - ${offer.brandOffered}`;
+  }
+
+  // Adiciona embalagem se ambos campos preenchidos
+  if (offer.unitsInPackaging > 0 && offer.unitWeight && offer.unitWeight > 0) {
+    title += ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, productUnit)}`;
+  }
+
+  // Adiciona preço se preenchido
+  if (offer.totalPackagingPrice > 0) {
+    title += ` | ${formatCurrency(offer.totalPackagingPrice)}`;
+  }
+
+  return title;
 };
 
 const CountdownTimer: React.FC<{ deadline: Date; onEnd?: () => void }> = ({ deadline, onEnd }) => {
@@ -220,6 +338,7 @@ export default function SellerQuotationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
   const [unseenAlerts, setUnseenAlerts] = useState<string[]>([]);
+  const [weightInputValues, setWeightInputValues] = useState<Record<string, string>>({});
   const [expandedProductIds, setExpandedProductIds] = useState<string[]>([]);
   const [showStopQuotingModal, setShowStopQuotingModal] = useState(false);
   const [offerToStop, setOfferToStop] = useState<{productId: string, offerUiId: string, productName: string} | null>(null);
@@ -233,18 +352,19 @@ export default function SellerQuotationPage() {
   const [newBrandModal, setNewBrandModal] = useState({
     isOpen: false,
     productId: '',
-    productName: ''
+    productName: '',
+    productUnit: '' as UnitOfMeasure | ''
   });
   const [newBrandForm, setNewBrandForm] = useState({
     brandName: '',
     packagingDescription: '',
     unitsInPackaging: 0,
+    unitWeight: 0,
     totalPackagingPrice: 0,
     imageFile: null as File | null
   });
   const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
-  
   const [timeLeft, setTimeLeft] = useState("Calculando...");
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
   
@@ -345,16 +465,18 @@ export default function SellerQuotationPage() {
   const handleNewBrandImageFocus = () => speak(voiceMessages.formFields.newBrand_image_prompt);
 
   // Funções para modal de nova marca
-  const openNewBrandModal = (productId: string, productName: string) => {
+  const openNewBrandModal = (productId: string, productName: string, productUnit: UnitOfMeasure) => {
     setNewBrandModal({
       isOpen: true,
       productId,
-      productName
+      productName,
+      productUnit
     });
     setNewBrandForm({
       brandName: '',
       packagingDescription: '',
       unitsInPackaging: 0,
+      unitWeight: 0,
       totalPackagingPrice: 0,
       imageFile: null
     });
@@ -365,12 +487,14 @@ export default function SellerQuotationPage() {
     setNewBrandModal({
       isOpen: false,
       productId: '',
-      productName: ''
+      productName: '',
+      productUnit: '' as UnitOfMeasure | ''
     });
     setNewBrandForm({
       brandName: '',
       packagingDescription: '',
       unitsInPackaging: 0,
+      unitWeight: 0,
       totalPackagingPrice: 0,
       imageFile: null
     });
@@ -419,9 +543,8 @@ export default function SellerQuotationPage() {
       return;
     }
 
-    if (!newBrandForm.brandName.trim() || !newBrandForm.packagingDescription.trim() || 
-        newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0) {
-      toast({ title: "Erro", description: "Todos os campos são obrigatórios.", variant: "destructive" });
+    if (newBrandForm.unitsInPackaging <= 0 || newBrandForm.unitWeight <= 0 || newBrandForm.totalPackagingPrice <= 0) {
+      toast({ title: "Erro", description: "Todos os campos são obrigatórios (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive" });
       return;
     }
 
@@ -449,6 +572,7 @@ export default function SellerQuotationPage() {
         brandName: newBrandForm.brandName.trim(),
         packagingDescription: newBrandForm.packagingDescription.trim(),
         unitsInPackaging: newBrandForm.unitsInPackaging,
+        unitWeight: newBrandForm.unitWeight,
         totalPackagingPrice: newBrandForm.totalPackagingPrice,
         pricePerUnit: pricePerUnit,
         imageUrl: imageUrl,
@@ -502,9 +626,6 @@ export default function SellerQuotationPage() {
       setIsSubmittingNewBrand(false);
     }
   };
-
-
-
 
   // Main listener for the quotation document itself
   useEffect(() => {
@@ -593,8 +714,6 @@ export default function SellerQuotationPage() {
         }).sort((a,b) => a.name.localeCompare(b.name));
         
         setProductsToQuote(fetchedProducts);
-
-
 
       } catch (error: any) {
         console.error("ERROR fetching initial data for seller quotation page:", error);
@@ -685,7 +804,6 @@ export default function SellerQuotationPage() {
     };
   }, [quotation, handleAutoCloseQuotation]); 
 
-
   // Effect to listen for pending brand requests
   useEffect(() => {
     if (!quotationId || !supplierId) return;
@@ -752,7 +870,6 @@ export default function SellerQuotationPage() {
     return () => unsubscribe();
   }, [quotationId]);
 
-
   useEffect(() => {
     if (!quotationId || !supplierId || productsToQuote.length === 0 || !currentSupplierDetails || isLoading || !quotation) return ()=>{};
 
@@ -762,9 +879,12 @@ export default function SellerQuotationPage() {
       const offersQuery = query(collection(db, offersPath));
 
       return onSnapshot(offersQuery, async (offersSnapshot) => {
+        const snapshotStartTime = performance.now();
+        console.log('[LISTENER] Offers snapshot received for product:', product.id, 'docs:', offersSnapshot.docs.length);
         const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
 
         // Fetch new supplier details
+        const fetchStartTime = performance.now();
         const newSupplierIdsToFetch = new Set<string>();
         offersData.forEach(offer => {
           if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
@@ -773,6 +893,7 @@ export default function SellerQuotationPage() {
         });
 
         if (newSupplierIdsToFetch.size > 0) {
+          console.log('[LISTENER] Fetching supplier details for:', Array.from(newSupplierIdsToFetch));
           const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
             try {
               const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
@@ -784,6 +905,8 @@ export default function SellerQuotationPage() {
             }
           });
           await Promise.all(fetchPromises);
+          const fetchEndTime = performance.now();
+          console.log(`[LISTENER] Supplier fetch took ${(fetchEndTime - fetchStartTime).toFixed(2)}ms`);
         }
 
         const offersGroupedByBrand = new Map<string, Offer[]>();
@@ -818,6 +941,7 @@ export default function SellerQuotationPage() {
               cnpj: supplierDetails.cnpj,
               packagingDescription: bestOffer.packagingDescription,
               unitsInPackaging: bestOffer.unitsInPackaging,
+              unitWeight: bestOffer.unitWeight,
               totalPackagingPrice: bestOffer.totalPackagingPrice,
               isSelf: bestOffer.supplierId === supplierId,
               productUnit: product.unit,
@@ -846,6 +970,7 @@ export default function SellerQuotationPage() {
                 cnpj: mySupplierDetails.cnpj,
                 packagingDescription: myOfferForBrand.packagingDescription,
                 unitsInPackaging: myOfferForBrand.unitsInPackaging,
+                unitWeight: myOfferForBrand.unitWeight,
                 totalPackagingPrice: myOfferForBrand.totalPackagingPrice,
                 isSelf: true,
                 productUnit: product.unit,
@@ -898,6 +1023,8 @@ export default function SellerQuotationPage() {
         }
 
         // Update the specific product
+        console.log('[LISTENER] Processing product update for:', product.id);
+        const listenerStartTime = performance.now();
         setProductsToQuote(currentProducts => {
           return currentProducts.map(p => {
             if (p.id === product.id) {
@@ -931,6 +1058,10 @@ export default function SellerQuotationPage() {
             return p;
           });
         });
+        const listenerEndTime = performance.now();
+        const totalListenerTime = listenerEndTime - snapshotStartTime;
+        console.log(`[LISTENER] setState took ${(listenerEndTime - listenerStartTime).toFixed(2)}ms`);
+        console.log(`[LISTENER] Total listener time for ${product.id}: ${totalListenerTime.toFixed(2)}ms`);
       }, (error) => {
         console.error(`🔴 [Portal] Error in offers listener for product ${product.id}:`, error);
       });
@@ -941,8 +1072,6 @@ export default function SellerQuotationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotationId, supplierId, currentSupplierDetails, toast, isLoading, quotation]);
-  
-
   
   // Effect for component unmount cleanup - only runs once
   useEffect(() => {
@@ -955,8 +1084,6 @@ export default function SellerQuotationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
 
   // Effect for voice narration when user actively changes tabs
   useEffect(() => {
@@ -1096,6 +1223,8 @@ export default function SellerQuotationPage() {
   };
 
   const handleOfferChange = (productId: string, offerUiId: string, field: keyof OfferWithUI, value: string | number | boolean) => {
+    console.log('[OFFER_CHANGE] Called with:', { productId, offerUiId, field, value });
+    const startTime = performance.now();
     setProductsToQuote(prevProducts =>
       prevProducts.map(p =>
         p.id === productId
@@ -1108,6 +1237,8 @@ export default function SellerQuotationPage() {
           : p
       )
     );
+    const endTime = performance.now();
+    console.log(`[OFFER_CHANGE] Completed in ${(endTime - startTime).toFixed(2)}ms`);
   };
 
   // Handlers de narração para campos do formulário
@@ -1153,6 +1284,48 @@ export default function SellerQuotationPage() {
     const decimalValue = centavos / 100;
     // Atualiza o estado com o valor decimal
     handleOfferChange(productId, offerUiId, 'totalPackagingPrice', decimalValue);
+  };
+
+  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>, product: ProductToQuoteVM, offer: OfferWithUI) => {
+    const inputValue = e.target.value;
+    const key = `${product.id}_${offer.uiId}`;
+
+    // Para Kg e Litros: usuário digita em gramas/ml, sistema converte para Kg/L
+    if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
+      const gramas = parseWeightInputForKg(inputValue);
+      const kg = gramas / 1000;
+
+      // Atualiza o display value (formatado com vírgula)
+      const formattedValue = formatWeightInputForKg(gramas);
+      setWeightInputValues(prev => ({ ...prev, [key]: formattedValue }));
+
+      // Atualiza o valor real em Kg/L
+      handleOfferChange(product.id, offer.uiId, 'unitWeight', kg);
+    } else {
+      // Para outras unidades: valor direto
+      const numericValue = parseFloat(inputValue.replace(',', '.')) || 0;
+      handleOfferChange(product.id, offer.uiId, 'unitWeight', numericValue);
+    }
+  };
+
+  const getWeightDisplayValue = (product: ProductToQuoteVM, offer: OfferWithUI): string => {
+    const key = `${product.id}_${offer.uiId}`;
+
+    // Para Kg/L: usa o valor formatado do state
+    if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
+      if (weightInputValues[key] !== undefined) {
+        return weightInputValues[key];
+      }
+      // Valor inicial: converte Kg para gramas e formata
+      if (offer.unitWeight) {
+        const gramas = Math.round(offer.unitWeight * 1000);
+        return formatWeightInputForKg(gramas);
+      }
+      return '0,000';
+    }
+
+    // Para outras unidades: valor direto
+    return offer.unitWeight?.toString().replace('.', ',') || '';
   };
 
   const handleStopQuotingClick = (productId: string, offerUiId: string, productName: string) => {
@@ -1206,49 +1379,31 @@ export default function SellerQuotationPage() {
   };
 
   const addOfferField = (productId: string, brandToPreFill?: string, isSuggested?: boolean) => {
-    console.log(`[ADD-OFFER-DEBUG] addOfferField ENTRY:`, {
-      productId,
-      brandToPreFill,
-      isSuggested,
-      timestamp: Date.now(),
-      currentSupplierDetails: !!currentSupplierDetails
-    });
 
     // Prevent duplicate execution
     const executionKey = `addOffer-${productId}-${brandToPreFill}-${isSuggested}`;
     if (lastClickRef.current?.action === executionKey && Date.now() - lastClickRef.current.timestamp < 500) {
-      console.log(`[ADD-OFFER-DEBUG] PREVENTED duplicate execution of ${executionKey}`);
       return;
     }
     lastClickRef.current = { action: executionKey, timestamp: Date.now() };
 
     if (!currentSupplierDetails) {
-        console.log(`[ADD-OFFER-DEBUG] ERROR: No supplier details available`);
         toast({title: "Erro", description: "Dados do fornecedor não carregados.", variant: "destructive"});
         return;
     }
 
     if (!expandedProductIds.includes(productId)) {
-      console.log(`[ADD-OFFER-DEBUG] Expanding product ${productId}`);
       setExpandedProductIds(prev => [...prev, productId]);
     }
 
     const newOfferUiId = Date.now().toString() + Math.random().toString(36).substring(2,7);
-    console.log(`[ADD-OFFER-DEBUG] Generated new offer uiId: ${newOfferUiId}`);
 
     setProductsToQuote(prevProducts => {
-      console.log(`[ADD-OFFER-DEBUG] setProductsToQuote STARTING for new offer creation`);
       const targetProduct = prevProducts.find(p => p.id === productId);
       if (targetProduct) {
-        console.log(`[ADD-OFFER-DEBUG] BEFORE adding - ${targetProduct.name} has ${targetProduct.supplierOffers.length} offers:`,
-          targetProduct.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id, isSuggested: o.isSuggestedBrand }))
-        );
       }
       const updatedProducts = prevProducts.map(p => {
         if (p.id === productId) {
-            console.log(`[OFFER-DEBUG] Before adding offer - ${p.name} has ${p.supplierOffers.length} offers:`,
-              p.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-            );
             const newOffer: OfferWithUI = {
                 uiId: newOfferUiId,
                 quotationId: quotationId, // Adicionar campo obrigatório
@@ -1264,20 +1419,11 @@ export default function SellerQuotationPage() {
                 productId: productId,
                 isSuggestedBrand: isSuggested || false,
             };
-            console.log(`[ADD-OFFER-DEBUG] CREATING new offer:`, {
-              uiId: newOffer.uiId,
-              brand: newOffer.brandOffered,
-              isSuggestedBrand: newOffer.isSuggestedBrand,
-              productName: p.name
-            });
 
             const updatedProduct = {
                 ...p,
                 supplierOffers: [...p.supplierOffers, newOffer],
             };
-            console.log(`[OFFER-DEBUG] After adding offer - ${p.name} will have ${updatedProduct.supplierOffers.length} offers:`,
-              updatedProduct.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-            );
              // Don't auto-focus for suggested brands - they should appear pre-filled but not editable
              if (!brandToPreFill) {
                setTimeout(() => {
@@ -1285,16 +1431,13 @@ export default function SellerQuotationPage() {
                   brandInputRef?.focus();
               }, 0);
              } else {
-               console.log(`[OFFER-DEBUG] Skipping auto-focus for suggested brand: ${brandToPreFill}`);
              }
             return updatedProduct;
         }
         return p;
       });
-      console.log(`[ADD-OFFER-DEBUG] setProductsToQuote COMPLETED for new offer creation`);
       return updatedProducts;
     });
-    console.log(`[ADD-OFFER-DEBUG] addOfferField COMPLETED for ${productId}`);
   };
   
   const removeOfferField = async (productId: string, offerToRemove: OfferWithUI) => {
@@ -1325,62 +1468,31 @@ export default function SellerQuotationPage() {
     // Debounce rapid clicks
     const now = Date.now();
     const actionKey = `suggested-${productId}-${brandName}`;
-    console.log(`[CLICK-DEBUG] handleSuggestedBrandClick ENTRY:`, {
-      productId,
-      brandName,
-      actionKey,
-      timestamp: now,
-      lastClick: lastClickRef.current
-    });
 
     if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 300) {
-      console.log(`[CLICK-DEBUG] DEBOUNCED - ignoring rapid click for ${actionKey}`);
       return;
     }
     lastClickRef.current = { action: actionKey, timestamp: now };
-    console.log(`[CLICK-DEBUG] PROCEEDING with click ${actionKey}`);
 
-    console.log(`[OFFER-DEBUG] handleSuggestedBrandClick called:`, { productId, brandName });
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
 
     const unsavedOfferIndex = product.supplierOffers.findIndex(o => !o.id);
-    console.log(`[OFFER-DEBUG] Current offers for ${product.name}:`, {
-      totalOffers: product.supplierOffers.length,
-      unsavedOfferIndex,
-      offers: product.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-    });
 
     if (unsavedOfferIndex !== -1) {
         // There is an unsaved offer, so update it.
-        console.log(`[OFFER-DEBUG] Updating existing unsaved offer with brand: ${brandName}`);
         const currentOffer = product.supplierOffers[unsavedOfferIndex];
-        console.log(`[OFFER-DEBUG] Current offer being updated:`, {
-          uiId: currentOffer.uiId,
-          oldBrand: currentOffer.brandOffered,
-          newBrand: brandName,
-          isSuggestedBrand: currentOffer.isSuggestedBrand,
-          hasId: !!currentOffer.id
-        });
         // Update both the brand name and mark as suggested brand
         const offerUiId = product.supplierOffers[unsavedOfferIndex].uiId;
-        console.log(`[STATE-DEBUG] BEFORE suggested brand update - offer state:`, {
-          uiId: offerUiId,
-          oldBrand: product.supplierOffers[unsavedOfferIndex].brandOffered,
-          oldIsSuggested: product.supplierOffers[unsavedOfferIndex].isSuggestedBrand,
-          newBrand: brandName
-        });
 
         // Prevent double execution using useCallback-like pattern
         const stateUpdateKey = `updateBrand-${productId}-${offerUiId}-${brandName}`;
         if (lastClickRef.current?.action === stateUpdateKey && Date.now() - lastClickRef.current.timestamp < 200) {
-          console.log(`[STATE-DEBUG] PREVENTED duplicate state update for ${stateUpdateKey}`);
           return;
         }
         lastClickRef.current = { action: stateUpdateKey, timestamp: Date.now() };
 
         setProductsToQuote(prevProducts => {
-          console.log(`[STATE-DEBUG] setProductsToQuote STARTING for suggested brand`);
           const result = prevProducts.map(p => {
             if (p.id === productId) {
               const updatedOffers = p.supplierOffers.map(offer => {
@@ -1390,11 +1502,6 @@ export default function SellerQuotationPage() {
                     brandOffered: brandName,
                     isSuggestedBrand: true
                   };
-                  console.log(`[STATE-DEBUG] UPDATING offer:`, {
-                    uiId: offer.uiId,
-                    from: { brand: offer.brandOffered, isSuggested: offer.isSuggestedBrand },
-                    to: { brand: brandName, isSuggested: true }
-                  });
                   return updatedOffer;
                 }
                 return offer;
@@ -1403,7 +1510,6 @@ export default function SellerQuotationPage() {
             }
             return p;
           });
-          console.log(`[STATE-DEBUG] setProductsToQuote COMPLETED for suggested brand`);
           return result;
         });
 
@@ -1411,7 +1517,6 @@ export default function SellerQuotationPage() {
         speak(voiceMessages.actions.brandSelected(brandName, product.unit));
     } else {
         // There are no unsaved offers, so add a new one.
-        console.log(`[OFFER-DEBUG] Adding new offer field with brand: ${brandName} - this is FIRST CLICK`);
         addOfferField(productId, brandName, true); // Mark as suggested brand so it's non-editable
 
         // Narração após selecionar marca
@@ -1423,60 +1528,32 @@ export default function SellerQuotationPage() {
     // Debounce rapid clicks
     const now = Date.now();
     const actionKey = `other-${productId}`;
-    console.log(`[CLICK-DEBUG] handleOtherBrandClick ENTRY:`, {
-      productId,
-      actionKey,
-      timestamp: now,
-      lastClick: lastClickRef.current
-    });
 
     if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 300) {
-      console.log(`[CLICK-DEBUG] DEBOUNCED - ignoring rapid other brand click for ${actionKey}`);
       return;
     }
     lastClickRef.current = { action: actionKey, timestamp: now };
-    console.log(`[CLICK-DEBUG] PROCEEDING with other brand click ${actionKey}`);
 
-    console.log(`[OFFER-DEBUG] handleOtherBrandClick called:`, { productId });
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
 
     const unsavedOfferIndex = product.supplierOffers.findIndex(o => !o.id);
-    console.log(`[OFFER-DEBUG] Other brand click - Current offers for ${product.name}:`, {
-      totalOffers: product.supplierOffers.length,
-      unsavedOfferIndex,
-      offers: product.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-    });
 
     if (unsavedOfferIndex === -1) {
         // Only add a new field if there are no unsaved offers
-        console.log(`[OFFER-DEBUG] Adding new empty offer field`);
         addOfferField(productId, '', false);
     } else {
         // Convert existing unsaved offer to "other brand" (clear brand and make editable)
         const currentOffer = product.supplierOffers[unsavedOfferIndex];
-        console.log(`[OFFER-DEBUG] Converting existing offer to 'other brand' mode:`, {
-          uiId: currentOffer.uiId,
-          oldBrand: currentOffer.brandOffered,
-          oldIsSuggested: currentOffer.isSuggestedBrand
-        });
-
-        console.log(`[STATE-DEBUG] BEFORE other brand conversion - offer state:`, {
-          uiId: currentOffer.uiId,
-          oldBrand: currentOffer.brandOffered,
-          oldIsSuggested: currentOffer.isSuggestedBrand
-        });
 
         // Prevent double execution
         const conversionKey = `convertOther-${productId}-${currentOffer.uiId}`;
         if (lastClickRef.current?.action === conversionKey && Date.now() - lastClickRef.current.timestamp < 200) {
-          console.log(`[STATE-DEBUG] PREVENTED duplicate other brand conversion for ${conversionKey}`);
           return;
         }
         lastClickRef.current = { action: conversionKey, timestamp: Date.now() };
 
         setProductsToQuote(prevProducts => {
-          console.log(`[STATE-DEBUG] setProductsToQuote STARTING for other brand conversion`);
           const result = prevProducts.map(p => {
             if (p.id === productId) {
               const updatedOffers = [...p.supplierOffers];
@@ -1486,16 +1563,10 @@ export default function SellerQuotationPage() {
                 brandOffered: '',
                 isSuggestedBrand: false
               };
-              console.log(`[STATE-DEBUG] CONVERTING offer to other brand:`, {
-                uiId: originalOffer.uiId,
-                from: { brand: originalOffer.brandOffered, isSuggested: originalOffer.isSuggestedBrand },
-                to: { brand: '', isSuggested: false }
-              });
               return { ...p, supplierOffers: updatedOffers };
             }
             return p;
           });
-          console.log(`[STATE-DEBUG] setProductsToQuote COMPLETED for other brand conversion`);
           return result;
         });
     }
@@ -1511,50 +1582,49 @@ export default function SellerQuotationPage() {
   };
 
   const handleSaveProductOffer = async (productId: string, offerUiId: string): Promise<boolean> => {
+    const totalStartTime = performance.now();
+    console.log('[SAVE] Starting handleSaveProductOffer', productId, offerUiId);
     // Debounce rapid save clicks
     const now = Date.now();
     const actionKey = `save-${productId}-${offerUiId}`;
     if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 1000) {
-      console.log(`[OFFER-DEBUG] Debouncing save request for ${actionKey}`);
+      console.log('[SAVE] Debounced - too soon');
       return false;
     }
     lastClickRef.current = { action: actionKey, timestamp: now };
 
-    console.log(`[OFFER-DEBUG] handleSaveProductOffer called:`, { productId, offerUiId });
     if (!currentSupplierDetails || !quotation || !quotation.userId) {
+        console.log('[SAVE] Missing supplier/quotation data');
         toast({title: "Erro Interno", description: "Dados do fornecedor, cotação ou ID do comprador ausentes.", variant: "destructive"});
         return false;
     }
     const product = productsToQuote.find(p => p.id === productId);
-    if (!product) return false;
-
-    console.log(`[OFFER-DEBUG] Before save - ${product.name} has ${product.supplierOffers.length} offers:`,
-      product.supplierOffers.map(o => ({ uiId: o.uiId, brand: o.brandOffered, hasId: !!o.id }))
-    );
+    if (!product) {
+      console.log('[SAVE] Product not found');
+      return false;
+    }
 
     const offerToSaveIndex = product.supplierOffers.findIndex(o => o.uiId === offerUiId);
     if (offerToSaveIndex === -1) {
-        console.log(`[OFFER-DEBUG] ERROR: Offer with uiId ${offerUiId} not found!`);
         toast({title: "Erro", description: "Oferta não encontrada para salvar.", variant: "destructive"});
         return false;
     }
     const offerData = product.supplierOffers[offerToSaveIndex];
-    console.log(`[OFFER-DEBUG] Found offer to save:`, {
-      uiId: offerData.uiId,
-      brand: offerData.brandOffered,
-      hasId: !!offerData.id,
-      index: offerToSaveIndex
-    }); 
 
     const unitsInPackaging = Number(offerData.unitsInPackaging);
+    const unitWeight = Number(offerData.unitWeight);
     const totalPackagingPrice = Number(offerData.totalPackagingPrice);
 
-    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0 || !offerData.brandOffered.trim() || !offerData.packagingDescription.trim()) {
-      toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Marca, Embalagem, Unidades > 0, Preço > 0).", variant: "destructive", duration: 7e3});
+    console.log('[SAVE] Validation:', { unitsInPackaging, unitWeight, totalPackagingPrice });
+
+    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
+      console.log('[SAVE] Validation failed');
+      toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive", duration: 7e3});
       return false;
     }
 
     const pricePerUnit = totalPackagingPrice / unitsInPackaging;
+    console.log('[SAVE] Price per unit:', pricePerUnit);
 
     const bestCompetitorOffer = product.bestOffersByBrand.find(o => o.supplierId !== supplierId);
 
@@ -1631,74 +1701,78 @@ export default function SellerQuotationPage() {
       }
     }
 
-    const offerPayload: Omit<Offer, 'id'> = { 
+    const offerPayload: Omit<Offer, 'id'> = {
       quotationId: quotationId, // Adicionar campo obrigatório
-      supplierId: currentSupplierDetails.id, 
-      supplierName: currentSupplierDetails.empresa, 
-      supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase(), 
+      supplierId: currentSupplierDetails.id,
+      supplierName: currentSupplierDetails.empresa,
+      supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase(),
       brandOffered: offerData.brandOffered,
       packagingDescription: offerData.packagingDescription,
       unitsInPackaging,
+      unitWeight,
       totalPackagingPrice,
       pricePerUnit,
-      updatedAt: serverTimestamp() as Timestamp, 
-      productId: productId, 
+      updatedAt: serverTimestamp() as Timestamp,
+      productId: productId,
     };
     
     const savingKey = `${productId}_${offerUiId}`;
+    console.log('[SAVE] Setting saving state to true');
     setIsSaving(prev => ({ ...prev, [savingKey]: true }));
     // Adiciona a oferta à lista de ofertas sendo salvas
     setSavingOffers(prev => new Set(prev).add(savingKey));
-    
+
     try {
       if (offerData.id) {
-        console.log(`[OFFER-DEBUG] Updating existing offer in Firestore with ID: ${offerData.id}`);
+        console.log('[SAVE] Updating existing offer:', offerData.id);
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
         await updateDoc(offerRef, offerPayload);
-        console.log(`[OFFER-DEBUG] Successfully updated offer ${offerData.id} in Firestore`);
+        console.log('[SAVE] Update complete');
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
         speak(voiceMessages.success.offerSaved);
       } else {
-        // Check if an offer with the same brand and price already exists for this supplier
-        const existingOfferQuery = query(
-          collection(db, `quotations/${quotationId}/products/${productId}/offers`),
-          where('supplierId', '==', currentSupplierDetails.id),
-          where('brandOffered', '==', offerData.brandOffered),
-          where('pricePerUnit', '==', pricePerUnit)
-        );
-        const existingOfferSnap = await getDocs(existingOfferQuery);
+        console.log('[SAVE] Creating new offer, skipping duplicate check for performance');
+        // Skip duplicate check for better performance - Firebase will handle uniqueness with IDs
 
-        if (!existingOfferSnap.empty) {
-          console.log(`[OFFER-DEBUG] Duplicate offer detected, skipping Firestore creation`);
-          toast({title: "Oferta Duplicada", description: "Esta oferta já existe.", variant: "destructive"});
-          setIsSaving(prev => ({ ...prev, [savingKey]: false }));
-          setSavingOffers(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(savingKey);
-            return newSet;
-          });
-          return false;
-        }
-
-        console.log(`[OFFER-DEBUG] Creating new offer in Firestore`);
+        console.log('[SAVE] Adding new offer to Firestore');
+        const addDocStartTime = performance.now();
         const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
         const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
-        console.log(`[OFFER-DEBUG] Successfully created new offer with ID: ${newOfferDocRef.id}`);
+        const addDocEndTime = performance.now();
+        console.log(`[SAVE] Add complete, doc ID: ${newOfferDocRef.id}, addDoc took ${(addDocEndTime - addDocStartTime).toFixed(2)}ms`);
 
-
+        const toastStartTime = performance.now();
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
-        speak(voiceMessages.success.offerSaved);
+        const toastEndTime = performance.now();
+        console.log(`[SAVE] Toast took ${(toastEndTime - toastStartTime).toFixed(2)}ms`);
+
+        const speakStartTime = performance.now();
+        // Make speak non-blocking by deferring it
+        setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
+        const speakEndTime = performance.now();
+        console.log(`[SAVE] Speak took ${(speakEndTime - speakStartTime).toFixed(2)}ms`);
       }
 
-      console.log(`[OFFER-DEBUG] Save completed successfully for offer ${offerUiId}`);
+      const clearingStartTime = performance.now();
+      console.log('[SAVE] Clearing alerts and flags');
+      
+      const alertsStartTime = performance.now();
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
+      const alertsEndTime = performance.now();
+      console.log(`[SAVE] setUnseenAlerts took ${(alertsEndTime - alertsStartTime).toFixed(2)}ms`);
+      
+      const offerChangeStartTime = performance.now();
       handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false); // Reset the flag after saving
+      const offerChangeEndTime = performance.now();
+      console.log(`[SAVE] handleOfferChange took ${(offerChangeEndTime - offerChangeStartTime).toFixed(2)}ms`);
 
+      const totalEndTime = performance.now();
+      console.log(`[SAVE] Save complete in ${(totalEndTime - totalStartTime).toFixed(2)}ms, returning true`);
       return true;
     } catch (error: any) {
-      console.log(`[OFFER-DEBUG] ERROR during save:`, error);
+      console.log('[SAVE] Error:', error);
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
-      speak(voiceMessages.error.saveFailed);
+      setTimeout(() => speak(voiceMessages.error.saveFailed), 0);
       return false;
     } finally {
       setIsSaving(prev => ({ ...prev, [savingKey]: false }));
@@ -1708,6 +1782,8 @@ export default function SellerQuotationPage() {
         newSet.delete(savingKey);
         return newSet;
       });
+      const totalEndTime = performance.now();
+      console.log(`[SAVE] Finally block completed, total time: ${(totalEndTime - totalStartTime).toFixed(2)}ms`);
     }
   };
   
@@ -1907,10 +1983,12 @@ export default function SellerQuotationPage() {
                     ))}
                   </TabsList>
                 </div>
-                <TabsContent value={activeCategoryTab}>
+                <TabsContent value={activeCategoryTab} className="space-y-8">
                   {filteredProducts.length === 0 && !isLoading ? (
                       <Card><CardContent className="p-6 text-center"><p className="text-muted-foreground">Nenhum item encontrado nesta categoria.</p></CardContent></Card>
-                  ) : filteredProducts.map((product, index) => {
+                  ) : (
+                    <div className="space-y-8">
+                      {filteredProducts.map((product, index) => {
                     const hasUnseenAlert = unseenAlerts.includes(product.id);
                     const isExpanded = expandedProductIds.includes(product.id);
                     const isDeliveryMismatch = product.hasSpecificDate && product.isDeliveryDayMismatch;
@@ -1923,16 +2001,30 @@ export default function SellerQuotationPage() {
                     const isMyOfferLosing = mySavedOffers.some(offer => offer.pricePerUnit > 0) && !isMyOfferWinning;
       
                     return (
-                      <Card key={product.id} className={`border-2 ${
+                      <Card key={product.id} className={`border-2 transition-all duration-300 ${
                           isMyOfferWinning ? 'animate-pulse-glow-green' :
                           isMyOfferLosing ? 'animate-pulse-glow-red' :
-                          hasUnseenAlert ? 'border-orange-500 shadow-lg' : 'border-transparent'
+                          hasUnseenAlert ? 'border-orange-500 shadow-lg' : 
+                          isExpanded ? 'border-blue-500 shadow-lg bg-gradient-to-r from-blue-50/30 to-indigo-50/30 dark:from-blue-950/20 dark:to-indigo-950/20' : 'border-transparent'
                       }`}>                  <CardHeader className="bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleProductExpansion(product.id)}>
                             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                                 <div className="flex items-center gap-3 flex-grow">
-      
+
                                     <div>
-                                        <h3 className="text-lg font-semibold">{product.name}</h3>
+                                        <h3 className="text-xl font-semibold">
+                                          {(() => {
+                                            // Pega a oferta em andamento (não salva) ou a última oferta do fornecedor
+                                            const myOfferInProgress = product.supplierOffers.find(o => o.supplierId === supplierId && !o.id);
+                                            const myLastOffer = product.supplierOffers.filter(o => o.supplierId === supplierId).sort((a, b) => {
+                                              if (a.updatedAt instanceof Timestamp && b.updatedAt instanceof Timestamp) {
+                                                return b.updatedAt.toMillis() - a.updatedAt.toMillis();
+                                              }
+                                              return 0;
+                                            })[0];
+                                            const offerToShow = myOfferInProgress || myLastOffer;
+                                            return buildDynamicTitle(product.name, offerToShow, product.unit);
+                                          })()}
+                                        </h3>
                                         <p className="text-sm text-muted-foreground">
                                           Pedido: {product.quantity} {abbreviateUnit(product.unit)} para {product.hasSpecificDate && product.deliveryDate ? format(product.deliveryDate.toDate(), "dd/MM/yyyy", { locale: ptBR }) : <span className="font-medium text-accent">entregar na próxima entrega da sua grade</span>}
                                         </p>
@@ -1981,7 +2073,10 @@ export default function SellerQuotationPage() {
                                                           </Tooltip>
                                                       </TooltipProvider>
                                                       <div>
-                                                          <p className="text-sm font-semibold" title={offer.brandName}>{offer.brandName}</p>
+                                                          <p className="text-sm font-semibold" title={offer.brandName}>
+                                                            {offer.brandName}
+                                                            {offer.unitsInPackaging && offer.unitWeight ? ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, offer.productUnit)}` : ''}
+                                                          </p>
                                                           <p className="text-xs text-muted-foreground">por {offer.supplierName}</p>
                                                       </div>
                                                   </div>
@@ -2031,7 +2126,10 @@ export default function SellerQuotationPage() {
                                                       </Tooltip>
                                                   </TooltipProvider>
                                                   <div>
-                                                      <p className="text-sm font-semibold" title={request.brandName}>{request.brandName}</p>
+                                                      <p className="text-sm font-semibold" title={request.brandName}>
+                                                        {request.brandName}
+                                                        {request.unitsInPackaging && request.unitWeight ? ` ${formatPackaging(request.unitsInPackaging, request.unitWeight, product.unit)}` : ''}
+                                                      </p>
                                                       <p className="text-xs text-muted-foreground">por {request.supplierName}</p>
                                                   </div>
                                               </div>
@@ -2097,7 +2195,7 @@ export default function SellerQuotationPage() {
                                         )}
                                         <Badge 
                                           variant="outline" 
-                                          onClick={() => !isLockedOut && openNewBrandModal(product.id, product.name)} 
+                                          onClick={() => !isLockedOut && openNewBrandModal(product.id, product.name, product.unit)} 
                                           className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}
                                         >
                                           <PlusCircle className="mr-1.5 h-3 w-3" /> Outra Marca
@@ -2105,8 +2203,6 @@ export default function SellerQuotationPage() {
                                         {product.notes && <p className="text-muted-foreground mt-2 sm:mt-0"><span className="font-medium">Obs. Comprador:</span> {product.notes}</p>}
                                      </div>
       
-      
-                                     
                                      {product.supplierOffers.map((offer, offerIndex) => {
                                        const savingKey = `${product.id}_${offer.uiId}`;
                                        const pricePerUnit = calculatePricePerUnit(offer);
@@ -2138,7 +2234,6 @@ export default function SellerQuotationPage() {
 
                                        // Debug logging removed to improve performance
 
-
                                        const isButtonDisabled = Boolean(
                                          isSaving[savingKey] ||
                                          isQuotationEnded ||
@@ -2157,52 +2252,8 @@ export default function SellerQuotationPage() {
       
                                        return (
                                          <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
-                                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)] gap-2 items-end">
-                                             <div>
-                                               <div className="flex items-center gap-1 mb-1">
-                                                 <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Sua Marca Ofertada *</label>
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => speak(voiceMessages.formFields.brandHelp)}
-                                                   className="text-muted-foreground hover:text-primary transition-colors"
-                                                   title="Ajuda sobre este campo"
-                                                 >
-                                                   <HelpCircle className="h-3.5 w-3.5" />
-                                                 </button>
-                                               </div>
-                                               <Input
-                                                 id={`brand-${product.id}-${offer.uiId}`}
-                                                 ref={ref => { brandInputRefs.current[`${product.id}_${offer.uiId}`] = ref; }}
-                                                 value={offer.brandOffered}
-                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'brandOffered', e.target.value)}
-                                                 placeholder="Ex: Marca Top"
-                                                 disabled={isBrandFieldDisabled}
-                                                 autoFocus={!offer.isSuggestedBrand && offer.brandOffered === ''}
-                                                 className={offer.isSuggestedBrand ? 'bg-muted/30' : undefined}
-                                               />
-                                             </div>
-                                             <div>
-                                               <div className="flex items-center gap-1 mb-1">
-                                                 <label htmlFor={`packaging-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Descrição da Embalagem *</label>
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => speak(voiceMessages.formFields.packagingHelp)}
-                                                   className="text-muted-foreground hover:text-primary transition-colors"
-                                                   title="Ajuda sobre este campo"
-                                                 >
-                                                   <HelpCircle className="h-3.5 w-3.5" />
-                                                 </button>
-                                               </div>
-                                               <Input
-                                                 id={`packaging-${product.id}-${offer.uiId}`}
-                                                 value={offer.packagingDescription}
-                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'packagingDescription', e.target.value)}
-                                                 onBlur={() => handlePackagingDescriptionBlur(product.id, offer.uiId)}
-                                                 placeholder="Ex: Caixa com 12 Unid."
-                                                 disabled={isOfferDisabled}
-                                               />
-                                             </div>
-                                             <div>
+                                           <div className="flex flex-col lg:flex-row gap-2 items-stretch lg:items-end">
+                                             <div className="flex-1 min-w-[120px]">
                                                <div className="flex items-center gap-1 mb-1">
                                                  <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
                                                  <button
@@ -2210,6 +2261,7 @@ export default function SellerQuotationPage() {
                                                    onClick={() => speak(voiceMessages.formFields.unitsHelp(product.unit))}
                                                    className="text-muted-foreground hover:text-primary transition-colors"
                                                    title="Ajuda sobre este campo"
+                                                   tabIndex={-1}
                                                  >
                                                    <HelpCircle className="h-3.5 w-3.5" />
                                                  </button>
@@ -2217,7 +2269,7 @@ export default function SellerQuotationPage() {
                                                <Input
                                                  id={`units-${product.id}-${offer.uiId}`}
                                                  type="number"
-                                                 value={offer.unitsInPackaging}
+                                                 value={offer.unitsInPackaging > 0 ? offer.unitsInPackaging : ''}
                                                  onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
                                                  onFocus={() => handleUnitsInPackagingFocus(product.id)}
                                                  onBlur={handleUnitsInPackagingBlur}
@@ -2225,7 +2277,47 @@ export default function SellerQuotationPage() {
                                                  disabled={isOfferDisabled}
                                                />
                                              </div>
-                                             <div>
+                                             
+                                             {/* X separator between fields */}
+                                             <div className="flex items-center justify-center px-2">
+                                               <span className="text-xl font-bold text-muted-foreground">×</span>
+                                             </div>
+                                             
+                                            <div className="flex-1 min-w-[140px]">
+                                              <div className="flex items-center gap-1 mb-1">
+                                                <label htmlFor={`weight-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">
+                                                  {getDynamicWeightLabel(product.unit)} *
+                                                </label>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => speak(product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)'
+                                                    ? `Digite o peso em ${product.unit === 'Kilograma(s)' ? 'gramas' : 'mililitros'}. O sistema converte automaticamente para ${product.unit === 'Kilograma(s)' ? 'quilogramas' : 'litros'}.`
+                                                    : `Digite o peso unitário em ${product.unit}.`
+                                                  )}
+                                                  className="text-muted-foreground hover:text-primary transition-colors"
+                                                  title="Ajuda sobre este campo"
+                                                  tabIndex={-1}
+                                                >
+                                                  <HelpCircle className="h-3.5 w-3.5" />
+                                                </button>
+                                              </div>
+                                              <div className="relative">
+                                                <Input
+                                                  id={`weight-${product.id}-${offer.uiId}`}
+                                                  type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
+                                                  value={getWeightDisplayValue(product, offer)}
+                                                  onChange={(e) => handleWeightChange(e, product, offer)}
+                                                  placeholder={getDynamicWeightPlaceholder(product.unit)}
+                                                  step={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' || product.unit === 'Grama(s)' || product.unit === 'Mililitro(s)' ? "1" : "0.01"}
+                                                  disabled={isOfferDisabled}
+                                                  className="pr-12"
+                                                />
+                                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                                                  {getUnitSuffix(product.unit)}
+                                                </span>
+                                              </div>
+                                            </div>
+                                             <div className="flex-1 min-w-[140px]">
                                                <div className="flex items-center gap-1 mb-1">
                                                  <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Preço Total da Emb. (R$) *</label>
                                                  <button
@@ -2233,6 +2325,7 @@ export default function SellerQuotationPage() {
                                                    onClick={() => speak(voiceMessages.formFields.priceHelp(product.unit))}
                                                    className="text-muted-foreground hover:text-primary transition-colors"
                                                    title="Ajuda sobre este campo"
+                                                   tabIndex={-1}
                                                  >
                                                    <HelpCircle className="h-3.5 w-3.5" />
                                                  </button>
@@ -2248,10 +2341,10 @@ export default function SellerQuotationPage() {
                                                  disabled={isOfferDisabled}
                                                />
                                              </div>
-                                             <div className="flex flex-col items-start sm:items-end">
-                                                 <label className="block text-xs font-medium text-muted-foreground mb-1 sm:invisible">Preço por Unidade</label>
-                                                 <div className="flex items-center justify-between w-full sm:justify-end">
-                                                    <span className={`text-md h-10 flex items-center px-3 py-2 rounded-md border ${pricePerUnitClasses}`}>{formatCurrency(pricePerUnit)} / {abbreviateUnit(product.unit)}</span>
+                                             <div className="flex-1 min-w-[120px] flex flex-col">
+                                                 <label className="block text-xs font-medium text-muted-foreground mb-1 lg:invisible">Preço/Unid.</label>
+                                                 <div className="flex items-center justify-start lg:justify-end h-10">
+                                                    <span className={`text-sm flex items-center px-3 py-2 rounded-md border ${pricePerUnitClasses}`}>{formatCurrency(pricePerUnit)} / {abbreviateUnit(product.unit)}</span>
                                                  </div>
                                              </div>
                                            </div>
@@ -2335,6 +2428,8 @@ export default function SellerQuotationPage() {
                         </Card>
                       )
                     })}
+                    </div>
+                  )}
                   </TabsContent>
               </Tabs>
             </section>      
@@ -2372,30 +2467,6 @@ export default function SellerQuotationPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="brand-name">Sua Marca Ofertada *</Label>
-              <Input
-                id="brand-name"
-                value={newBrandForm.brandName}
-                onChange={(e) => handleNewBrandFormChange('brandName', e.target.value)}
-                onFocus={handleNewBrandBrandNameFocus}
-                placeholder="Ex: Maturatta"
-                className="text-base"
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="packaging-desc">Descrição da Embalagem *</Label>
-              <Input
-                id="packaging-desc"
-                value={newBrandForm.packagingDescription}
-                onChange={(e) => handleNewBrandFormChange('packagingDescription', e.target.value)}
-                onFocus={handleNewBrandPackagingFocus}
-                placeholder="Ex: Caixa com 12 Unid."
-                className="text-base"
-              />
-            </div>
-            
-            <div className="grid gap-2">
               <Label htmlFor="units-packaging">Total Un na Emb. *</Label>
               <Input
                 id="units-packaging"
@@ -2406,6 +2477,44 @@ export default function SellerQuotationPage() {
                 placeholder="Ex: 12"
                 className="text-base"
               />
+            </div>
+
+            {/* X separator between fields */}
+            <div className="flex items-center justify-center">
+              <span className="text-2xl font-bold text-muted-foreground">×</span>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="unit-weight-modal">
+                {getDynamicWeightLabel(newBrandModal.productUnit)} *
+              </Label>
+              <div className="relative">
+                <Input
+                  id="unit-weight-modal"
+                  type={newBrandModal.productUnit === 'Kilograma(s)' || newBrandModal.productUnit === 'Litro(s)' ? "text" : "number"}
+                  value={
+                    newBrandModal.productUnit === 'Kilograma(s)' || newBrandModal.productUnit === 'Litro(s)'
+                      ? (newBrandForm.unitWeight > 0 ? formatWeightInputForKg(newBrandForm.unitWeight * 1000) : '')
+                      : (newBrandForm.unitWeight || '')
+                  }
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    if (newBrandModal.productUnit === 'Kilograma(s)' || newBrandModal.productUnit === 'Litro(s)') {
+                      const gramas = parseWeightInputForKg(inputValue);
+                      const kg = gramas / 1000;
+                      handleNewBrandFormChange('unitWeight', kg);
+                    } else {
+                      const numericValue = parseFloat(inputValue.replace(',', '.')) || 0;
+                      handleNewBrandFormChange('unitWeight', numericValue);
+                    }
+                  }}
+                  placeholder={getDynamicWeightPlaceholder(newBrandModal.productUnit)}
+                  className="text-base pr-12"
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                  {getUnitSuffix(newBrandModal.productUnit)}
+                </span>
+              </div>
             </div>
             
             <div className="grid gap-2">

@@ -96,6 +96,7 @@ export interface Offer {
   brandOffered: string;
   packagingDescription: string;
   unitsInPackaging: number;
+  unitWeight?: number; // Peso unitário da embalagem
   totalPackagingPrice: number;
   updatedAt: Timestamp | FieldValue;
   createdAt?: Timestamp | FieldValue; // Added to track when offer was created
@@ -113,6 +114,7 @@ export interface PendingBrandRequest {
   brandName: string;
   packagingDescription: string;
   unitsInPackaging: number;
+  unitWeight?: number; // Peso unitário da embalagem
   totalPackagingPrice: number;
   pricePerUnit: number; // Calculated from totalPackagingPrice / unitsInPackaging
   imageUrl?: string; // URL do Vercel Blob Storage

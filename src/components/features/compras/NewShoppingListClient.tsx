@@ -43,6 +43,26 @@ const SUPPLY_CATEGORIES_COLLECTION = 'supply_categories';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
 const DEFAULT_IMPORT_CATEGORY_NAME = "Geral";
 
+const abbreviateUnit = (unit: UnitOfMeasure | string): string => {
+  switch (unit) {
+    case "Kilograma(s)": return "Kg";
+    case "Litro(s)": return "Lt";
+    case "Unidade(s)": return "Unid.";
+    case "Grama(s)": return "g";
+    case "Mililitro(s)": return "ml";
+    case "Caixa(s)": return "Cx.";
+    case "Pacote(s)": return "Pct.";
+    case "Dúzia(s)": return "Dz.";
+    case "Peça(s)": return "Pç.";
+    case "Metro(s)": return "m";
+    case "Lata(s)": return "Lata";
+    case "Garrafa(s)": return "Gf.";
+    default:
+      if (typeof unit === 'string' && unit.includes("(")) return unit.substring(0, unit.indexOf("(")).trim();
+      return String(unit);
+  }
+};
+
 interface NewShoppingListClientProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
@@ -522,19 +542,26 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
                       <span className="sr-only">Remover {item.name} da lista</span>
                     </Button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-1">
                       <label htmlFor={`quantity-${item.supplyId}`} className="text-xs text-muted-foreground block mb-0.5">Quantidade</label>
-                      <Input id={`quantity-${item.supplyId}`} ref={el => { quantityInputRefs.current[item.supplyId] = el; }} type="text" inputMode="decimal" value={item.quantity} onFocus={() => setLastAddedSupplyId(item.supplyId)} onChange={(e) => handleUpdateListItem(item.supplyId, 'quantity', e.target.value)} onKeyDown={handleQuantityKeyDown} disabled={isLocked} />
-                    </div>
-                    <div className="sm:col-span-1">
-                      <label htmlFor={`unit-${item.supplyId}`} className="text-xs text-muted-foreground block mb-0.5">Unidade</label>
-                      <SelectPrimitive value={item.unit} onValueChange={(value) => handleUpdateListItem(item.supplyId, 'unit', value as UnitOfMeasure)} disabled={isLocked}>
-                        <SelectPrimitiveTrigger id={`unit-${item.supplyId}`}><SelectPrimitiveValue /></SelectPrimitiveTrigger>
-                        <SelectPrimitiveContent>
-                          {unitsOfMeasure.map(uom => <SelectPrimitiveItem key={uom} value={uom}>{uom}</SelectPrimitiveItem>)}
-                        </SelectPrimitiveContent>
-                      </SelectPrimitive>
+                      <div className="relative">
+                        <Input 
+                            id={`quantity-${item.supplyId}`} 
+                            ref={el => { quantityInputRefs.current[item.supplyId] = el; }} 
+                            type="text" 
+                            inputMode="decimal" 
+                            value={item.quantity} 
+                            onFocus={() => setLastAddedSupplyId(item.supplyId)} 
+                            onChange={(e) => handleUpdateListItem(item.supplyId, 'quantity', e.target.value)} 
+                            onKeyDown={handleQuantityKeyDown} 
+                            disabled={isLocked}
+                            className="pr-12"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
+                            {abbreviateUnit(item.unit)}
+                        </span>
+                      </div>
                     </div>
                     <div className="sm:col-span-1">
                       <label htmlFor={`date-${item.supplyId}`} className="text-xs text-muted-foreground block mb-0.5">Data Entrega</label>

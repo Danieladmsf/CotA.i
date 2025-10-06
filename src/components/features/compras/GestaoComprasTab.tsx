@@ -92,28 +92,38 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
       toast({title: "Erro ao buscar cotações", description: error.message, variant: "destructive"});
     });
 
-    // Listener for Shopping List Items
+    // Items are now fetched when a quotation is selected
+    setIsLoading(false);
+
+    return () => {
+      unsubQuotations();
+    };
+  }, [selectedDate, user]); // Removido toast das dependências
+
+  useEffect(() => {
+    if (!activeQuotation) {
+      setShoppingListItems([]);
+      return;
+    }
+
+    setIsLoading(true);
     const qItems = query(
       collection(db, SHOPPING_LIST_ITEMS_COLLECTION),
-      where("userId", "==", user.uid),
-      where("listDate", ">=", Timestamp.fromDate(startOfSelectedDay)),
-      where("listDate", "<=", Timestamp.fromDate(endOfSelectedDay))
+      where("quotationId", "==", activeQuotation.id)
     );
-    const unsubItems = onSnapshot(qItems, (snapshot) => {
+
+    const unsubscribe = onSnapshot(qItems, (snapshot) => {
       const fetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingListItem));
       setShoppingListItems(fetchedItems);
       setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching list items:", error);
-      toast({title: "Erro ao carregar lista de compras", description: error.message, variant: "destructive"});
+      console.error("Error fetching items for quotation:", error);
+      toast({ title: "Erro ao carregar itens da cotação", description: error.message, variant: "destructive" });
       setIsLoading(false);
     });
 
-    return () => {
-      unsubQuotations();
-      unsubItems();
-    };
-  }, [selectedDate, user]); // Removido toast das dependências
+    return () => unsubscribe();
+  }, [activeQuotation, toast]);
 
   const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
   const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
@@ -161,16 +171,14 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
   };
   
   const itemsToDisplay = useMemo(() => {
-    const listToFilter = activeQuotation
-      ? shoppingListItems.filter(item => item.quotationId === activeQuotation.id)
-      : shoppingListItems.filter(item => !item.quotationId);
-
-    return listToFilter.filter(item => {
+    // Since shoppingListItems are now fetched based on activeQuotation,
+    // we just need to apply the search and status filters.
+    return shoppingListItems.filter(item => {
       const searchTermMatch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const statusMatch = statusFilter === 'todos-status' || item.status === statusFilter;
       return searchTermMatch && statusMatch;
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [shoppingListItems, activeQuotation, searchTerm, statusFilter]);
+  }, [shoppingListItems, searchTerm, statusFilter]);
 
   const getStatusBadgeVariant = (status: ShoppingListItem['status']): "default" | "secondary" | "destructive" | "outline" | "success" => {
     switch (status) {
