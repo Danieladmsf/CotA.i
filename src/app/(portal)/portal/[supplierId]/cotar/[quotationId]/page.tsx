@@ -2055,8 +2055,8 @@ export default function SellerQuotationPage() {
                                           }
       
                                           return (
-                                              <div key={offer.brandName + offer.supplierId} className={`flex items-center justify-between p-2 rounded-md bg-muted/20 border-l-4 min-w-[200px] ${variantClasses}`}>
-                                                  <div className="flex items-center gap-3">
+                                              <div key={offer.brandName + offer.supplierId} className={`flex items-start justify-between p-3 rounded-md bg-muted/20 border-l-4 min-w-[280px] gap-3 ${variantClasses}`}>
+                                                  <div className="flex items-start gap-3 flex-1">
                                                       <TooltipProvider>
                                                           <Tooltip>
                                                               <TooltipTrigger asChild>
@@ -2072,16 +2072,29 @@ export default function SellerQuotationPage() {
                                                               </TooltipContent>
                                                           </Tooltip>
                                                       </TooltipProvider>
-                                                      <div>
-                                                          <p className="text-sm font-semibold" title={offer.brandName}>
-                                                            {offer.brandName}
-                                                            {offer.unitsInPackaging && offer.unitWeight ? ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, offer.productUnit)}` : ''}
-                                                          </p>
+                                                      <div className="flex-1">
+                                                          <div className="mb-1">
+                                                            <h4 className="text-base font-semibold text-foreground" title={offer.brandName}>
+                                                              {offer.brandName}
+                                                              {offer.unitsInPackaging && offer.unitWeight && (
+                                                                <span className="text-sm text-muted-foreground font-normal">
+                                                                  {` - ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, offer.productUnit)}`}
+                                                                </span>
+                                                              )}
+                                                              {offer.totalPackagingPrice && offer.totalPackagingPrice > 0 && (
+                                                                <span className="text-sm text-muted-foreground font-normal">
+                                                                  {` | ${formatCurrency(offer.totalPackagingPrice)}`}
+                                                                </span>
+                                                              )}
+                                                            </h4>
+                                                          </div>
                                                           <p className="text-xs text-muted-foreground">por {offer.supplierName}</p>
                                                       </div>
                                                   </div>
-                                                  <div className="text-right">
-                                                      <p className={`text-base font-bold ${textPriceClass}`}>{formatCurrency(offer.pricePerUnit)} / {abbreviateUnit(offer.productUnit)}</p>
+                                                  <div className="text-right shrink-0">
+                                                      <p className={`text-base font-bold leading-tight ${textPriceClass}`}>
+                                                        {formatCurrency(offer.pricePerUnit)} / {abbreviateUnit(offer.productUnit)}
+                                                      </p>
                                                       <div className="mt-1">
                                                         {isLowestOverall && <Badge variant={offer.isSelf ? "default" : "outline"} className={`text-xs ${offer.isSelf ? 'bg-green-600 text-white' : 'border-green-600 text-green-700'}`}>Melhor Preço</Badge>}
                                                         {!isLowestOverall && offer.isSelf && <Badge variant="default" className="text-xs">Sua Oferta</Badge>}
@@ -2100,8 +2113,8 @@ export default function SellerQuotationPage() {
                                 })() && (
                                   <div className="flex flex-row flex-wrap gap-2 p-1">
                                       {product.pendingBrandRequests?.map(request => (
-                                          <div key={request.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50/50 border-l-4 border-orange-500 min-w-[200px] flex-grow">
-                                              <div className="flex items-center gap-3">
+                                          <div key={request.id} className="flex items-start justify-between p-3 rounded-md bg-orange-50/50 border-l-4 border-orange-500 min-w-[280px] gap-3">
+                                              <div className="flex items-start gap-3 flex-1">
                                                   <TooltipProvider>
                                                       <Tooltip>
                                                           <TooltipTrigger asChild>
@@ -2125,16 +2138,27 @@ export default function SellerQuotationPage() {
                                                           </TooltipContent>
                                                       </Tooltip>
                                                   </TooltipProvider>
-                                                  <div>
-                                                      <p className="text-sm font-semibold" title={request.brandName}>
-                                                        {request.brandName}
-                                                        {request.unitsInPackaging && request.unitWeight ? ` ${formatPackaging(request.unitsInPackaging, request.unitWeight, product.unit)}` : ''}
-                                                      </p>
+                                                  <div className="flex-1">
+                                                      <div className="mb-1">
+                                                        <h4 className="text-base font-semibold text-foreground" title={request.brandName}>
+                                                          {request.brandName}
+                                                          {request.unitsInPackaging && request.unitWeight && (
+                                                            <span className="text-sm text-muted-foreground font-normal">
+                                                              {` - ${formatPackaging(request.unitsInPackaging, request.unitWeight, product.unit)}`}
+                                                            </span>
+                                                          )}
+                                                          {request.totalPackagingPrice && request.totalPackagingPrice > 0 && (
+                                                            <span className="text-sm text-muted-foreground font-normal">
+                                                              {` | ${formatCurrency(request.totalPackagingPrice)}`}
+                                                            </span>
+                                                          )}
+                                                        </h4>
+                                                      </div>
                                                       <p className="text-xs text-muted-foreground">por {request.supplierName}</p>
                                                   </div>
                                               </div>
-                                              <div className="text-right">
-                                                  <p className="text-base font-bold text-orange-600">{formatCurrency(request.pricePerUnit)} / {abbreviateUnit(product.unit)}</p>
+                                              <div className="text-right shrink-0">
+                                                  <p className="text-base font-bold text-orange-600 leading-tight">{formatCurrency(request.pricePerUnit)} / {abbreviateUnit(product.unit)}</p>
                                                   <div className="mt-1">
                                                     <Badge variant="outline" className="text-xs border-orange-600 text-orange-700">
                                                       Aguardando Aprovação
