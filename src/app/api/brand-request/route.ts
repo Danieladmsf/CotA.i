@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
       brandName,
       packagingDescription,
       unitsInPackaging,
+      unitWeight,
       totalPackagingPrice,
       pricePerUnit,
       imageUrl,
@@ -33,9 +34,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (unitsInPackaging <= 0 || totalPackagingPrice <= 0) {
+    if (unitsInPackaging <= 0 || unitWeight <= 0 || totalPackagingPrice <= 0) {
       return NextResponse.json(
-        { error: 'Units and price must be greater than 0' },
+        { error: 'Units, weight and price must be greater than 0' },
         { status: 400 }
       );
     }
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
       brandName: brandName.trim(),
       packagingDescription: packagingDescription.trim(),
       unitsInPackaging: Number(unitsInPackaging),
+      unitWeight: Number(unitWeight),
       totalPackagingPrice: Number(totalPackagingPrice),
       pricePerUnit: Number(pricePerUnit),
       imageUrl: imageUrl || '',

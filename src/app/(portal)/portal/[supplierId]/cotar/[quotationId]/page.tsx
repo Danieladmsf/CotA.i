@@ -68,8 +68,17 @@ const PENDING_BRAND_REQUESTS_COLLECTION = "pending_brand_requests";
 // Utility function to handle preferredBrands as both string and array
 const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
   if (!preferredBrands) return [];
-  if (Array.isArray(preferredBrands)) return preferredBrands;
-  return preferredBrands.split(',').map(b => b.trim());
+  let brands: string[];
+  if (Array.isArray(preferredBrands)) {
+    brands = preferredBrands;
+  } else {
+    brands = preferredBrands.split(',').map(b => b.trim());
+  }
+  // Filter out brands that are only numbers or empty
+  return brands.filter(brand => {
+    const trimmed = brand.trim();
+    return trimmed.length > 0 && !(/^\d+$/.test(trimmed));
+  });
 };
 
 const dayMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -570,7 +579,7 @@ export default function SellerQuotationPage() {
         supplierName: currentSupplierDetails.empresa,
         supplierInitials: currentSupplierDetails.vendedor.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
         brandName: newBrandForm.brandName.trim(),
-        packagingDescription: newBrandForm.packagingDescription.trim(),
+        packagingDescription: newBrandForm.packagingDescription.trim() || formatPackaging(newBrandForm.unitsInPackaging, newBrandForm.unitWeight, newBrandModal.productUnit),
         unitsInPackaging: newBrandForm.unitsInPackaging,
         unitWeight: newBrandForm.unitWeight,
         totalPackagingPrice: newBrandForm.totalPackagingPrice,
@@ -2491,6 +2500,19 @@ export default function SellerQuotationPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
+              <Label htmlFor="brand-name">Nome da Marca *</Label>
+              <Input
+                id="brand-name"
+                type="text"
+                value={newBrandForm.brandName}
+                onChange={(e) => handleNewBrandFormChange('brandName', e.target.value)}
+                onFocus={handleNewBrandBrandNameFocus}
+                placeholder="Ex: Marca Nova"
+                className="text-base"
+              />
+            </div>
+            
+            <div className="grid gap-2">
               <Label htmlFor="units-packaging">Total Un na Emb. *</Label>
               <Input
                 id="units-packaging"
@@ -2583,7 +2605,7 @@ export default function SellerQuotationPage() {
             </Button>
             <Button 
               onClick={submitNewBrandRequest}
-              disabled={isSubmittingNewBrand || !newBrandForm.brandName.trim() || !newBrandForm.packagingDescription.trim() || newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0}
+              disabled={isSubmittingNewBrand || !newBrandForm.brandName.trim() || newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isSubmittingNewBrand ? (

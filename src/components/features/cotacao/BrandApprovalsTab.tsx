@@ -191,6 +191,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             brandOffered: request.brandName,
             packagingDescription: request.packagingDescription,
             unitsInPackaging: request.unitsInPackaging,
+            unitWeight: request.unitWeight,
             totalPackagingPrice: request.totalPackagingPrice,
             pricePerUnit: request.pricePerUnit,
             updatedAt: Timestamp.now(),
