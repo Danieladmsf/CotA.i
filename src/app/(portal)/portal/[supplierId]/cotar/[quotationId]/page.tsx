@@ -374,33 +374,6 @@ export default function SellerQuotationPage() {
   });
   const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
-  // Estado para o passo-a-passo inline
-  const [inlineSteps, setInlineSteps] = useState<{
-    isActive: boolean;
-    productId: string;
-    offerUiId: string;
-    currentStep: number;
-    data: {
-      packageType: 'caixa' | 'fardo' | 'granel' | '';
-      unitsPerPackage: number;
-      unitWeight: number;
-      pricePerPackage: number;
-      packagesCount: number;
-    };
-  }>({
-    isActive: false,
-    productId: '',
-    offerUiId: '',
-    currentStep: 1,
-    data: {
-      packageType: '',
-      unitsPerPackage: 0,
-      unitWeight: 0,
-      pricePerPackage: 0,
-      packagesCount: 0
-    }
-  });
-
   const [timeLeft, setTimeLeft] = useState("Calculando...");
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
   
@@ -2249,24 +2222,6 @@ export default function SellerQuotationPage() {
                                          </Alert>
                                      )}
       
-                                     {/* Assistente para produtos sem ofertas */}
-                                     {isFirstOfferForProduct(product.id) && (
-                                       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                         <div className="flex items-center justify-between">
-                                           <div>
-                                             <h4 className="text-sm font-medium text-blue-900">🧙‍♂️ Primeira vez cotando este item?</h4>
-                                             <p className="text-xs text-blue-700 mt-1">Use nosso assistente para facilitar o preenchimento.</p>
-                                           </div>
-                                           <button
-                                             onClick={() => alert('Assistente será implementado em breve!')}
-                                             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
-                                           >
-                                             🚀 Em Breve
-                                           </button>
-                                         </div>
-                                       </div>
-                                     )}
-
                                      <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2 text-sm">
                                         {product.preferredBrands && product.preferredBrands.length > 0 && (
                                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -2335,188 +2290,113 @@ export default function SellerQuotationPage() {
       
                                        return (
                                          <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
-                                           <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-7 gap-2 items-end">
-                                               <div className="space-y-1">
-                                               <div className="flex items-center gap-1">
-                                                 <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Quantas Cx ou fardos vc irá enviar *</label>
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => speak("Digite quantas caixas ou fardos você irá enviar para o comprador")}
-                                                   className="text-muted-foreground hover:text-primary transition-colors"
-                                                   title="Ajuda sobre este campo"
-                                                   tabIndex={-1}
-                                                 >
-                                                   <HelpCircle className="h-3.5 w-3.5" />
-                                                 </button>
-                                               </div>
+                                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                             {/* Campo 1: Quantas Cx ou fardos */}
+                                             <div className="space-y-1">
+                                               <label htmlFor={`packages-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Quantas Cx ou fardos vc irá enviar *</label>
                                                <Input
-                                                 id={`units-${product.id}-${offer.uiId}`}
+                                                 id={`packages-${product.id}-${offer.uiId}`}
                                                  type="number"
                                                  value={offer.unitsInPackaging > 0 ? offer.unitsInPackaging : ''}
                                                  onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
                                                  placeholder="Ex: 5"
                                                  disabled={isOfferDisabled}
-                                                 className="w-full"
                                                />
                                              </div>
-                                             
+
+                                             {/* Campo 2: Total Un na Emb */}
                                              <div className="space-y-1">
-                                               <div className="flex items-center gap-1">
-                                                 <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => speak("Digite quantas unidades vêm dentro de cada caixa ou fardo")}
-                                                   className="text-muted-foreground hover:text-primary transition-colors"
-                                                   title="Ajuda sobre este campo"
-                                                   tabIndex={-1}
-                                                 >
-                                                   <HelpCircle className="h-3.5 w-3.5" />
-                                                 </button>
-                                               </div>
+                                               <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
                                                <Input
-                                                 id={`brand-${product.id}-${offer.uiId}`}
+                                                 id={`units-${product.id}-${offer.uiId}`}
                                                  type="number"
                                                  value={offer.unitsPerPackage || ''}
                                                  onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsPerPackage', e.target.value)}
                                                  placeholder="Ex: 12"
                                                  disabled={isOfferDisabled}
-                                                 className="w-full"
                                                />
                                              </div>
-                                             
-                                            <div className="flex-1 min-w-[140px]">
-                                              <div className="flex items-center gap-1 mb-1">
-                                                <label htmlFor={`weight-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">
-                                                  {getDynamicWeightLabel(product.unit)} *
-                                                </label>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => speak(product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)'
-                                                    ? `Digite o peso em ${product.unit === 'Kilograma(s)' ? 'gramas' : 'mililitros'}. O sistema converte automaticamente para ${product.unit === 'Kilograma(s)' ? 'quilogramas' : 'litros'}.`
-                                                    : `Digite o peso unitário em ${product.unit}.`
-                                                  )}
-                                                  className="text-muted-foreground hover:text-primary transition-colors"
-                                                  title="Ajuda sobre este campo"
-                                                  tabIndex={-1}
-                                                >
-                                                  <HelpCircle className="h-3.5 w-3.5" />
-                                                </button>
-                                              </div>
-                                              <div className="relative">
-                                                <Input
-                                                  id={`weight-${product.id}-${offer.uiId}`}
-                                                  type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
-                                                  value={getWeightDisplayValue(product, offer)}
-                                                  onChange={(e) => handleWeightChange(e, product, offer)}
-                                                  placeholder={getDynamicWeightPlaceholder(product.unit)}
-                                                  step={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' || product.unit === 'Grama(s)' || product.unit === 'Mililitro(s)' ? "1" : "0.01"}
-                                                  disabled={isOfferDisabled}
-                                                  className="pr-12"
-                                                />
-                                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
-                                                  {getUnitSuffix(product.unit)}
-                                                </span>
-                                              </div>
-                                            </div>
-                                             <div className="flex-1 min-w-[140px]">
-                                               <div className="flex items-center gap-1 mb-1">
-                                                 <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Preço Total da Emb. (R$) *</label>
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => speak(voiceMessages.formFields.priceHelp(product.unit))}
-                                                   className="text-muted-foreground hover:text-primary transition-colors"
-                                                   title="Ajuda sobre este campo"
-                                                   tabIndex={-1}
-                                                 >
-                                                   <HelpCircle className="h-3.5 w-3.5" />
-                                                 </button>
+
+                                             {/* Campo 3: Peso */}
+                                             <div className="space-y-1">
+                                               <label htmlFor={`weight-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Peso (Kg) *</label>
+                                               <div className="relative">
+                                                 <Input
+                                                   id={`weight-${product.id}-${offer.uiId}`}
+                                                   type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
+                                                   value={getWeightDisplayValue(product, offer)}
+                                                   onChange={(e) => handleWeightChange(e, product, offer)}
+                                                   placeholder="0,000"
+                                                   disabled={isOfferDisabled}
+                                                   className="pr-8"
+                                                 />
+                                                 <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">Kg</span>
                                                </div>
+                                             </div>
+
+                                             {/* Campo 4: Preço Total da Emb */}
+                                             <div className="space-y-1">
+                                               <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Preço Total da Emb. (R$) *</label>
                                                <Input
                                                  id={`price-${product.id}-${offer.uiId}`}
                                                  type="text"
                                                  value={offer.totalPackagingPrice > 0 ? formatCurrencyInput(offer.totalPackagingPrice * 100) : ''}
                                                  onChange={(e) => handlePriceChange(product.id, offer.uiId, e.target.value)}
-                                                 onFocus={() => handlePriceFocus(product.id)}
-                                                 onBlur={() => handlePriceBlur(product.id, offer.uiId)}
                                                  placeholder="R$ 0,00"
                                                  disabled={isOfferDisabled}
                                                />
                                              </div>
-                                             <div className="flex-1 min-w-[120px] flex flex-col">
-                                                 <label className="block text-xs font-medium text-muted-foreground mb-1 lg:invisible">Preço/Unid.</label>
-                                                 <div className="flex items-center justify-start lg:justify-end h-10">
-                                                    <span className={`text-sm flex items-center px-3 py-2 rounded-md border ${pricePerUnitClasses}`}>{formatCurrency(pricePerUnit)} / {abbreviateUnit(product.unit)}</span>
-                                                 </div>
+
+                                             {/* Campo 5: Valor Total do Pedido (calculado) */}
+                                             <div className="space-y-1">
+                                               <label className="block text-xs font-medium text-muted-foreground">Valor Total do Pedido (R$)</label>
+                                               <Input
+                                                 type="text"
+                                                 value={(() => {
+                                                   const packagesCount = Number(offer.unitsInPackaging) || 0;
+                                                   const pricePerEmb = Number(offer.totalPackagingPrice) || 0;
+                                                   if (packagesCount > 0 && pricePerEmb > 0) {
+                                                     return formatCurrencyInput((packagesCount * pricePerEmb) * 100);
+                                                   }
+                                                   return '';
+                                                 })()}
+                                                 readOnly
+                                                 className="bg-muted/50"
+                                               />
+                                             </div>
+
+                                             {/* Campo 6: Preço/Unid. */}
+                                             <div className="space-y-1">
+                                               <label className="block text-xs font-medium text-muted-foreground">Preço/Unid.</label>
+                                               <div className="h-10 flex items-center">
+                                                 <span className={`text-sm px-2 py-1 rounded border w-full text-center ${pricePerUnitClasses}`}>
+                                                   {formatCurrency(pricePerUnit)} / {abbreviateUnit(product.unit)}
+                                                 </span>
+                                               </div>
                                              </div>
                                            </div>
-                                           <div className="flex flex-col sm:flex-row gap-2 justify-between items-center">
-                                             {(isMyOfferOutbid || offer.showBeatOfferOptions) ? (
-                                                 <div className="flex items-center gap-4">
-                                                      <span className="text-xs text-muted-foreground mr-1">Cobrir oferta:</span>
-                                                      {[1, 2, 3, 4, 5].map((p) => (
-                                                          <Button
-                                                          key={p}
-                                                          type="button"
-                                                          size="sm"
-                                                          variant="outline"
-                                                          className="h-7 px-2 text-xs border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
-                                                          onClick={() => handleBeatOfferClick(product.id, offer.uiId, p)}
-                                                          disabled={Boolean(isButtonDisabled || !offer.unitsInPackaging || Number(offer.unitsInPackaging) <= 0 || (offer.id && !isInEditMode(product.id, offer.uiId)))}
-                                                          >
-                                                          -{p}%
-                                                          </Button>
-                                                      ))}
-                                                  </div>
-                                             ) : (
-                                               <div></div> // Placeholder to keep layout consistent
-                                             )}
-                                             <div className="flex flex-col sm:flex-row gap-2 justify-end">
-                                               {offer.id ? (
-                                                 // Oferta já confirmada - mostrar "Parar de cotar"
-                                                 <Button
-                                                   variant="outline"
-                                                   size="sm"
-                                                   onClick={() => handleStopQuotingClick(product.id, offer.uiId, product.name)}
-                                                   disabled={isButtonDisabled}
-                                                   className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50 hover:border-destructive"
-                                                 >
-                                                   <Trash2 className="h-4 w-4 mr-2" />
-                                                   Parar de cotar este item
-                                                 </Button>
-                                               ) : (
-                                                 // Oferta não confirmada - mostrar "Remover oferta"
-                                                 <Button
-                                                   variant="outline"
-                                                   size="sm"
-                                                   onClick={() => removeOfferField(product.id, offer)}
-                                                   disabled={isButtonDisabled}
-                                                   className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50 hover:border-destructive"
-                                                 >
-                                                   {isSaving[savingKey] && offer.id ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                                                   Remover Oferta
-                                                 </Button>
-                                               )}
+
+                                           {/* Botões na linha de baixo */}
+                                           <div className="flex justify-end gap-2 pt-2 border-t">
+
+                                             <div className="flex gap-2">
+                                               <Button
+                                                 variant="outline"
+                                                 size="sm"
+                                                 onClick={() => removeOfferField(product.id, offer)}
+                                                 disabled={isOfferDisabled}
+                                                 className="text-destructive hover:text-destructive"
+                                               >
+                                                 Remover Oferta
+                                               </Button>
                                                <Button
                                                  onClick={async () => {
-                                                   if (offer.id && !isInEditMode(product.id, offer.uiId)) {
-                                                     // Se está salva e não está editando, ativar modo edição
-                                                     toggleEditMode(product.id, offer.uiId);
-                                                   } else {
-                                                     // Se está editando ou é nova, salvar
-                                                     const success = await handleSaveProductOffer(product.id, offer.uiId);
-                                                     // Depois de salvar com sucesso, sair do modo edição
-                                                     if (success && isInEditMode(product.id, offer.uiId)) {
-                                                       toggleEditMode(product.id, offer.uiId);
-                                                     }
-                                                   }
+                                                   const success = await handleSaveProductOffer(product.id, offer.uiId);
                                                  }}
-                                                 disabled={isButtonDisabled || savingOffers.has(savingKey)}
-                                                 className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
+                                                 disabled={isOfferDisabled}
+                                                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                                                >
-                                                  {isSaving[savingKey] && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
-                                                  {isQuotationEnded ? 'Prazo Encerrado' :
-                                                   !offer.id ? 'Salvar Nova Oferta' :
-                                                   !isInEditMode(product.id, offer.uiId) ? 'Editar oferta' : 'Salvar alterações'}
+                                                 Salvar Nova Oferta
                                                </Button>
                                              </div>
                                            </div>
