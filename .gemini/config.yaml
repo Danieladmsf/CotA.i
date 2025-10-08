@@ -1,0 +1,42 @@
+# Gemini Code Assist Configuration
+# This file configures the behavior of Gemini Code Assist for this repository
+
+# General settings
+auto_review: true
+max_review_time_minutes: 5
+
+# Code review settings
+review:
+  # Focus areas for code review
+  focus_areas:
+    - security
+    - performance
+    - best_practices
+    - code_quality
+    - maintainability
+  
+  # Programming languages to review
+  languages:
+    - typescript
+    - javascript
+    - tsx
+    - jsx
+    - json
+    - yaml
+    - md
+
+# Pull request settings
+pull_request:
+  auto_summary: true
+  auto_review: true
+  
+# Exclude patterns (files/folders to ignore)
+exclude:
+  - node_modules/**
+  - .next/**
+  - dist/**
+  - build/**
+  - "*.min.js"
+  - "*.bundle.js"
+  - package-lock.json
+  - "*.log"
