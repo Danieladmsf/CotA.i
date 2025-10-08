@@ -162,3 +162,44 @@ export async function sendCounterProposalReminder(
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Sends a notification to the buyer about quantity variations in supplier offers.
+ */
+export async function sendQuantityVariationNotification(
+    buyerInfo: { whatsapp?: string; name?: string },
+    notificationData: {
+      supplierName: string;
+      productName: string;
+      brandName: string;
+      requestedQuantity: number;
+      offeredQuantity: number;
+      unit: string;
+      variationType: 'over' | 'under';
+      variationPercentage: number;
+    },
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    if (!buyerInfo.whatsapp) {
+        return { success: false, error: `Buyer has no WhatsApp number.` };
+    }
+    
+    const variationIcon = notificationData.variationType === 'over' ? '📈' : '📉';
+    const variationText = notificationData.variationType === 'over' ? 'acima' : 'abaixo';
+    const variationSign = notificationData.variationType === 'over' ? '+' : '-';
+    
+    const message = `${variationIcon} *Variação de Quantidade Detectada*\n\n` +
+        `Fornecedor: *${notificationData.supplierName}*\n` +
+        `Produto: *${notificationData.productName} (${notificationData.brandName})*\n\n` +
+        `Solicitado: *${notificationData.requestedQuantity} ${notificationData.unit}*\n` +
+        `Ofertado: *${notificationData.offeredQuantity} ${notificationData.unit}*\n` +
+        `Variação: *${variationSign}${notificationData.variationPercentage.toFixed(1)}%* (${variationText} do pedido)\n\n` +
+        `⚠️ Por favor, revise se esta variação é aceitável para sua operação.`;
+
+    try {
+        await queueMessageForSending(buyerInfo.whatsapp, message, userId, notificationData.supplierName);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
