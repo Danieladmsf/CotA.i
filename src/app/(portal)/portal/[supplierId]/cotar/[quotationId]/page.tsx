@@ -717,7 +717,7 @@ const renderNewBrandFlowCard = (
   parseWeightInputForKg: (value: string) => number,
   isSubmittingNewBrand: boolean
 ) => {
-  const { currentStep, brandName, unitsPerPackage, packageWeight, packagePrice, imageFile } = flow;
+  const { currentStep, brandName, packagingType, unitsPerPackage, packageWeight, packagePrice, requiredPackages, imageFile } = flow;
 
   const renderStep = () => {
     switch (currentStep) {
@@ -747,7 +747,39 @@ const renderNewBrandFlowCard = (
       case 2:
         return (
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold">Quantas unidades vêm na embalagem desta marca?</h4>
+            <h4 className="text-lg font-semibold">Seu item virá em:</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Button
+                variant={packagingType === 'caixa' ? 'default' : 'outline'}
+                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'caixa', 3)}
+                className="h-16 text-base"
+              >
+                📦 Caixa
+              </Button>
+              <Button
+                variant={packagingType === 'fardo' ? 'default' : 'outline'}
+                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'fardo', 3)}
+                className="h-16 text-base"
+              >
+                📄 Fardo
+              </Button>
+              <Button
+                variant={packagingType === 'granel' ? 'default' : 'outline'}
+                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'granel', 4)} // Pula etapa 3 para granel
+                className="h-16 text-base"
+              >
+                🌾 A Granel
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">
+              Quantas unidades vêm na {packagingType}?
+            </h4>
             <div className="space-y-2">
               <Input
                 type="number"
@@ -757,7 +789,7 @@ const renderNewBrandFlowCard = (
                 className="text-lg h-12"
               />
               <Button
-                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 3)}
+                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 4)}
                 disabled={unitsPerPackage <= 0}
                 className="w-full bg-orange-600 hover:bg-orange-700"
               >
@@ -767,7 +799,7 @@ const renderNewBrandFlowCard = (
           </div>
         );
 
-      case 3:
+      case 4:
         const isLiquid = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
         const weightLabel = isLiquid ? 'volume (Litros)' : 'peso (Kg)';
         return (
@@ -810,7 +842,7 @@ const renderNewBrandFlowCard = (
                 </span>
               </div>
               <Button
-                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 4)}
+                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 5)}
                 disabled={packageWeight <= 0}
                 className="w-full bg-orange-600 hover:bg-orange-700"
               >
@@ -820,7 +852,7 @@ const renderNewBrandFlowCard = (
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Qual o preço da embalagem desta marca?</h4>
@@ -837,7 +869,7 @@ const renderNewBrandFlowCard = (
                 className="text-lg h-12"
               />
               <Button
-                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 5)}
+                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 6)}
                 disabled={packagePrice <= 0}
                 className="w-full bg-orange-600 hover:bg-orange-700"
               >
@@ -847,7 +879,37 @@ const renderNewBrandFlowCard = (
           </div>
         );
 
-      case 5:
+      case 6:
+        const unitLabel = product.unit === 'Kilograma(s)' ? 'Kg' : 
+                         product.unit === 'Litro(s)' ? 'Litros' : 
+                         product.unit === 'Unidade(s)' ? 'unidades' : product.unit;
+        
+        return (
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">
+              Para atender {product.quantity} {unitLabel} do pedido do comprador, 
+              quantas embalagens você precisa enviar?
+            </h4>
+            <div className="space-y-2">
+              <Input
+                type="number"
+                placeholder="Ex: 4"
+                value={flow.requiredPackages > 0 ? flow.requiredPackages : ''}
+                onChange={(e) => updateNewBrandFlowStep(productId, 'requiredPackages', parseInt(e.target.value) || 0)}
+                className="text-lg h-12"
+              />
+              <Button
+                onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 7)}
+                disabled={flow.requiredPackages <= 0}
+                className="w-full bg-orange-600 hover:bg-orange-700"
+              >
+                Próximo
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 7:
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Envie uma imagem da marca/produto (opcional):</h4>
@@ -864,13 +926,13 @@ const renderNewBrandFlowCard = (
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 6)}
+                  onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 8)}
                   className="flex-1"
                 >
                   Pular
                 </Button>
                 <Button
-                  onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 6)}
+                  onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 8)}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
                   Próximo
@@ -880,19 +942,66 @@ const renderNewBrandFlowCard = (
           </div>
         );
 
-      case 6:
-        const totalValue = packagePrice;
+      case 8:
+        // Calcular a quantidade oferecida baseada nos dados preenchidos
+        const tempBrandOffer = {
+          unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
+          unitsPerPackage: packagingType === 'granel' ? 1 : unitsPerPackage,
+          unitWeight: packageWeight
+        };
+        
+        const offeredQuantity = calculateTotalOfferedQuantity(tempBrandOffer as any, product);
+        const requestedQuantity = product.quantity;
+        const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
+        
+        const totalValue = (flow.requiredPackages || 1) * packagePrice;
         const pricePerUnit = packagePrice / (unitsPerPackage || 1);
         
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Confirme os dados da nova marca:</h4>
             
+            {/* Alerta de variação de quantidade */}
+            {!quantityValidation.isValid && (
+              <div className={`p-3 rounded-lg border-l-4 ${
+                quantityValidation.variationType === 'over' 
+                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20' 
+                  : 'bg-red-50 border-red-500 dark:bg-red-950/20'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">
+                    {quantityValidation.variationType === 'over' ? '⚠️' : '❌'}
+                  </span>
+                  <div className="text-sm">
+                    <p className="font-semibold">
+                      {quantityValidation.variationType === 'over' 
+                        ? 'Quantidade Acima do Pedido' 
+                        : 'Quantidade Abaixo do Pedido'}
+                    </p>
+                    <p className="mt-1">
+                      Pedido: <strong>{requestedQuantity} {abbreviateUnit(product.unit)}</strong> | 
+                      Oferta: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Variação: <strong>{quantityValidation.variationPercentage.toFixed(1)}%</strong> 
+                      {quantityValidation.variationType === 'over' ? ' acima' : ' abaixo'} do solicitado
+                    </p>
+                    <p className="mt-2 text-xs">
+                      {quantityValidation.variationType === 'over' 
+                        ? 'O comprador receberá uma notificação sobre esta quantidade extra.'
+                        : 'Esta nova marca não atende completamente o pedido do comprador.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-orange-50/50 dark:bg-orange-950/20 p-4 rounded-lg space-y-3 border border-orange-200 dark:border-orange-800">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div><strong>Nova Marca:</strong> {brandName}</div>
                 <div><strong>Para Produto:</strong> {product.name}</div>
-                <div><strong>Unidades por embalagem:</strong> {unitsPerPackage || 'N/A'}</div>
+                <div><strong>Embalagem:</strong> {packagingType}</div>
+                <div><strong>Unidades por embalagem:</strong> {packagingType === 'granel' ? 'N/A' : unitsPerPackage}</div>
                 <div><strong>Peso/Volume por embalagem:</strong> {(() => {
                   const isLiquidUnit = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
                   if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
@@ -906,11 +1015,16 @@ const renderNewBrandFlowCard = (
                   }
                 })()}</div>
                 <div><strong>Preço por embalagem:</strong> {formatCurrency(packagePrice)}</div>
+                <div><strong>Quantidade a enviar:</strong> {flow.requiredPackages || 1} embalagem(s)</div>
                 <div><strong>Imagem:</strong> {imageFile ? imageFile.name : 'Nenhuma'}</div>
               </div>
               <div className="border-t border-orange-200 dark:border-orange-700 pt-3">
                 <div className="text-lg font-bold">Preço por unidade: {formatCurrency(pricePerUnit)}</div>
-                <div className="text-lg font-bold text-orange-600 mt-2">Solicitação será enviada para aprovação</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Total oferecido: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
+                </div>
+                <div className="text-lg font-bold text-primary mt-2">Valor Total do Pedido: {formatCurrency(totalValue)}</div>
+                <div className="text-sm text-orange-600 mt-1">Solicitação será enviada para aprovação</div>
               </div>
             </div>
 
@@ -944,7 +1058,7 @@ const renderNewBrandFlowCard = (
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-xl font-semibold text-orange-700 dark:text-orange-300">Nova Marca</h3>
-          <p className="text-sm text-muted-foreground">Etapa {currentStep} de 6 - {product.name}</p>
+          <p className="text-sm text-muted-foreground">Etapa {currentStep} de 8 - {product.name}</p>
         </div>
         <Button
           variant="ghost"
@@ -959,7 +1073,7 @@ const renderNewBrandFlowCard = (
       <div className="w-full bg-muted rounded-full h-2">
         <div 
           className="bg-orange-600 h-2 rounded-full transition-all duration-300" 
-          style={{ width: `${(currentStep / 6) * 100}%` }}
+          style={{ width: `${(currentStep / 8) * 100}%` }}
         />
       </div>
 
@@ -1020,9 +1134,11 @@ export default function SellerQuotationPage() {
     isActive: boolean;
     currentStep: number;
     brandName: string;
+    packagingType: 'caixa' | 'fardo' | 'granel' | '';
     unitsPerPackage: number;
     packageWeight: number;
     packagePrice: number;
+    requiredPackages: number;
     imageFile: File | null;
     showGuidedFlow: boolean;
   }>>({});
@@ -2110,9 +2226,11 @@ export default function SellerQuotationPage() {
         isActive: true,
         currentStep: 1,
         brandName: '',
+        packagingType: '',
         unitsPerPackage: 0,
         packageWeight: 0,
         packagePrice: 0,
+        requiredPackages: 0,
         imageFile: null,
         showGuidedFlow: true
       }
@@ -2151,8 +2269,30 @@ export default function SellerQuotationPage() {
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
 
+    // Verificar se os dados atendem à quantidade solicitada
+    const tempBrandOffer = {
+      unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
+      unitsPerPackage: flow.packagingType === 'granel' ? 1 : flow.unitsPerPackage,
+      unitWeight: flow.packageWeight
+    };
+    
+    const offeredQuantity = calculateTotalOfferedQuantity(tempBrandOffer as any, product);
+    const requestedQuantity = product.quantity;
+    const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
+    
+    // Se há variação significativa, mostrar toast informativo
+    if (!quantityValidation.isValid) {
+      console.log(`[NEW_BRAND] Detected ${quantityValidation.variationType} variation of ${quantityValidation.variationPercentage.toFixed(1)}% for product ${product.name}`);
+      
+      toast({
+        title: "Variação de Quantidade Detectada",
+        description: `Sua nova marca tem ${quantityValidation.variationPercentage.toFixed(1)}% de variação ${quantityValidation.variationType === 'over' ? 'acima' : 'abaixo'} do pedido.`,
+        duration: 5000,
+      });
+    }
+
     // Verificar dados básicos
-    if (!flow.brandName.trim() || flow.unitsPerPackage <= 0 || flow.packageWeight <= 0 || flow.packagePrice <= 0) {
+    if (!flow.brandName.trim() || flow.unitsPerPackage <= 0 || flow.packageWeight <= 0 || flow.packagePrice <= 0 || flow.requiredPackages <= 0) {
       toast({
         title: "Dados Inválidos", 
         description: "Todos os campos devem estar preenchidos corretamente.", 
@@ -2179,7 +2319,7 @@ export default function SellerQuotationPage() {
         productName: product.name,
         brandName: flow.brandName,
         packagingDescription: `${flow.unitsPerPackage} unidades por embalagem`,
-        unitsInPackaging: 1, // Sempre 1 para requests de marca
+        unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
         unitsPerPackage: flow.unitsPerPackage,
         unitWeight: flow.packageWeight,
         totalPackagingPrice: flow.packagePrice,
