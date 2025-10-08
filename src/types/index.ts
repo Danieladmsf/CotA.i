@@ -96,6 +96,7 @@ export interface Offer {
   brandOffered: string;
   packagingDescription: string;
   unitsInPackaging: number;
+  unitsPerPackage?: number; // Quantas unidades vêm em cada embalagem/caixa
   unitWeight?: number; // Peso unitário da embalagem
   totalPackagingPrice: number;
   updatedAt: Timestamp | FieldValue;

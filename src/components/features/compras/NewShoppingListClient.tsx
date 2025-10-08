@@ -223,9 +223,9 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
             } as NewListItem))
             .filter(item => item.status !== 'Encerrado');
 
-          const sortedItems = fetchedItems.sort((a, b) => a.name.localeCompare(b.name));
-          setCurrentListItems(sortedItems);
-          setOriginalListItems(sortedItems);
+          // Manter ordem de criação - itens mais recentes primeiro (já vem ordenado pela query)
+          setCurrentListItems(fetchedItems);
+          setOriginalListItems(fetchedItems);
         } else {
           setCurrentMode('new');
         }
@@ -287,7 +287,7 @@ export default function NewShoppingListClient({ selectedDate, onDateChange, onLi
       categoryId: supply.categoryId,
     };
 
-    setCurrentListItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+    setCurrentListItems(prev => [newItem, ...prev]);
     setLastAddedSupplyId(supply.id);
   };
 

@@ -374,6 +374,33 @@ export default function SellerQuotationPage() {
   });
   const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
+  // Estado para o passo-a-passo inline
+  const [inlineSteps, setInlineSteps] = useState<{
+    isActive: boolean;
+    productId: string;
+    offerUiId: string;
+    currentStep: number;
+    data: {
+      packageType: 'caixa' | 'fardo' | 'granel' | '';
+      unitsPerPackage: number;
+      unitWeight: number;
+      pricePerPackage: number;
+      packagesCount: number;
+    };
+  }>({
+    isActive: false,
+    productId: '',
+    offerUiId: '',
+    currentStep: 1,
+    data: {
+      packageType: '',
+      unitsPerPackage: 0,
+      unitWeight: 0,
+      pricePerPackage: 0,
+      packagesCount: 0
+    }
+  });
+
   const [timeLeft, setTimeLeft] = useState("Calculando...");
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
   
@@ -1581,6 +1608,11 @@ export default function SellerQuotationPage() {
     }
   };
 
+  const isFirstOfferForProduct = useCallback((productId: string) => {
+    const product = productsToQuote.find(p => p.id === productId);
+    return !product || product.supplierOffers.length === 0;
+  }, [productsToQuote]);
+
   const calculatePricePerUnit = (offer: OfferWithUI | Partial<OfferWithUI>): number | null => {
     const units = Number(offer.unitsInPackaging);
     const price = Number(offer.totalPackagingPrice);
@@ -2217,6 +2249,24 @@ export default function SellerQuotationPage() {
                                          </Alert>
                                      )}
       
+                                     {/* Assistente para produtos sem ofertas */}
+                                     {isFirstOfferForProduct(product.id) && (
+                                       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                         <div className="flex items-center justify-between">
+                                           <div>
+                                             <h4 className="text-sm font-medium text-blue-900">🧙‍♂️ Primeira vez cotando este item?</h4>
+                                             <p className="text-xs text-blue-700 mt-1">Use nosso assistente para facilitar o preenchimento.</p>
+                                           </div>
+                                           <button
+                                             onClick={() => alert('Assistente será implementado em breve!')}
+                                             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
+                                           >
+                                             🚀 Em Breve
+                                           </button>
+                                         </div>
+                                       </div>
+                                     )}
+
                                      <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2 text-sm">
                                         {product.preferredBrands && product.preferredBrands.length > 0 && (
                                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -2285,13 +2335,13 @@ export default function SellerQuotationPage() {
       
                                        return (
                                          <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
-                                           <div className="flex flex-col lg:flex-row gap-2 items-stretch lg:items-end">
-                                             <div className="flex-1 min-w-[120px]">
-                                               <div className="flex items-center gap-1 mb-1">
-                                                 <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
+                                           <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-7 gap-2 items-end">
+                                               <div className="space-y-1">
+                                               <div className="flex items-center gap-1">
+                                                 <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Quantas Cx ou fardos vc irá enviar *</label>
                                                  <button
                                                    type="button"
-                                                   onClick={() => speak(voiceMessages.formFields.unitsHelp(product.unit))}
+                                                   onClick={() => speak("Digite quantas caixas ou fardos você irá enviar para o comprador")}
                                                    className="text-muted-foreground hover:text-primary transition-colors"
                                                    title="Ajuda sobre este campo"
                                                    tabIndex={-1}
@@ -2304,16 +2354,34 @@ export default function SellerQuotationPage() {
                                                  type="number"
                                                  value={offer.unitsInPackaging > 0 ? offer.unitsInPackaging : ''}
                                                  onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
-                                                 onFocus={() => handleUnitsInPackagingFocus(product.id)}
-                                                 onBlur={handleUnitsInPackagingBlur}
-                                                 placeholder="Ex: 12"
+                                                 placeholder="Ex: 5"
                                                  disabled={isOfferDisabled}
+                                                 className="w-full"
                                                />
                                              </div>
                                              
-                                             {/* X separator between fields */}
-                                             <div className="flex items-center justify-center px-2">
-                                               <span className="text-xl font-bold text-muted-foreground">×</span>
+                                             <div className="space-y-1">
+                                               <div className="flex items-center gap-1">
+                                                 <label htmlFor={`brand-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => speak("Digite quantas unidades vêm dentro de cada caixa ou fardo")}
+                                                   className="text-muted-foreground hover:text-primary transition-colors"
+                                                   title="Ajuda sobre este campo"
+                                                   tabIndex={-1}
+                                                 >
+                                                   <HelpCircle className="h-3.5 w-3.5" />
+                                                 </button>
+                                               </div>
+                                               <Input
+                                                 id={`brand-${product.id}-${offer.uiId}`}
+                                                 type="number"
+                                                 value={offer.unitsPerPackage || ''}
+                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsPerPackage', e.target.value)}
+                                                 placeholder="Ex: 12"
+                                                 disabled={isOfferDisabled}
+                                                 className="w-full"
+                                               />
                                              </div>
                                              
                                             <div className="flex-1 min-w-[140px]">
