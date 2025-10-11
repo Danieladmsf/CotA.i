@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { format, intervalToDuration } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CompetitorOfferCard, BrandRequestCard, OfferFormCard } from "@/components/features/cotacao/supplier-portal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { sendCounterProposalReminder, sendQuantityVariationNotification } from "@/actions/notificationActions";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
@@ -2941,65 +2942,31 @@ export default function SellerQuotationPage() {
                                 {hasMyOffers && product.bestOffersByBrand && product.bestOffersByBrand.length > 0 && (
                                   <div className="flex flex-row flex-wrap gap-6 p-3">
                                       {product.bestOffersByBrand.map(offer => {
-                                          let variantClasses = "border-muted-foreground/20";
-                                          let textPriceClass = "text-foreground";
                                           const isLowestOverall = product.lowestPriceThisProductHas !== null && offer.pricePerUnit === product.lowestPriceThisProductHas;
-                                          
-                                          if(isLowestOverall) {
-                                            variantClasses = "border-green-500";
-                                            textPriceClass = "text-green-600 dark:text-green-400";
-                                          } else if(offer.isSelf) {
-                                            variantClasses = "border-primary";
-                                            textPriceClass = "text-primary";
-                                          }
-      
+
                                           return (
-                                              <div key={offer.brandName + offer.supplierId} className={`flex items-start justify-between p-3 rounded-md bg-muted/20 border-l-4 min-w-[280px] gap-3 ${variantClasses}`}>
-                                                  <div className="flex items-start gap-3 flex-1">
-                                                      <TooltipProvider>
-                                                          <Tooltip>
-                                                              <TooltipTrigger asChild>
-                                                                  <Avatar className="h-8 w-8 shrink-0 cursor-pointer">
-                                                                    <Image src={isValidImageUrl(offer.supplierFotoUrl) ? offer.supplierFotoUrl : 'https://placehold.co/40x40.png'} alt={offer.supplierName || 'Fornecedor'} width={40} height={40} className="object-cover w-full h-full rounded-full" data-ai-hint={offer.supplierFotoHint || 'logo company'} />
-                                                                    <AvatarFallback className="text-xs bg-muted">{offer.supplierInitials}</AvatarFallback>
-                                                                  </Avatar>
-                                                              </TooltipTrigger>
-                                                              <TooltipContent side="top" className="bg-background border text-foreground shadow-lg rounded-md text-xs p-2">
-                                                                <p className="font-semibold">{offer.vendedor}</p>
-                                                                <p>{offer.supplierName}</p>
-                                                                <p className="text-muted-foreground">CNPJ: {offer.cnpj}</p>
-                                                              </TooltipContent>
-                                                          </Tooltip>
-                                                      </TooltipProvider>
-                                                      <div className="flex-1">
-                                                          <div className="mb-1">
-                                                            <h4 className="text-base font-semibold text-foreground" title={offer.brandName}>
-                                                              {offer.brandName}
-                                                              {offer.unitsInPackaging && offer.unitWeight && (
-                                                                <span className="text-sm text-muted-foreground font-normal">
-                                                                  {` - ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, offer.productUnit)}`}
-                                                                </span>
-                                                              )}
-                                                              {offer.totalPackagingPrice && offer.totalPackagingPrice > 0 && (
-                                                                <span className="text-sm text-muted-foreground font-normal">
-                                                                  {` | ${formatCurrency(offer.totalPackagingPrice)}`}
-                                                                </span>
-                                                              )}
-                                                            </h4>
-                                                          </div>
-                                                          <p className="text-xs text-muted-foreground">por {offer.supplierName}</p>
-                                                      </div>
-                                                  </div>
-                                                  <div className="text-right shrink-0">
-                                                      <p className={`text-base font-bold leading-tight ${textPriceClass}`}>
-                                                        {formatCurrency(offer.pricePerUnit)} / {abbreviateUnit(offer.productUnit)}
-                                                      </p>
-                                                      <div className="mt-1">
-                                                        {isLowestOverall && <Badge variant={offer.isSelf ? "default" : "outline"} className={`text-xs ${offer.isSelf ? 'bg-green-600 text-white' : 'border-green-600 text-green-700'}`}>Melhor Preço</Badge>}
-                                                        {!isLowestOverall && offer.isSelf && <Badge variant="default" className="text-xs">Sua Oferta</Badge>}
-                                                      </div>
-                                                  </div>
-                                              </div>
+                                              <CompetitorOfferCard
+                                                key={offer.brandName + offer.supplierId}
+                                                brandName={offer.brandName}
+                                                supplierId={offer.supplierId}
+                                                supplierName={offer.supplierName}
+                                                supplierInitials={offer.supplierInitials}
+                                                supplierFotoUrl={offer.supplierFotoUrl}
+                                                supplierFotoHint={offer.supplierFotoHint}
+                                                vendedor={offer.vendedor}
+                                                cnpj={offer.cnpj}
+                                                pricePerUnit={offer.pricePerUnit}
+                                                productUnit={offer.productUnit}
+                                                unitsInPackaging={offer.unitsInPackaging}
+                                                unitWeight={offer.unitWeight}
+                                                totalPackagingPrice={offer.totalPackagingPrice}
+                                                isSelf={offer.isSelf}
+                                                isLowestOverall={isLowestOverall}
+                                                formatCurrency={formatCurrency}
+                                                abbreviateUnit={abbreviateUnit}
+                                                formatPackaging={formatPackaging}
+                                                isValidImageUrl={isValidImageUrl}
+                                              />
                                           )
                                       })}
                                   </div>
@@ -3011,89 +2978,25 @@ export default function SellerQuotationPage() {
                                   return hasBrandRequests;
                                 })() && (
                                   <div className="flex flex-row flex-wrap gap-2 p-1">
-                                      {product.pendingBrandRequests?.map(request => {
-                                        // Define colors based on status (only pending or rejected shown)
-                                        const isPending = request.status === 'pending';
-                                        const isRejected = request.status === 'rejected';
-
-                                        const cardBg = isPending ? 'bg-orange-50/50' : 'bg-red-50/50';
-                                        const borderColor = isPending ? 'border-orange-500' : 'border-red-500';
-                                        const textColor = isPending ? 'text-orange-600' : 'text-red-600';
-                                        const badgeBorder = isPending ? 'border-orange-600' : 'border-red-600';
-                                        const badgeText = isPending ? 'text-orange-700' : 'text-red-700';
-                                        const badgeLabel = isPending ? 'Aguardando Aprovação' : '✗ Rejeitada';
-
-                                        return (
-                                          <div key={request.id} className={`flex items-start justify-between p-3 rounded-md ${cardBg} border-l-4 ${borderColor} min-w-[280px] gap-3`}>
-                                              <div className="flex items-start gap-3 flex-1">
-                                                  <TooltipProvider>
-                                                      <Tooltip>
-                                                          <TooltipTrigger asChild>
-                                                              <Avatar className="h-8 w-8 shrink-0 cursor-pointer">
-                                                                {request.imageUrl ? (
-                                                                  <Image 
-                                                                    src={request.imageUrl} 
-                                                                    alt={request.brandName} 
-                                                                    width={40} 
-                                                                    height={40} 
-                                                                    className="object-cover w-full h-full rounded-full" 
-                                                                  />
-                                                                ) : (
-                                                                  <AvatarFallback className="text-xs bg-orange-100">{request.supplierInitials}</AvatarFallback>
-                                                                )}
-                                                              </Avatar>
-                                                          </TooltipTrigger>
-                                                          <TooltipContent side="top" className="bg-background border text-foreground shadow-lg rounded-md text-xs p-2">
-                                                            <p className="font-semibold">{request.supplierName}</p>
-                                                            <p className="text-muted-foreground">Nova marca proposta</p>
-                                                          </TooltipContent>
-                                                      </Tooltip>
-                                                  </TooltipProvider>
-                                                  <div className="flex-1">
-                                                      <div className="mb-1">
-                                                        <h4 className="text-base font-semibold text-foreground" title={request.brandName}>
-                                                          {request.brandName}
-                                                          {request.unitsInPackaging && request.unitWeight && (
-                                                            <span className="text-sm text-muted-foreground font-normal">
-                                                              {` - ${formatPackaging(request.unitsInPackaging, request.unitWeight, product.unit)}`}
-                                                            </span>
-                                                          )}
-                                                          {request.totalPackagingPrice && request.totalPackagingPrice > 0 && (
-                                                            <span className="text-sm text-muted-foreground font-normal">
-                                                              {` | ${formatCurrency(request.totalPackagingPrice)}`}
-                                                            </span>
-                                                          )}
-                                                        </h4>
-                                                      </div>
-                                                      <p className="text-xs text-muted-foreground">por {request.supplierName}</p>
-                                                  </div>
-                                              </div>
-                                              <div className="text-right shrink-0">
-                                                  <p className={`text-base font-bold ${textColor} leading-tight`}>
-                                                    {(() => {
-                                                      // Fallback: recalcula preço se estiver inválido
-                                                      if (request.pricePerUnit && !isNaN(request.pricePerUnit)) {
-                                                        return formatCurrency(request.pricePerUnit);
-                                                      }
-                                                      // Recalcular se temos os dados necessários
-                                                      if (request.totalPackagingPrice && request.unitsInPackaging && request.unitWeight) {
-                                                        const calculated = request.totalPackagingPrice / (request.unitsInPackaging * request.unitWeight);
-                                                        return formatCurrency(calculated);
-                                                      }
-                                                      return "-";
-                                                    })()}
-                                                    {" / "}
-                                                    {abbreviateUnit(product.unit)}
-                                                  </p>
-                                                  <div className="mt-1">
-                                                    <Badge variant="outline" className={`text-xs ${badgeBorder} ${badgeText}`}>
-                                                      {badgeLabel}
-                                                    </Badge>
-                                                  </div>
-                                              </div>
-                                          </div>
-                                        );
-                                      })}
+                                      {product.pendingBrandRequests?.map(request => (
+                                        <BrandRequestCard
+                                          key={request.id || `brand-${request.brandName}`}
+                                          id={request.id || ''}
+                                          brandName={request.brandName}
+                                          supplierName={request.supplierName}
+                                          supplierInitials={request.supplierInitials}
+                                          imageUrl={request.imageUrl}
+                                          status={request.status}
+                                          unitsInPackaging={request.unitsInPackaging}
+                                          unitWeight={request.unitWeight}
+                                          totalPackagingPrice={request.totalPackagingPrice}
+                                          pricePerUnit={request.pricePerUnit}
+                                          productUnit={product.unit}
+                                          formatCurrency={formatCurrency}
+                                          abbreviateUnit={abbreviateUnit}
+                                          formatPackaging={formatPackaging}
+                                        />
+                                      ))}
                                   </div>
                                 )}
                                 <div className="sm:ml-auto">
@@ -3260,120 +3163,28 @@ export default function SellerQuotationPage() {
                                          );
                                        }
                                        
-                                       // Card padrão (formulário)
+                                       // Card padrão (formulário) - usando componente
+                                       const totalOrderValue = (Number(offer.unitsInPackaging) || 0) * (Number(offer.totalPackagingPrice) || 0);
+
                                        return (
-                                         <div key={`${product.id}-${offerIndex}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
-                                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                                             {/* Campo 1: Quantas Cx ou fardos */}
-                                             <div className="space-y-1">
-                                               <label htmlFor={`packages-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Quantas Cx ou fardos vc irá enviar *</label>
-                                               <Input
-                                                 id={`packages-${product.id}-${offer.uiId}`}
-                                                 type="number"
-                                                 value={offer.unitsInPackaging > 0 ? offer.unitsInPackaging : ''}
-                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
-                                                 placeholder="Ex: 5"
-                                                 disabled={isOfferDisabled}
-                                               />
-                                             </div>
-
-                                             {/* Campo 2: Total Un na Emb */}
-                                             <div className="space-y-1">
-                                               <label htmlFor={`units-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Total Un na Emb. *</label>
-                                               <Input
-                                                 id={`units-${product.id}-${offer.uiId}`}
-                                                 type="number"
-                                                 value={offer.unitsPerPackage || ''}
-                                                 onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsPerPackage', parseInt(e.target.value) || 0)}
-                                                 placeholder="Ex: 12"
-                                                 disabled={isOfferDisabled}
-                                               />
-                                             </div>
-
-                                             {/* Campo 3: Peso */}
-                                             <div className="space-y-1">
-                                               <label htmlFor={`weight-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Peso (Kg) *</label>
-                                               <div className="relative">
-                                                 <Input
-                                                   id={`weight-${product.id}-${offer.uiId}`}
-                                                   type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
-                                                   value={getWeightDisplayValue(product, offer)}
-                                                   onChange={(e) => handleWeightChange(e, product, offer)}
-                                                   placeholder="0,000"
-                                                   disabled={isOfferDisabled}
-                                                   className="pr-8"
-                                                 />
-                                                 <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">Kg</span>
-                                               </div>
-                                             </div>
-
-                                             {/* Campo 4: Preço Total da Emb */}
-                                             <div className="space-y-1">
-                                               <label htmlFor={`price-${product.id}-${offer.uiId}`} className="block text-xs font-medium text-muted-foreground">Preço Total da Emb. (R$) *</label>
-                                               <Input
-                                                 id={`price-${product.id}-${offer.uiId}`}
-                                                 type="text"
-                                                 value={offer.totalPackagingPrice > 0 ? formatCurrencyInput(offer.totalPackagingPrice * 100) : ''}
-                                                 onChange={(e) => handlePriceChange(product.id, offer.uiId, e.target.value)}
-                                                 placeholder="R$ 0,00"
-                                                 disabled={isOfferDisabled}
-                                               />
-                                             </div>
-
-                                             {/* Campo 5: Valor Total do Pedido (calculado) */}
-                                             <div className="space-y-1">
-                                               <label className="block text-xs font-medium text-muted-foreground">Valor Total do Pedido (R$)</label>
-                                               <Input
-                                                 type="text"
-                                                 value={(() => {
-                                                   const packagesCount = Number(offer.unitsInPackaging) || 0;
-                                                   const pricePerEmb = Number(offer.totalPackagingPrice) || 0;
-                                                   if (packagesCount > 0 && pricePerEmb > 0) {
-                                                     return formatCurrencyInput((packagesCount * pricePerEmb) * 100);
-                                                   }
-                                                   return '';
-                                                 })()}
-                                                 readOnly
-                                                 className="bg-muted/50"
-                                               />
-                                             </div>
-
-                                             {/* Campo 6: Preço/Unid. */}
-                                             <div className="space-y-1">
-                                               <label className="block text-xs font-medium text-muted-foreground">Preço/Unid.</label>
-                                               <div className="h-10 flex items-center">
-                                                 <span className={`text-sm px-2 py-1 rounded border w-full text-center ${pricePerUnitClasses}`}>
-                                                   {formatCurrency(pricePerUnit)} / {abbreviateUnit(product.unit)}
-                                                 </span>
-                                               </div>
-                                             </div>
-                                           </div>
-
-                                           {/* Botões na linha de baixo */}
-                                           <div className="flex justify-end gap-2 pt-2 border-t">
-
-                                             <div className="flex gap-2">
-                                               <Button
-                                                 variant="outline"
-                                                 size="sm"
-                                                 onClick={() => removeOfferField(product.id, offer)}
-                                                 disabled={isOfferDisabled}
-                                                 className="text-destructive hover:text-destructive"
-                                               >
-                                                 Remover Oferta
-                                               </Button>
-                                               <Button
-                                                 onClick={async () => {
-                                                   const success = await handleSaveProductOffer(product.id, offer.uiId);
-                                                 }}
-                                                 disabled={isOfferDisabled}
-                                                 className="bg-primary text-primary-foreground hover:bg-primary/90"
-                                               >
-                                                 Salvar Nova Oferta
-                                               </Button>
-                                             </div>
-                                           </div>
-                                         </div>
+                                         <OfferFormCard
+                                           key={`${product.id}-${offerIndex}-${offer.uiId}`}
+                                           offer={offer}
+                                           product={product}
+                                           pricePerUnit={pricePerUnit}
+                                           pricePerUnitClasses={pricePerUnitClasses}
+                                           totalOrderValue={totalOrderValue}
+                                           isOfferDisabled={isOfferDisabled}
+                                           handleOfferChange={handleOfferChange}
+                                           handleWeightChange={handleWeightChange}
+                                           handlePriceChange={handlePriceChange}
+                                           handleSaveProductOffer={handleSaveProductOffer}
+                                           removeOfferField={removeOfferField}
+                                           formatCurrency={formatCurrency}
+                                           formatCurrencyInput={formatCurrencyInput}
+                                           abbreviateUnit={abbreviateUnit}
+                                           getWeightDisplayValue={getWeightDisplayValue}
+                                         />
                                        );
                                      })}
                                      </>

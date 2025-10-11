@@ -280,7 +280,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
               quotationId: request.quotationId,
               productName: productNameForNotif,
               brandName: request.brandName,
-              rejectionReason: rejectionReason
+              rejectionReason: undefined // Could be enhanced in the future to ask for rejection reason
             });
 
         if (notificationResult.success) {
