@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
       brandName,
       packagingDescription,
       unitsInPackaging,
+      unitsPerPackage, // ADDED for new field
       unitWeight,
       totalPackagingPrice,
       pricePerUnit,
@@ -41,6 +42,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate pricePerUnit
+    const pricePerUnitNumber = Number(pricePerUnit);
+    if (!pricePerUnit || isNaN(pricePerUnitNumber) || !isFinite(pricePerUnitNumber)) {
+      return NextResponse.json(
+        { error: 'Invalid price per unit calculation' },
+        { status: 400 }
+      );
+    }
+
     // Create the brand request document
     const brandRequest = {
       quotationId,
@@ -52,9 +62,10 @@ export async function POST(request: NextRequest) {
       brandName: brandName.trim(),
       packagingDescription: packagingDescription.trim(),
       unitsInPackaging: Number(unitsInPackaging),
+      unitsPerPackage: unitsPerPackage ? Number(unitsPerPackage) : Number(unitsInPackaging), // Use unitsPerPackage if provided, otherwise use unitsInPackaging for backward compatibility
       unitWeight: Number(unitWeight),
       totalPackagingPrice: Number(totalPackagingPrice),
-      pricePerUnit: Number(pricePerUnit),
+      pricePerUnit: pricePerUnitNumber,
       imageUrl: imageUrl || '',
       imageFileName: imageFileName || '',
       status: 'pending',
@@ -70,6 +81,8 @@ export async function POST(request: NextRequest) {
 
     // Create notification for the buyer
     try {
+      console.log('📧 Creating notification for buyer:', { buyerUserId, brandName, productName });
+
       const notificationData = {
         userId: buyerUserId,
         type: 'brand_approval_pending',
@@ -87,8 +100,10 @@ export async function POST(request: NextRequest) {
         createdAt: Timestamp.now()
       };
 
+      console.log('📧 Notification data:', notificationData);
+
       const notificationRef = await db.collection('notifications').add(notificationData);
-      console.log('✅ Notification created for buyer:', {
+      console.log('✅ Notification created successfully:', {
         buyerUserId,
         notificationId: notificationRef.id,
         type: 'brand_approval_pending',

@@ -190,7 +190,8 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             supplierInitials: request.supplierInitials,
             brandOffered: request.brandName,
             packagingDescription: request.packagingDescription,
-            unitsInPackaging: request.unitsInPackaging,
+            unitsInPackaging: 1, // Default to 1 since brand request doesn't specify package quantity
+            unitsPerPackage: request.unitsInPackaging, // In brand request, this field contains units per package
             unitWeight: request.unitWeight,
             totalPackagingPrice: request.totalPackagingPrice,
             pricePerUnit: request.pricePerUnit,

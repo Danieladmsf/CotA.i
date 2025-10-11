@@ -49,7 +49,7 @@ import {
 import { format, intervalToDuration } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { sendOutbidNotification, sendCounterProposalReminder, sendQuantityVariationNotification } from "@/actions/notificationActions";
+import { sendCounterProposalReminder, sendQuantityVariationNotification } from "@/actions/notificationActions";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,6 +59,17 @@ import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { voiceMessages } from "@/config/voiceMessages";
 import { useSupplierAuth } from "@/hooks/useSupplierAuth";
 import SupplierPinModal from "@/components/features/portal/SupplierPinModal";
+import { CountdownTimer } from "@/components/ui/CountdownTimer";
+import {
+  useQuotationDeadline,
+  calculateCounterProposalStatus,
+  isCounterProposalExpired,
+  calculateBlockingRules,
+  useCounterProposalReminders,
+  usePriorityNotificationHandler,
+  type CounterProposalInfo
+} from "@/hooks/quotation";
+import { handleOutbidNotification } from "@/lib/quotation/notificationHelpers";
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
@@ -166,15 +177,11 @@ const getUnitSuffix = (unit: string): string => {
 };
 
 interface ProductToQuoteVM extends ShoppingListItem {
-  supplierOffers: OfferWithUI[]; 
+  supplierOffers: OfferWithUI[];
   bestOffersByBrand: BestOfferForBrandDisplay[];
   lowestPriceThisProductHas?: number | null;
   isDeliveryDayMismatch: boolean;
-  counterProposalInfo?: {
-      deadline: Date;
-      winningBrand: string;
-      myBrand: string; // The supplier's own brand that was outbid
-  } | null;
+  counterProposalInfo: CounterProposalInfo | null;
   isLockedOut?: boolean;
   acknowledgedDeliveryMismatches?: string[]; // NEW FIELD
   categoryName?: string;
@@ -331,38 +338,6 @@ const buildDynamicTitle = (
   return title;
 };
 
-const CountdownTimer: React.FC<{ deadline: Date; onEnd?: () => void }> = ({ deadline, onEnd }) => {
-  const [timeLeft, setTimeLeft] = useState("Calculando...");
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const updateTimer = useCallback(() => {
-    const now = new Date();
-    const diff = deadline.getTime() - now.getTime();
-    if (diff <= 0) {
-      setTimeLeft("Encerrado");
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (onEnd) onEnd();
-      return;
-    }
-    const duration = intervalToDuration({ start: now, end: deadline });
-    const parts: string[] = [];
-    if (duration.days && duration.days > 0) parts.push(`${duration.days}d`);
-    if (duration.hours && duration.hours > 0) parts.push(`${duration.hours}h`);
-    if (duration.minutes && duration.minutes > 0) parts.push(`${duration.minutes}m`);
-    if (duration.seconds && duration.seconds > 0) parts.push(`${duration.seconds}s`);
-    setTimeLeft(parts.join(' ') || "0s");
-  }, [deadline, onEnd]);
-
-  useEffect(() => {
-    updateTimer();
-    intervalRef.current = setInterval(updateTimer, 1000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [updateTimer]);
-
-  return <span>{timeLeft}</span>;
-};
 
 const isValidImageUrl = (url?: string): url is string => {
   return !!url && (url.startsWith('http') || url.startsWith('data:'));
@@ -556,7 +531,7 @@ const renderVendorFlowCard = (
 
       case 6:
         const totalValue = requiredPackages * packagePrice;
-        const pricePerUnit = packagePrice / (unitsPerPackage || 1);
+        const pricePerUnit = packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1));
         
         // Calcular quantidade total oferecida
         const tempOffer: OfferWithUI = {
@@ -955,7 +930,7 @@ const renderNewBrandFlowCard = (
         const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
         
         const totalValue = (flow.requiredPackages || 1) * packagePrice;
-        const pricePerUnit = packagePrice / (unitsPerPackage || 1);
+        const pricePerUnit = packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1));
         
         return (
           <div className="space-y-4">
@@ -1103,6 +1078,7 @@ export default function SellerQuotationPage() {
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [currentSupplierDetails, setCurrentSupplierDetails] = useState<SupplierType | null>(null);
   const [productsToQuote, setProductsToQuote] = useState<ProductToQuoteVM[]>([]);
+  const [pendingRequestsCache, setPendingRequestsCache] = useState<PendingBrandRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
   const [unseenAlerts, setUnseenAlerts] = useState<string[]>([]);
@@ -1172,15 +1148,42 @@ export default function SellerQuotationPage() {
   });
   const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
-  const [timeLeft, setTimeLeft] = useState("Calculando...");
-  const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
-  
-  const activeTimersRef = useRef(new Map<string, NodeJS.Timeout>());
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const brandInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const supplierDetailsCache = useRef(new Map<string, SupplierType>());
   const closingQuotationsRef = useRef(new Set<string>());
   const lastClickRef = useRef<{ action: string; timestamp: number } | null>(null);
+
+  // Hook de cronômetro e auto-close da cotação
+  const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
+    if (closingQuotationsRef.current.has(quotationId)) {
+        return;
+    }
+    console.log(`[SellerPortal] Deadline passed for quotation ${quotationId}. Triggering auto-close action from portal page.`);
+    closingQuotationsRef.current.add(quotationId);
+
+    // Optimistic UI update
+    const originalQuotationStatus = quotation?.status;
+    setQuotation(prev => prev ? { ...prev, status: 'Fechada' } : null);
+
+    const result = await closeQuotationAndItems(quotationId, quotation?.userId || '');
+    if(result.success && (result.updatedItemsCount ?? 0) > 0) {
+      toast({
+        title: "Cotação Encerrada",
+        description: "O prazo para esta cotação terminou. Não é mais possível enviar ou editar ofertas.",
+      });
+    } else if (!result.success) {
+      console.error("Portal: Failed to auto-close quotation:", result.error);
+      setQuotation(prev => prev ? { ...prev, status: originalQuotationStatus || 'Aberta' } : null);
+      toast({
+        title: "Erro ao Encerrar Cotação",
+        description: result.error || "Não foi possível encerrar a cotação automaticamente.",
+        variant: "destructive"
+      });
+    }
+    closingQuotationsRef.current.delete(quotationId);
+  }, [toast, quotation, setQuotation]);
+
+  const { timeLeft, isDeadlinePassed, isQuotationEnded } = useQuotationDeadline(quotation, handleAutoCloseQuotation);
 
   const productsWithMyOffers = useMemo(() => {
     const productIds = new Set<string>();
@@ -1208,36 +1211,6 @@ export default function SellerQuotationPage() {
     }
     return productsToQuote.filter(p => p.categoryName === activeCategoryTab);
   }, [productsToQuote, activeCategoryTab]);
-
-  const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
-    if (closingQuotationsRef.current.has(quotationId)) {
-        return;
-    }
-    console.log(`[SellerPortal] Deadline passed for quotation ${quotationId}. Triggering auto-close action from portal page.`);
-    closingQuotationsRef.current.add(quotationId);
-
-    // Optimistic UI update
-    const originalQuotationStatus = quotation?.status; // Store original status
-    setQuotation(prev => prev ? { ...prev, status: 'Fechada' } : null); // Immediately update to 'Fechada'
-
-    const result = await closeQuotationAndItems(quotationId, quotation?.userId || ''); // Pass userId for authorization
-    if(result.success && (result.updatedItemsCount ?? 0) > 0) {
-      toast({
-        title: "Cotação Encerrada",
-        description: "O prazo para esta cotação terminou. Não é mais possível enviar ou editar ofertas.",
-      });
-    } else if (!result.success) {
-      console.error("Portal: Failed to auto-close quotation:", result.error);
-      // Revert UI state if server action failed
-      setQuotation(prev => prev ? { ...prev, status: originalQuotationStatus || 'Aberta' } : null);
-      toast({
-        title: "Erro ao Encerrar Cotação",
-        description: result.error || "Não foi possível encerrar a cotação automaticamente.",
-        variant: "destructive"
-      });
-    }
-    closingQuotationsRef.current.delete(quotationId);
-  }, [toast, quotation, setQuotation]);
 
   const handleAcknowledgeMismatch = async (productId: string) => {
     if (!supplierId) {
@@ -1271,11 +1244,27 @@ export default function SellerQuotationPage() {
   const handleNewBrandPriceFocus = () => speak(voiceMessages.formFields.newBrand_price_prompt);
   const handleNewBrandImageFocus = () => speak(voiceMessages.formFields.newBrand_image_prompt);
 
+  // Helper function to check and block actions when quotation is ended
+  const checkAndBlockIfQuotationEnded = (): boolean => {
+    if (isQuotationEnded) {
+      toast({
+        title: "Ação Bloqueada",
+        description: "Não é possível adicionar marcas em cotações encerradas.",
+        variant: "destructive"
+      });
+      return true; // Blocked
+    }
+    return false; // Allowed
+  };
+
   // Funções para nova marca (agora usando fluxo guiado ao invés de modal)
   const openNewBrandModal = (productId: string, productName: string, productUnit: UnitOfMeasure) => {
+    // Verificação de segurança: bloquear se cotação encerrada
+    if (checkAndBlockIfQuotationEnded()) return;
+
     // Usar fluxo guiado ao invés de modal
     startNewBrandFlow(productId);
-    
+
     // Manter dados do modal para compatibilidade (mas não abrir modal)
     setNewBrandModal({
       isOpen: false, // Modal fechado, usando fluxo guiado
@@ -1363,7 +1352,10 @@ export default function SellerQuotationPage() {
         }
       }
 
-      const pricePerUnit = newBrandForm.totalPackagingPrice / newBrandForm.unitsInPackaging;
+      // No modal de nova marca, unitsInPackaging representa "Total Un na Emb" (unidades por embalagem)
+      // O preço é da embalagem completa, então calculamos: preço_embalagem / (unidades × peso_unitário)
+      const unitsPerPackage = newBrandForm.unitsInPackaging; // "Total Un na Emb"
+      const pricePerUnit = newBrandForm.totalPackagingPrice / (unitsPerPackage * newBrandForm.unitWeight);
 
       const brandRequestData = {
         quotationId: quotation.id,
@@ -1375,6 +1367,7 @@ export default function SellerQuotationPage() {
         brandName: newBrandForm.brandName.trim(),
         packagingDescription: newBrandForm.packagingDescription.trim() || formatPackaging(newBrandForm.unitsInPackaging, newBrandForm.unitWeight, newBrandModal.productUnit),
         unitsInPackaging: newBrandForm.unitsInPackaging,
+        unitsPerPackage: newBrandForm.unitsInPackaging, // No modal, unitsInPackaging = unitsPerPackage
         unitWeight: newBrandForm.unitWeight,
         totalPackagingPrice: newBrandForm.totalPackagingPrice,
         pricePerUnit: pricePerUnit,
@@ -1451,7 +1444,7 @@ export default function SellerQuotationPage() {
     return () => unsubscribe();
   }, [quotationId, toast]);
 
-  // Effect to load initial static data (supplier, products)
+  // Effect to load supplier details only (quotation and products load via real-time listeners)
   useEffect(() => {
     if (!quotationId || !supplierId) {
         setIsLoading(false);
@@ -1460,156 +1453,37 @@ export default function SellerQuotationPage() {
     }
     setIsLoading(true);
 
-    const fetchInitialData = async () => {
+    const fetchSupplierData = async () => {
       try {
-        const quotationRef = doc(db, QUOTATIONS_COLLECTION, quotationId);
-        const quotationSnap = await getDoc(quotationRef);
-        if (!quotationSnap.exists()) throw new Error("Cotação não encontrada.");
-        const fetchedQuotation = { id: quotationSnap.id, ...quotationSnap.data() } as Quotation;
-        setQuotation(fetchedQuotation);
-
         const supplierRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
         const supplierSnap = await getDoc(supplierRef);
         if (!supplierSnap.exists()) throw new Error("Fornecedor não encontrado.");
         const fetchedSupplier = { id: supplierSnap.id, ...supplierSnap.data() } as SupplierType;
-        setCurrentSupplierDetails(fetchedSupplier); 
+        setCurrentSupplierDetails(fetchedSupplier);
         supplierDetailsCache.current.set(supplierId, fetchedSupplier);
-        
-        const supplierDeliveryDays = fetchedSupplier.diasDeEntrega || [];
-
-        const shoppingListItemsQuery = query(
-          collection(db, SHOPPING_LIST_ITEMS_COLLECTION),
-          where("quotationId", "==", quotationId)
-        );
-        
-        const shoppingListSnapshot = await getDocs(shoppingListItemsQuery);
-
-        // Fetch pending brand requests at the same time
-        const pendingRequestsQuery = query(
-          collection(db, PENDING_BRAND_REQUESTS_COLLECTION),
-          where("quotationId", "==", quotationId),
-          where("supplierId", "==", supplierId),
-          where("status", "==", "pending")
-        );
-        const pendingRequestsSnapshot = await getDocs(pendingRequestsQuery);
-        const allPendingRequests = pendingRequestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingBrandRequest));
-        
-        const fetchedProducts = shoppingListSnapshot.docs.map(docSnap => {
-          const itemData = docSnap.data() as ShoppingListItem;
-          
-          let isMismatch = false;
-          if (itemData.hasSpecificDate && itemData.deliveryDate) {
-            const deliveryDate = itemData.deliveryDate.toDate();
-            const deliveryDay = dayMap[deliveryDate.getDay()];
-            isMismatch = !supplierDeliveryDays.includes(deliveryDay);
-          }
-
-          // Find pending requests for this specific product
-          const productPendingRequests = allPendingRequests.filter(req => req.productId === docSnap.id);
-          
-          return {
-            ...itemData,
-            id: docSnap.id,
-            supplierOffers: [], 
-            bestOffersByBrand: [],
-            lowestPriceThisProductHas: null,
-            isDeliveryDayMismatch: isMismatch,
-            counterProposalInfo: null,
-            isLockedOut: false,
-            pendingBrandRequests: productPendingRequests // Initialize with fetched data
-          } as ProductToQuoteVM;
-        }).sort((a,b) => a.name.localeCompare(b.name));
-        
-        setProductsToQuote(fetchedProducts);
 
       } catch (error: any) {
-        console.error("ERROR fetching initial data for seller quotation page:", error);
+        console.error("ERROR fetching supplier data:", error);
         toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
         speak(voiceMessages.error.loadFailed);
-      } finally {
         setIsLoading(false);
       }
     };
-    fetchInitialData();
+    fetchSupplierData();
   }, [quotationId, supplierId, toast, speak]);
 
-  // Effect for handling priority notifications and welcome speech
-  useEffect(() => {
-    if (isLoading || notificationsLoading || hasSpokenTabMessage || !productsToQuote.length || !currentSupplierDetails) {
-        return;
-    }
-
-    const brandApprovalNotification = notifications.find(n => n.type === 'brand_approval_approved');
-    const brandRejectionNotification = notifications.find(n => n.type === 'brand_approval_rejected');
-
-    if (brandApprovalNotification) {
-        speak(voiceMessages.actions.brandApproved(brandApprovalNotification.brandName || ''));
-        markAsRead(brandApprovalNotification.id);
-        setHasSpokenTabMessage(true);
-    } else if (brandRejectionNotification) {
-        speak(voiceMessages.actions.brandRejected(brandRejectionNotification.brandName || ''));
-        markAsRead(brandRejectionNotification.id);
-        setHasSpokenTabMessage(true);
-    } else {
-        // If no priority message was spoken, speak the normal welcome message
-        const supplierName = currentSupplierDetails.empresa?.split(' ')[0] || 'Fornecedor';
-        const itemCount = productsToQuote.length;
-        speak(voiceMessages.welcome.quotationPage(supplierName, itemCount));
-        setHasSpokenTabMessage(true);
-    }
-  }, [isLoading, notificationsLoading, hasSpokenTabMessage, notifications, productsToQuote, currentSupplierDetails, markAsRead, speak]);
-
-  useEffect(() => {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-
-    if (quotation && quotation.deadline) {
-      const deadlineDate = quotation.deadline.toDate();
-
-      const updateTimer = () => {
-        const now = new Date();
-        const diff = deadlineDate.getTime() - now.getTime();
-
-        if (diff <= 0) {
-          setTimeLeft("Prazo Encerrado");
-          setIsDeadlinePassed(true);
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-          }
-          if (quotation.id && quotation.status === 'Aberta') {
-            handleAutoCloseQuotation(quotation.id);
-          }
-          return;
-        }
-
-        setIsDeadlinePassed(false);
-        const duration = intervalToDuration({ start: now, end: deadlineDate });
-        const parts: string[] = [];
-        if (duration.days && duration.days > 0) parts.push(`${duration.days}d`);
-        if (duration.hours && duration.hours > 0) parts.push(`${duration.hours}h`);
-        if (duration.minutes && duration.minutes > 0) parts.push(`${duration.minutes}m`);
-        if (duration.seconds && duration.seconds > 0) parts.push(`${duration.seconds}s`);
-        
-        setTimeLeft(parts.join(' ') || "Encerrando...");
-      };
-
-      updateTimer(); 
-      countdownIntervalRef.current = setInterval(updateTimer, 1000);
-    } else {
-      setTimeLeft("Prazo não definido");
-      setIsDeadlinePassed(false);
-    }
-
-    return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-        countdownIntervalRef.current = null;
-      }
-    };
-  }, [quotation, handleAutoCloseQuotation]); 
+  // Handle priority notifications and welcome speech
+  usePriorityNotificationHandler({
+    isLoading,
+    notificationsLoading,
+    hasSpokenTabMessage,
+    notifications,
+    productsToQuote,
+    currentSupplierDetails,
+    markAsRead,
+    speak,
+    setHasSpokenTabMessage,
+  });
 
   // Effect to listen for pending brand requests
   useEffect(() => {
@@ -1628,25 +1502,35 @@ export default function SellerQuotationPage() {
         ...doc.data()
       } as PendingBrandRequest));
 
-      // Update products to include pending requests
-      setProductsToQuote(prevProducts =>
-        prevProducts.map(product => {
+      console.log('🔶 Pending requests loaded:', pendingRequests.length);
+
+      // Armazena no cache para uso na carga inicial de produtos
+      setPendingRequestsCache(pendingRequests);
+
+      // Update products to include pending requests (se já existem produtos)
+      setProductsToQuote(prevProducts => {
+        if (prevProducts.length === 0) {
+          console.log('🔶 Products not loaded yet, requests cached for later');
+          return prevProducts;
+        }
+
+        return prevProducts.map(product => {
           const productPendingRequests = pendingRequests.filter(req => req.productId === product.id);
           console.log(`🔶 Product ${product.name} pending requests:`, productPendingRequests);
           return {
             ...product,
             pendingBrandRequests: productPendingRequests
           };
-        })
-      );
+        });
+      });
     });
 
     return () => unsubscribe();
   }, [quotationId, supplierId]);
 
-  // Effect to listen for real-time changes in shopping_list_items (preferred brands updates)
+  // Effect to listen for real-time changes in shopping_list_items (initial load + updates)
   useEffect(() => {
-    if (!quotationId) return;
+    if (!quotationId || !currentSupplierDetails) return;
 
     const shoppingListItemsQuery = query(
       collection(db, SHOPPING_LIST_ITEMS_COLLECTION),
@@ -1654,8 +1538,46 @@ export default function SellerQuotationPage() {
     );
 
     const unsubscribe = onSnapshot(shoppingListItemsQuery, (snapshot) => {
-      // Update products with new preferred brands
+      const supplierDeliveryDays = currentSupplierDetails.diasDeEntrega || [];
+
       setProductsToQuote(prevProducts => {
+        // Initial load: prevProducts is empty
+        if (prevProducts.length === 0) {
+          const initialProducts = snapshot.docs.map(docSnap => {
+            const itemData = docSnap.data() as ShoppingListItem;
+
+            let isMismatch = false;
+            if (itemData.hasSpecificDate && itemData.deliveryDate) {
+              const deliveryDate = itemData.deliveryDate.toDate();
+              const deliveryDay = dayMap[deliveryDate.getDay()];
+              isMismatch = !supplierDeliveryDays.includes(deliveryDay);
+            }
+
+            // Aplica pending requests do cache se existirem
+            const productPendingRequests = pendingRequestsCache.filter(req => req.productId === docSnap.id);
+            if (productPendingRequests.length > 0) {
+              console.log(`🔶 Applying cached pending requests to ${itemData.name}:`, productPendingRequests.length);
+            }
+
+            return {
+              ...itemData,
+              id: docSnap.id,
+              supplierOffers: [],
+              bestOffersByBrand: [],
+              lowestPriceThisProductHas: null,
+              isDeliveryDayMismatch: isMismatch,
+              counterProposalInfo: null,
+              isLockedOut: false,
+              pendingBrandRequests: productPendingRequests
+            } as ProductToQuoteVM;
+          }).sort((a, b) => a.name.localeCompare(b.name));
+
+          // Set loading to false after initial products load
+          setIsLoading(false);
+          return initialProducts;
+        }
+
+        // Update existing products with new data (e.g., preferredBrands changes)
         const updatedProducts = prevProducts.map(product => {
           const updatedDoc = snapshot.docs.find(doc => doc.id === product.id);
           if (updatedDoc) {
@@ -1664,60 +1586,88 @@ export default function SellerQuotationPage() {
             return {
               ...product,
               preferredBrands: updatedData.preferredBrands,
-              updatedAt: updatedData.updatedAt
+              updatedAt: updatedData.updatedAt,
+              // Preserva dados que vêm de outros listeners
+              pendingBrandRequests: product.pendingBrandRequests || []
             };
           }
           return product;
         });
-        
+
         return updatedProducts;
       });
     });
 
     return () => unsubscribe();
-  }, [quotationId]);
+  }, [quotationId, currentSupplierDetails]);
 
   useEffect(() => {
     if (!quotationId || !supplierId || productsToQuote.length === 0 || !currentSupplierDetails || isLoading || !quotation) return ()=>{};
 
-    // Create individual listeners for each product's offers
-    const unsubscribers = productsToQuote.map(product => {
-      const offersPath = `quotations/${quotationId}/products/${product.id}/offers`;
-      const offersQuery = query(collection(db, offersPath));
+    console.log('[LISTENER] Setting up SINGLE offers listener for all products');
 
-      return onSnapshot(offersQuery, async (offersSnapshot) => {
-        const snapshotStartTime = performance.now();
-        console.log('[LISTENER] Offers snapshot received for product:', product.id, 'docs:', offersSnapshot.docs.length);
-        const offersData = offersSnapshot.docs.map(doc => ({ ...doc.data() as Offer, id: doc.id, uiId: doc.id }));
+    // OPTIMIZED: Single listener for ALL offers in this quotation using collectionGroup
+    const offersCollectionGroupQuery = query(
+      collectionGroup(db, 'offers'),
+      where('quotationId', '==', quotationId)
+    );
 
-        // Fetch new supplier details
-        const fetchStartTime = performance.now();
-        const newSupplierIdsToFetch = new Set<string>();
-        offersData.forEach(offer => {
-          if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
-            newSupplierIdsToFetch.add(offer.supplierId);
+    const unsubscribe = onSnapshot(offersCollectionGroupQuery, async (offersSnapshot) => {
+      const snapshotStartTime = performance.now();
+      console.log('[LISTENER] Single offers snapshot received, total docs:', offersSnapshot.docs.length);
+
+      // Group offers by productId
+      const offersByProduct = new Map<string, Offer[]>();
+      offersSnapshot.docs.forEach(doc => {
+        const offerData = { ...doc.data() as Offer, id: doc.id, uiId: doc.id };
+        // Extract productId from document path: quotations/{quotationId}/products/{productId}/offers/{offerId}
+        const pathParts = doc.ref.path.split('/');
+        const productId = pathParts[3]; // Index 3 is the productId
+
+        if (!offersByProduct.has(productId)) {
+          offersByProduct.set(productId, []);
+        }
+        offersByProduct.get(productId)!.push(offerData);
+      });
+
+      // Fetch new supplier details (all at once)
+      const fetchStartTime = performance.now();
+      const allOffers = offersSnapshot.docs.map(doc => doc.data() as Offer);
+      const newSupplierIdsToFetch = new Set<string>();
+      allOffers.forEach(offer => {
+        if (offer.supplierId && !supplierDetailsCache.current.has(offer.supplierId)) {
+          newSupplierIdsToFetch.add(offer.supplierId);
+        }
+      });
+
+      if (newSupplierIdsToFetch.size > 0) {
+        console.log('[LISTENER] Fetching supplier details for:', Array.from(newSupplierIdsToFetch));
+        const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
+          try {
+            const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
+            if (supplierDoc.exists()) {
+              supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
+            }
+          } catch (err) {
+            console.error(`Error fetching supplier details for ID ${sid}:`, err);
           }
         });
+        await Promise.all(fetchPromises);
+        const fetchEndTime = performance.now();
+        console.log(`[LISTENER] Supplier fetch took ${(fetchEndTime - fetchStartTime).toFixed(2)}ms`);
+      }
 
-        if (newSupplierIdsToFetch.size > 0) {
-          console.log('[LISTENER] Fetching supplier details for:', Array.from(newSupplierIdsToFetch));
-          const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
-            try {
-              const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
-              if (supplierDoc.exists()) {
-                supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
-              }
-            } catch (err) {
-              console.error(`Error fetching supplier details for ID ${sid}:`, err);
-            }
-          });
-          await Promise.all(fetchPromises);
-          const fetchEndTime = performance.now();
-          console.log(`[LISTENER] Supplier fetch took ${(fetchEndTime - fetchStartTime).toFixed(2)}ms`);
-        }
+      // Process each product's offers
+      const listenerStartTime = performance.now();
+      setProductsToQuote(currentProducts => {
+        return currentProducts.map(product => {
+          const offersData = offersByProduct.get(product.id) || [];
 
-        const offersGroupedByBrand = new Map<string, Offer[]>();
-        offersData.forEach(offer => {
+          if (offersData.length === 0) return product; // No offers for this product
+
+          // Group offers by brand for this product
+          const offersGroupedByBrand = new Map<string, Offer[]>();
+          offersData.forEach(offer => {
           if(offer.pricePerUnit > 0) {
             if (!offersGroupedByBrand.has(offer.brandOffered)) {
               offersGroupedByBrand.set(offer.brandOffered, []);
@@ -1788,109 +1738,60 @@ export default function SellerQuotationPage() {
         });
         brandDisplays.sort((a, b) => a.pricePerUnit - b.pricePerUnit || a.brandName.localeCompare(b.brandName));
 
-        const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
-        const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id}));
+          const lowestPriceOverall = brandDisplays.length > 0 ? brandDisplays[0].pricePerUnit : null;
+          const myOffers = offersData.filter(o => o.supplierId === supplierId).map(o => ({...o, uiId: o.id!}));
 
-        let counterProposalInfo: ProductToQuoteVM['counterProposalInfo'] = null;
-        let isLockedOut = false;
-        const myOffersWithPrice = myOffers.filter(o => o.pricePerUnit > 0);
+          // Calcula contraproposta e lockout usando hook
+          const { counterProposalInfo, isLockedOut } = calculateCounterProposalStatus(
+            quotation,
+            supplierId,
+            offersData,
+            lowestPriceOverall
+          );
 
-        if (myOffersWithPrice.length > 0) {
-          const myBestOffer = myOffersWithPrice.reduce((prev, curr) => (prev.pricePerUnit < curr.pricePerUnit ? prev : curr));
-          const myBestPrice = myBestOffer.pricePerUnit;
+          // Get local offers that are not yet saved to Firestore
+          const localUnsavedOffers = product.supplierOffers.filter(o => !o.id);
 
-          if(lowestPriceOverall && myBestPrice > lowestPriceOverall) {
-            const outbidOffer = offersData
-              .filter(o => o.supplierId !== supplierId && o.pricePerUnit === lowestPriceOverall && o.updatedAt instanceof Timestamp)
-              .sort((a, b) => (b.updatedAt as Timestamp).toMillis() - (a.updatedAt as Timestamp).toMillis())[0];
-
-            const counterProposalMins = quotation.counterProposalTimeInMinutes ?? 15;
-
-            if (outbidOffer && outbidOffer.updatedAt instanceof Timestamp) {
-              const deadline = new Date(outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000);
-
-              // Check if there are multiple competing suppliers (not just first offer)
-              const competingSuppliersCount = new Set(offersData.filter(o => o.pricePerUnit > 0).map(o => o.supplierId)).size;
-
-              // Check if main quotation is still open
-              const isQuotationOpen = quotation.status === 'Aberta' && quotation.deadline && new Date() < quotation.deadline.toDate();
-
-              if (new Date() < deadline) {
-                counterProposalInfo = {
-                  deadline,
-                  winningBrand: outbidOffer.brandOffered,
-                  myBrand: myBestOffer.brandOffered,
-                };
-              } else if (competingSuppliersCount > 1 && !isQuotationOpen) {
-                // Only lock out if there are competing offers AND main quotation is closed
-                isLockedOut = true;
-              }
-            }
-          }
-        }
-
-        // Update the specific product
-        console.log('[LISTENER] Processing product update for:', product.id);
-        const listenerStartTime = performance.now();
-        setProductsToQuote(currentProducts => {
-          return currentProducts.map(p => {
-            if (p.id === product.id) {
-              // Get local offers that are not yet saved to Firestore
-              const localUnsavedOffers = p.supplierOffers.filter(o => !o.id);
-
-              // From the unsaved local offers, filter out any that now exist in Firestore
-              const trulyLocalOffers = localUnsavedOffers.filter(localOffer => {
-                const hasMatchInFirestore = myOffers.some(firestoreOffer =>
-                  firestoreOffer.brandOffered === localOffer.brandOffered &&
-                  firestoreOffer.supplierId === localOffer.supplierId &&
-                  Number(firestoreOffer.totalPackagingPrice) === Number(localOffer.totalPackagingPrice) &&
-                  Number(firestoreOffer.unitsInPackaging) === Number(localOffer.unitsInPackaging) &&
-                  firestoreOffer.packagingDescription === localOffer.packagingDescription
-                );
-                return !hasMatchInFirestore;
-              });
-
-              // The new list of offers is the one from Firestore plus any truly local ones that haven't been saved
-              const updatedOffers = [...myOffers, ...trulyLocalOffers].sort((a, b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
-
-              return {
-                ...p,
-                supplierOffers: updatedOffers,
-                bestOffersByBrand: brandDisplays,
-                lowestPriceThisProductHas: lowestPriceOverall,
-                counterProposalInfo,
-                isLockedOut
-              };
-            }
-            return p;
+          // From the unsaved local offers, filter out any that now exist in Firestore
+          const trulyLocalOffers = localUnsavedOffers.filter(localOffer => {
+            const hasMatchInFirestore = myOffers.some(firestoreOffer =>
+              firestoreOffer.brandOffered === localOffer.brandOffered &&
+              firestoreOffer.supplierId === localOffer.supplierId &&
+              Number(firestoreOffer.totalPackagingPrice) === Number(localOffer.totalPackagingPrice) &&
+              Number(firestoreOffer.unitsInPackaging) === Number(localOffer.unitsInPackaging) &&
+              firestoreOffer.packagingDescription === localOffer.packagingDescription
+            );
+            return !hasMatchInFirestore;
           });
+
+          // The new list of offers is the one from Firestore plus any truly local ones that haven't been saved
+          const updatedOffers = [...myOffers, ...trulyLocalOffers].sort((a, b) => (a.brandOffered || '').localeCompare(b.brandOffered || ''));
+
+          return {
+            ...product,
+            supplierOffers: updatedOffers,
+            bestOffersByBrand: brandDisplays,
+            lowestPriceThisProductHas: lowestPriceOverall,
+            counterProposalInfo,
+            isLockedOut
+          };
         });
-        const listenerEndTime = performance.now();
-        const totalListenerTime = listenerEndTime - snapshotStartTime;
-        console.log(`[LISTENER] setState took ${(listenerEndTime - listenerStartTime).toFixed(2)}ms`);
-        console.log(`[LISTENER] Total listener time for ${product.id}: ${totalListenerTime.toFixed(2)}ms`);
-      }, (error) => {
-        console.error(`🔴 [Portal] Error in offers listener for product ${product.id}:`, error);
       });
+
+      const listenerEndTime = performance.now();
+      const totalListenerTime = listenerEndTime - snapshotStartTime;
+      console.log(`[LISTENER] setState took ${(listenerEndTime - listenerStartTime).toFixed(2)}ms`);
+      console.log(`[LISTENER] Total listener time: ${totalListenerTime.toFixed(2)}ms`);
+    }, (error) => {
+      console.error(`🔴 [Portal] Error in SINGLE offers listener:`, error);
     });
 
-    return () => {
-      unsubscribers.forEach(unsub => unsub());
-    };
+    return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotationId, supplierId, currentSupplierDetails, toast, isLoading, quotation]);
   
-  // Effect for component unmount cleanup - only runs once
-  useEffect(() => {
-    // This is the ref to be used in the cleanup function.
-    // It's a snapshot of the ref when the effect was created.
-    const timers = activeTimersRef.current;
-    return () => {
-      console.log("[Reminder] Component unmounting. Clearing all active timers.");
-      timers.forEach(clearTimeout);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Hook de lembretes de contraproposta
+  useCounterProposalReminders(productsToQuote, quotation, currentSupplierDetails);
 
   // Effect for voice narration when user actively changes tabs
   useEffect(() => {
@@ -1908,78 +1809,6 @@ export default function SellerQuotationPage() {
       }
     }
   }, [activeCategoryTab, hasSpokenTabMessage, speak]);
-
-  // Effect to schedule and manage counter-proposal reminders
-  useEffect(() => {
-    if (!quotation || !currentSupplierDetails || productsToQuote.length === 0) {
-      return;
-    }
-
-    const requiredReminders = new Set<string>();
-
-    productsToQuote.forEach(product => {
-      const { counterProposalInfo } = product;
-      if (
-        counterProposalInfo &&
-        quotation.counterProposalTimeInMinutes &&
-        quotation.counterProposalReminderPercentage &&
-        quotation.counterProposalReminderPercentage > 0 &&
-        new Date() < counterProposalInfo.deadline
-      ) {
-        // The key must be unique for each combination of product and the supplier's brand that was outbid.
-        const reminderKey = `${product.id}-${counterProposalInfo.myBrand}`;
-        requiredReminders.add(reminderKey);
-      }
-    });
-
-    // Clean up obsolete timers
-    const currentTimers = activeTimersRef.current;
-    currentTimers.forEach((timerId, reminderKey) => {
-      if (!requiredReminders.has(reminderKey)) {
-        console.log(`[Reminder] Clearing obsolete reminder: ${reminderKey}`);
-        clearTimeout(timerId);
-        currentTimers.delete(reminderKey);
-      }
-    });
-
-    // Set new timers
-    requiredReminders.forEach(reminderKey => {
-      if (!currentTimers.has(reminderKey)) {
-        const [productId, myBrand] = reminderKey.split(/-(.*)/s);
-        const product = productsToQuote.find(p => p.id === productId && p.counterProposalInfo?.myBrand === myBrand);
-
-        if (product && product.counterProposalInfo) {
-          const { deadline } = product.counterProposalInfo;
-          const totalDurationMs = quotation.counterProposalTimeInMinutes! * 60 * 1000;
-          const reminderPercentage = quotation.counterProposalReminderPercentage!;
-          
-          const remindBeforeEndMs = totalDurationMs * (reminderPercentage / 100);
-          const timeoutDelayMs = deadline.getTime() - remindBeforeEndMs - Date.now();
-          const minutesLeftForMessage = Math.round(remindBeforeEndMs / 60000);
-
-          if (timeoutDelayMs > 0 && minutesLeftForMessage > 0) {
-            console.log(`[Reminder] Scheduling new reminder for ${product.name} (${myBrand}) in ${timeoutDelayMs / 1000}s.`);
-            
-            const timerId = setTimeout(() => {
-              console.log(`[Reminder] Sending reminder for ${product.name} (${myBrand}).`);
-              if (currentSupplierDetails && myBrand && quotation.userId) {
-                  sendCounterProposalReminder(
-                    currentSupplierDetails,
-                    product.name,
-                    myBrand,
-                    minutesLeftForMessage,
-                    quotation.userId
-                  );
-              }
-              currentTimers.delete(reminderKey);
-            }, timeoutDelayMs);
-
-            currentTimers.set(reminderKey, timerId);
-          }
-        }
-      }
-    });
-  }, [productsToQuote, quotation, currentSupplierDetails]);
 
   const toggleProductExpansion = (productId: string) => {
     const wasExpanded = expandedProductIds.includes(productId);
@@ -2081,7 +1910,7 @@ export default function SellerQuotationPage() {
 
     // Criar nova oferta com dados do fluxo guiado
     const newOfferUiId = Date.now().toString() + Math.random().toString(36).substring(2,7);
-    const pricePerUnit = flow.packagePrice / (flow.unitsPerPackage || 1);
+    const pricePerUnit = flow.packagePrice / ((flow.unitsPerPackage || 1) * (flow.packageWeight || 1));
     
     const newOffer: OfferWithUI = {
       uiId: newOfferUiId,
@@ -2490,11 +2319,6 @@ export default function SellerQuotationPage() {
     });
   };
 
-  const isCounterProposalExpired = (product: ProductToQuoteVM): boolean => {
-    if (!product.counterProposalInfo) return false;
-    return new Date() > product.counterProposalInfo.deadline;
-  };
-
   const toggleEditMode = (productId: string, offerUiId: string) => {
     const editKey = `${productId}_${offerUiId}`;
     setEditingOffers(prev => {
@@ -2601,9 +2425,12 @@ export default function SellerQuotationPage() {
   };
 
   const handleSuggestedBrandClick = (productId: string, brandName: string) => {
+    // Verificação de segurança: bloquear se cotação encerrada
+    if (checkAndBlockIfQuotationEnded()) return;
+
     // Iniciar o fluxo guiado do vendedor
     initVendorFlow(productId, brandName);
-    
+
     // Narração após selecionar marca
     const product = productsToQuote.find(p => p.id === productId);
     if (product) {
@@ -2665,10 +2492,13 @@ export default function SellerQuotationPage() {
   }, [productsToQuote]);
 
   const calculatePricePerUnit = (offer: OfferWithUI | Partial<OfferWithUI>): number | null => {
-    const units = Number(offer.unitsInPackaging);
+    const unitsPerPackage = Number(offer.unitsPerPackage);
     const price = Number(offer.totalPackagingPrice);
-    if (!isNaN(units) && !isNaN(price) && units > 0 && price > 0) {
-      return price / units;
+    const weight = Number(offer.unitWeight);
+
+    if (!isNaN(unitsPerPackage) && !isNaN(price) && !isNaN(weight) && unitsPerPackage > 0 && price > 0 && weight > 0) {
+      // Cálculo correto: preço / (unidades_por_embalagem × peso_unitário)
+      return price / (unitsPerPackage * weight);
     }
     return null;
   };
@@ -2704,18 +2534,19 @@ export default function SellerQuotationPage() {
     const offerData = product.supplierOffers[offerToSaveIndex];
 
     const unitsInPackaging = Number(offerData.unitsInPackaging);
+    const unitsPerPackage = Number(offerData.unitsPerPackage);
     const unitWeight = Number(offerData.unitWeight);
     const totalPackagingPrice = Number(offerData.totalPackagingPrice);
 
-    console.log('[SAVE] Validation:', { unitsInPackaging, unitWeight, totalPackagingPrice });
+    console.log('[SAVE] Validation:', { unitsInPackaging, unitsPerPackage, unitWeight, totalPackagingPrice });
 
-    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
+    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitsPerPackage) || unitsPerPackage <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
       console.log('[SAVE] Validation failed');
       toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive", duration: 7e3});
       return false;
     }
 
-    const pricePerUnit = totalPackagingPrice / unitsInPackaging;
+    const pricePerUnit = totalPackagingPrice / (unitsPerPackage * unitWeight);
     console.log('[SAVE] Price per unit:', pricePerUnit);
 
     const bestCompetitorOffer = product.bestOffersByBrand.find(o => o.supplierId !== supplierId);
@@ -2746,52 +2577,22 @@ export default function SellerQuotationPage() {
 
     const previousBestOffer = product.bestOffersByBrand.length > 0 ? product.bestOffersByBrand[0] : null;
 
-    if (previousBestOffer && !previousBestOffer.isSelf && pricePerUnit < previousBestOffer.pricePerUnit) {
-      console.log(`[Action Trigger] Condition met to notify for product ${product.name}. My price ${pricePerUnit} is less than ${previousBestOffer.pricePerUnit}.`);
-      let outbidSupplierDetails = supplierDetailsCache.current.get(previousBestOffer.supplierId);
-      
-      if (!outbidSupplierDetails) {
-          try {
-              const docSnap = await getDoc(doc(db, FORNECEDORES_COLLECTION, previousBestOffer.supplierId));
-              if (docSnap.exists()) {
-                  outbidSupplierDetails = { id: docSnap.id, ...docSnap.data() } as SupplierType;
-                  supplierDetailsCache.current.set(previousBestOffer.supplierId, outbidSupplierDetails);
-              }
-          } catch(err) {
-              console.error(`[Action Trigger] Failed to fetch outbid supplier details for ID ${previousBestOffer.supplierId}`, err);
-          }
-      }
-      
-      if (outbidSupplierDetails) {
-        const supplierInfo = {
-            whatsapp: outbidSupplierDetails.whatsapp,
-            empresa: outbidSupplierDetails.empresa,
-        };
-        sendOutbidNotification(
-          supplierInfo,
-          {
-            productName: product.name,
-            brandName: previousBestOffer.brandName,
-            newBestPriceFormatted: formatCurrency(pricePerUnit, false),
-            unitAbbreviated: abbreviateUnit(product.unit),
-            winningSupplierName: currentSupplierDetails.empresa,
-            counterProposalTimeInMinutes: quotation.counterProposalTimeInMinutes ?? 15,
-          },
-          quotation.userId
-        ).then(result => {
-           if (!result.success) {
-               toast({
-                   title: "Falha na Notificação",
-                   description: `Não foi possível notificar o concorrente sobre a contraproposta. Erro: ${result.error}`,
-                   variant: "destructive"
-               });
-           }
+    // Handle outbid notification
+    await handleOutbidNotification({
+      previousBestOffer,
+      newPricePerUnit: pricePerUnit,
+      product,
+      quotation,
+      currentSupplierDetails,
+      supplierDetailsCache: supplierDetailsCache.current,
+      onError: (message) => {
+        toast({
+          title: "Falha na Notificação",
+          description: message,
+          variant: "destructive"
         });
-
-      } else {
-        console.warn(`[Action Trigger] Could not find details for outbid supplier ID: ${previousBestOffer.supplierId}`);
       }
-    }
+    });
 
     const offerPayload: Omit<Offer, 'id'> = {
       quotationId: quotationId, // Adicionar campo obrigatório
@@ -3002,8 +2803,6 @@ export default function SellerQuotationPage() {
       </div>
     );
   }
-
-  const isQuotationEnded = isDeadlinePassed || quotation.status === 'Fechada' || quotation.status === 'Concluída';
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
@@ -3263,7 +3062,22 @@ export default function SellerQuotationPage() {
                                                   </div>
                                               </div>
                                               <div className="text-right shrink-0">
-                                                  <p className="text-base font-bold text-orange-600 leading-tight">{formatCurrency(request.pricePerUnit)} / {abbreviateUnit(product.unit)}</p>
+                                                  <p className="text-base font-bold text-orange-600 leading-tight">
+                                                    {(() => {
+                                                      // Fallback: recalcula preço se estiver inválido
+                                                      if (request.pricePerUnit && !isNaN(request.pricePerUnit)) {
+                                                        return formatCurrency(request.pricePerUnit);
+                                                      }
+                                                      // Recalcular se temos os dados necessários
+                                                      if (request.totalPackagingPrice && request.unitsInPackaging && request.unitWeight) {
+                                                        const calculated = request.totalPackagingPrice / (request.unitsInPackaging * request.unitWeight);
+                                                        return formatCurrency(calculated);
+                                                      }
+                                                      return "-";
+                                                    })()}
+                                                    {" / "}
+                                                    {abbreviateUnit(product.unit)}
+                                                  </p>
                                                   <div className="mt-1">
                                                     <Badge variant="outline" className="text-xs border-orange-600 text-orange-700">
                                                       Aguardando Aprovação
@@ -3290,6 +3104,20 @@ export default function SellerQuotationPage() {
                                     </div>
                                 )}
                                  <CardContent className={`p-4 space-y-4 ${isDeliveryMismatch && !product.acknowledgedDeliveryMismatches?.includes(supplierId) ? 'opacity-40 pointer-events-none' : ''}`}>
+                                     {(() => {
+                                       // Calcula bloqueio para badges
+                                       const { isBadgeDisabled } = calculateBlockingRules({
+                                         isQuotationEnded,
+                                         isLockedOut,
+                                         isStoppedQuoting: stoppedQuotingProducts.has(product.id),
+                                         counterProposalInfo: product.counterProposalInfo,
+                                         isOfferSaved: false,
+                                         isInEditMode: false,
+                                         isSaving: false
+                                       });
+
+                                     return (
+                                     <>
                                      {isLockedOut && (
                                           <Alert variant="destructive">
                                               <AlertTriangle className="h-4 w-4" />
@@ -3318,14 +3146,14 @@ export default function SellerQuotationPage() {
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="font-medium text-muted-foreground mr-1">Marcas Sugeridas:</span>
                                             {getPreferredBrandsArray(product.preferredBrands).map(brand => (
-                                                <Badge key={brand.trim()} variant="outline" onClick={() => !isLockedOut && handleSuggestedBrandClick(product.id, brand.trim())} className={isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}>{brand.trim()}</Badge>
+                                                <Badge key={brand.trim()} variant="outline" onClick={() => !isBadgeDisabled && handleSuggestedBrandClick(product.id, brand.trim())} className={isBadgeDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}>{brand.trim()}</Badge>
                                             ))}
                                           </div>
                                         )}
-                                        <Badge 
-                                          variant="outline" 
-                                          onClick={() => !isLockedOut && openNewBrandModal(product.id, product.name, product.unit)} 
-                                          className={`border-primary/70 text-primary/90 ${isLockedOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}
+                                        <Badge
+                                          variant="outline"
+                                          onClick={() => !isBadgeDisabled && openNewBrandModal(product.id, product.name, product.unit)}
+                                          className={`border-primary/70 text-primary/90 ${isBadgeDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted hover:border-primary/50'}`}
                                         >
                                           <PlusCircle className="mr-1.5 h-3 w-3" /> Outra Marca
                                         </Badge>
@@ -3389,30 +3217,16 @@ export default function SellerQuotationPage() {
                                          }, 0);
                                        }
       
-                                       // Calcular condições de desabilitação
-                                       const isOfferDisabled = Boolean(
-                                         isQuotationEnded ||
-                                         isLockedOut ||
-                                         stoppedQuotingProducts.has(product.id) ||
-                                         isCounterProposalExpired(product) ||
-                                         (offer.id && !isInEditMode(product.id, offer.uiId))
-                                       );
-
-                                       // Brand field is disabled for suggested brands (non-editable display)
-                                       const isBrandFieldDisabled = Boolean(
-                                         isOfferDisabled ||
-                                         offer.isSuggestedBrand
-                                       );
-
-                                       // Debug logging removed to improve performance
-
-                                       const isButtonDisabled = Boolean(
-                                         isSaving[savingKey] ||
-                                         isQuotationEnded ||
-                                         isLockedOut ||
-                                         stoppedQuotingProducts.has(product.id) ||
-                                         isCounterProposalExpired(product)
-                                       );
+                                       // Calcular condições de bloqueio usando hook
+                                       const { isOfferDisabled, isBrandFieldDisabled, isButtonDisabled } = calculateBlockingRules({
+                                         isQuotationEnded,
+                                         isLockedOut,
+                                         isStoppedQuoting: stoppedQuotingProducts.has(product.id),
+                                         counterProposalInfo: product.counterProposalInfo,
+                                         isOfferSaved: !!offer.id,
+                                         isInEditMode: isInEditMode(product.id, offer.uiId),
+                                         isSaving: isSaving[savingKey] || false
+                                       }, offer.isSuggestedBrand);
                                        
                                        if (hasMyOffers && pricePerUnit !== null && bestCompetitorOfferOverall) {
                                           if(pricePerUnit <= bestCompetitorOfferOverall.pricePerUnit) {
@@ -3554,6 +3368,9 @@ export default function SellerQuotationPage() {
                                          </div>
                                        );
                                      })}
+                                     </>
+                                     );
+                                     })()}
                                  </CardContent>
                               </div>
                           )}
@@ -3702,9 +3519,9 @@ export default function SellerQuotationPage() {
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={submitNewBrandRequest}
-              disabled={isSubmittingNewBrand || !newBrandForm.brandName.trim() || newBrandForm.unitsInPackaging <= 0 || newBrandForm.totalPackagingPrice <= 0}
+              disabled={isSubmittingNewBrand || !newBrandForm.brandName.trim() || newBrandForm.unitsInPackaging <= 0 || newBrandForm.unitWeight <= 0 || newBrandForm.totalPackagingPrice <= 0}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isSubmittingNewBrand ? (
