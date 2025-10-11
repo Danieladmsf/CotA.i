@@ -118,6 +118,15 @@ interface BestOfferForBrandDisplay {
   productUnit: UnitOfMeasure;
 }
 
+interface NewBrandForm {
+  brandName: string;
+  packagingDescription: string;
+  unitsInPackaging: number;
+  unitWeight: number;
+  totalPackagingPrice: number;
+  imageFile: File | null;
+}
+
 // Dynamic label and placeholder functions based on product unit
 const getDynamicWeightLabel = (unit: string): string => {
   switch (unit) {
@@ -692,7 +701,16 @@ const renderNewBrandFlowCard = (
   parseWeightInputForKg: (value: string) => number,
   isSubmittingNewBrand: boolean
 ) => {
-  const { currentStep, brandName, packagingType, unitsPerPackage, packageWeight, packagePrice, requiredPackages, imageFile } = flow;
+  const {
+    currentStep,
+    brandName = '',
+    packagingType = '',
+    unitsPerPackage = 0,
+    packageWeight = 0,
+    packagePrice = 0,
+    requiredPackages = 0,
+    imageFile = null
+  } = flow || {};
 
   const renderStep = () => {
     switch (currentStep) {
@@ -1138,13 +1156,13 @@ export default function SellerQuotationPage() {
     productName: '',
     productUnit: '' as UnitOfMeasure | ''
   });
-  const [newBrandForm, setNewBrandForm] = useState({
+  const [newBrandForm, setNewBrandForm] = useState<NewBrandForm>({
     brandName: '',
     packagingDescription: '',
     unitsInPackaging: 0,
     unitWeight: 0,
     totalPackagingPrice: 0,
-    imageFile: null as File | null
+    imageFile: null
   });
   const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
@@ -1158,7 +1176,6 @@ export default function SellerQuotationPage() {
     if (closingQuotationsRef.current.has(quotationId)) {
         return;
     }
-    console.log(`[SellerPortal] Deadline passed for quotation ${quotationId}. Triggering auto-close action from portal page.`);
     closingQuotationsRef.current.add(quotationId);
 
     // Optimistic UI update
@@ -1172,7 +1189,6 @@ export default function SellerQuotationPage() {
         description: "O prazo para esta cotação terminou. Não é mais possível enviar ou editar ofertas.",
       });
     } else if (!result.success) {
-      console.error("Portal: Failed to auto-close quotation:", result.error);
       setQuotation(prev => prev ? { ...prev, status: originalQuotationStatus || 'Aberta' } : null);
       toast({
         title: "Erro ao Encerrar Cotação",
@@ -1232,7 +1248,6 @@ export default function SellerQuotationPage() {
       );
       toast({ title: "Confirmação Salva", description: "Sua confirmação de entrega foi registrada." });
     } catch (error: any) {
-      console.error("Error acknowledging delivery mismatch:", error);
       toast({ title: "Erro ao Salvar Confirmação", description: error.message, variant: "destructive" });
     }
   };
@@ -1319,7 +1334,6 @@ export default function SellerQuotationPage() {
       const data = await response.json();
       return data.url;
     } catch (error: any) {
-      console.error('Upload error:', error);
       throw new Error('Falha no upload da imagem: ' + error.message);
     }
   };
@@ -1348,7 +1362,7 @@ export default function SellerQuotationPage() {
         try {
           imageUrl = await uploadImageToVercelBlob(newBrandForm.imageFile);
         } catch (error: any) {
-          console.warn('Image upload failed, continuing without image:', error);
+          // Image upload failed, continuing without image
         }
       }
 
@@ -1391,12 +1405,21 @@ export default function SellerQuotationPage() {
       }
 
       const result = await response.json();
-      
-      toast({ 
-        title: "Solicitação Enviada!", 
-        description: "Sua nova marca foi enviada para aprovação do comprador.",
-        variant: "default"
-      });
+
+      // Check for notification error
+      if (result.notificationError) {
+        toast({
+          title: "Solicitação Enviada com Aviso",
+          description: `Marca enviada, mas notificação falhou: ${result.notificationError}`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Solicitação Enviada!",
+          description: "Sua nova marca foi enviada para aprovação do comprador.",
+          variant: "default"
+        });
+      }
 
       speak(voiceMessages.success.brandRequestSent);
 
@@ -1407,8 +1430,6 @@ export default function SellerQuotationPage() {
       }
 
     } catch (error: any) {
-      console.error("Error submitting brand request:", error);
-      
       if (error.code === 'permission-denied') {
         toast({ 
           title: "Erro de Permissão", 
@@ -1463,7 +1484,6 @@ export default function SellerQuotationPage() {
         supplierDetailsCache.current.set(supplierId, fetchedSupplier);
 
       } catch (error: any) {
-        console.error("ERROR fetching supplier data:", error);
         toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
         speak(voiceMessages.error.loadFailed);
         setIsLoading(false);
@@ -1485,41 +1505,46 @@ export default function SellerQuotationPage() {
     setHasSpokenTabMessage,
   });
 
-  // Effect to listen for pending brand requests
+  // Effect to listen for brand requests
+  // NOTE: Approved brands automatically become offers and are not shown here
+  // Only pending (orange) and rejected (red) requests are displayed
   useEffect(() => {
     if (!quotationId || !supplierId) return;
 
-    const pendingRequestsQuery = query(
+    const brandRequestsQuery = query(
       collection(db, PENDING_BRAND_REQUESTS_COLLECTION),
       where("quotationId", "==", quotationId),
-      where("supplierId", "==", supplierId),
-      where("status", "==", "pending")
+      where("supplierId", "==", supplierId)
+      // Query all statuses but filter client-side to show only pending/rejected
     );
 
-    const unsubscribe = onSnapshot(pendingRequestsQuery, (snapshot) => {
-      const pendingRequests = snapshot.docs.map(doc => ({
+    const unsubscribe = onSnapshot(brandRequestsQuery, (snapshot) => {
+      const brandRequests = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as PendingBrandRequest));
 
-      console.log('🔶 Pending requests loaded:', pendingRequests.length);
+      // Filtrar apenas pending e rejected (approved vira oferta automaticamente)
+      const visibleRequests = brandRequests.filter(req => req.status === 'pending' || req.status === 'rejected');
+
+      console.log('🔵 [Brand Requests] Total recebidas:', brandRequests.length);
+      console.log('🔵 [Brand Requests] Visíveis (pending/rejected):', visibleRequests.length);
+      console.log('🔵 [Brand Requests] Status:', brandRequests.map(r => ({ id: r.id, brand: r.brandName, status: r.status })));
 
       // Armazena no cache para uso na carga inicial de produtos
-      setPendingRequestsCache(pendingRequests);
+      setPendingRequestsCache(visibleRequests);
 
-      // Update products to include pending requests (se já existem produtos)
+      // Update products to include visible brand requests (se já existem produtos)
       setProductsToQuote(prevProducts => {
         if (prevProducts.length === 0) {
-          console.log('🔶 Products not loaded yet, requests cached for later');
           return prevProducts;
         }
 
         return prevProducts.map(product => {
-          const productPendingRequests = pendingRequests.filter(req => req.productId === product.id);
-          console.log(`🔶 Product ${product.name} pending requests:`, productPendingRequests);
+          const productBrandRequests = visibleRequests.filter(req => req.productId === product.id);
           return {
             ...product,
-            pendingBrandRequests: productPendingRequests
+            pendingBrandRequests: productBrandRequests // Mantém o nome do campo por compatibilidade
           };
         });
       });
@@ -1555,9 +1580,6 @@ export default function SellerQuotationPage() {
 
             // Aplica pending requests do cache se existirem
             const productPendingRequests = pendingRequestsCache.filter(req => req.productId === docSnap.id);
-            if (productPendingRequests.length > 0) {
-              console.log(`🔶 Applying cached pending requests to ${itemData.name}:`, productPendingRequests.length);
-            }
 
             return {
               ...itemData,
@@ -1582,7 +1604,6 @@ export default function SellerQuotationPage() {
           const updatedDoc = snapshot.docs.find(doc => doc.id === product.id);
           if (updatedDoc) {
             const updatedData = updatedDoc.data() as ShoppingListItem;
-            console.log(`📦 Updated product ${product.name} with new preferredBrands:`, updatedData.preferredBrands);
             return {
               ...product,
               preferredBrands: updatedData.preferredBrands,
@@ -1604,8 +1625,6 @@ export default function SellerQuotationPage() {
   useEffect(() => {
     if (!quotationId || !supplierId || productsToQuote.length === 0 || !currentSupplierDetails || isLoading || !quotation) return ()=>{};
 
-    console.log('[LISTENER] Setting up SINGLE offers listener for all products');
-
     // OPTIMIZED: Single listener for ALL offers in this quotation using collectionGroup
     const offersCollectionGroupQuery = query(
       collectionGroup(db, 'offers'),
@@ -1614,7 +1633,6 @@ export default function SellerQuotationPage() {
 
     const unsubscribe = onSnapshot(offersCollectionGroupQuery, async (offersSnapshot) => {
       const snapshotStartTime = performance.now();
-      console.log('[LISTENER] Single offers snapshot received, total docs:', offersSnapshot.docs.length);
 
       // Group offers by productId
       const offersByProduct = new Map<string, Offer[]>();
@@ -1641,7 +1659,6 @@ export default function SellerQuotationPage() {
       });
 
       if (newSupplierIdsToFetch.size > 0) {
-        console.log('[LISTENER] Fetching supplier details for:', Array.from(newSupplierIdsToFetch));
         const fetchPromises = Array.from(newSupplierIdsToFetch).map(async (sid) => {
           try {
             const supplierDoc = await getDoc(doc(db, FORNECEDORES_COLLECTION, sid));
@@ -1649,12 +1666,11 @@ export default function SellerQuotationPage() {
               supplierDetailsCache.current.set(sid, { ...supplierDoc.data(), id: sid } as SupplierType);
             }
           } catch (err) {
-            console.error(`Error fetching supplier details for ID ${sid}:`, err);
+            // Error fetching supplier details
           }
         });
         await Promise.all(fetchPromises);
         const fetchEndTime = performance.now();
-        console.log(`[LISTENER] Supplier fetch took ${(fetchEndTime - fetchStartTime).toFixed(2)}ms`);
       }
 
       // Process each product's offers
@@ -1780,10 +1796,8 @@ export default function SellerQuotationPage() {
 
       const listenerEndTime = performance.now();
       const totalListenerTime = listenerEndTime - snapshotStartTime;
-      console.log(`[LISTENER] setState took ${(listenerEndTime - listenerStartTime).toFixed(2)}ms`);
-      console.log(`[LISTENER] Total listener time: ${totalListenerTime.toFixed(2)}ms`);
     }, (error) => {
-      console.error(`🔴 [Portal] Error in SINGLE offers listener:`, error);
+      // Error in SINGLE offers listener
     });
 
     return () => unsubscribe();
@@ -1937,8 +1951,6 @@ export default function SellerQuotationPage() {
     
     // Se há variação significativa, registrar para possível notificação futura
     if (!quantityValidation.isValid && quotation) {
-      console.log(`[VENDOR_FLOW] Detected ${quantityValidation.variationType} variation of ${quantityValidation.variationPercentage.toFixed(1)}% for product ${product.name}`);
-      
       // Mostrar toast informativo para o fornecedor
       toast({
         title: "Variação de Quantidade Detectada",
@@ -1949,8 +1961,6 @@ export default function SellerQuotationPage() {
 
     try {
       // Salvar automaticamente no Firestore
-      console.log('[VENDOR_FLOW] Auto-saving offer to Firestore');
-
       const offerPayload: Omit<Offer, 'id'> = {
         quotationId: quotationId,
         supplierId: currentSupplierDetails.id,
@@ -1969,13 +1979,6 @@ export default function SellerQuotationPage() {
 
       const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
       const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
-      
-      console.log(`[VENDOR_FLOW] Auto-save complete, doc ID: ${newOfferDocRef.id}`);
-
-      // Verificar variação de quantidade e registrar (após salvamento bem-sucedido)
-      if (!quantityValidation.isValid && quotation) {
-        console.log(`[VENDOR_FLOW] Quantity variation logged for saved offer`);
-      }
 
       // Atualizar estado local com a oferta salva (incluindo o ID do Firestore)
       const savedOffer: OfferWithUI = {
@@ -2006,8 +2009,6 @@ export default function SellerQuotationPage() {
       setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
 
     } catch (error: any) {
-      console.error('[VENDOR_FLOW] Error auto-saving offer:', error);
-      
       // Em caso de erro, ainda adicionar ao estado local para não perder o trabalho
       setProductsToQuote(prevProducts =>
         prevProducts.map(p => {
@@ -2111,8 +2112,6 @@ export default function SellerQuotationPage() {
     
     // Se há variação significativa, mostrar toast informativo
     if (!quantityValidation.isValid) {
-      console.log(`[NEW_BRAND] Detected ${quantityValidation.variationType} variation of ${quantityValidation.variationPercentage.toFixed(1)}% for product ${product.name}`);
-      
       toast({
         title: "Variação de Quantidade Detectada",
         description: `Sua nova marca tem ${quantityValidation.variationPercentage.toFixed(1)}% de variação ${quantityValidation.variationType === 'over' ? 'acima' : 'abaixo'} do pedido.`,
@@ -2139,28 +2138,54 @@ export default function SellerQuotationPage() {
         imageUrl = await uploadImageToVercelBlob(flow.imageFile);
       }
 
-      // Criar request de nova marca
-      const brandRequest = {
+      // Calcular preço por unidade
+      const pricePerUnit = flow.packagePrice / (flow.unitsPerPackage * flow.packageWeight);
+
+      // Criar request de nova marca usando a API
+      const brandRequestData = {
         quotationId: quotationId,
-        supplierId: currentSupplierDetails.id,
-        supplierName: currentSupplierDetails.empresa,
         productId: productId,
         productName: product.name,
+        supplierId: currentSupplierDetails.id,
+        supplierName: currentSupplierDetails.empresa,
+        supplierInitials: currentSupplierDetails.vendedor.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
         brandName: flow.brandName,
         packagingDescription: `${flow.unitsPerPackage} unidades por embalagem`,
-        unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
+        unitsInPackaging: flow.requiredPackages || 1,
         unitsPerPackage: flow.unitsPerPackage,
         unitWeight: flow.packageWeight,
         totalPackagingPrice: flow.packagePrice,
+        pricePerUnit: pricePerUnit,
         imageUrl: imageUrl,
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-        requestedBy: sellerUser?.uid || '',
-        sellerId: sellerUser?.uid || ''
+        imageFileName: flow.imageFile?.name || '',
+        buyerUserId: quotation.userId,
+        sellerUserId: sellerUser?.uid || currentSupplierDetails.id
       };
 
-      // Enviar para Firestore
-      await addDoc(collection(db, PENDING_BRAND_REQUESTS_COLLECTION), brandRequest);
+      console.log('\n🟢 [completeNewBrandFlow] Enviando para API /api/brand-request');
+      console.log('🟢 [completeNewBrandFlow] Dados:', brandRequestData);
+
+      // Enviar para API que cria a brand request E a notificação
+      const response = await fetch('/api/brand-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(brandRequestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao enviar solicitação');
+      }
+
+      const result = await response.json();
+      console.log('✅ [completeNewBrandFlow] Resposta da API:', result);
+
+      // Check for notification error
+      if (result.notificationError) {
+        console.error('🚨 [completeNewBrandFlow] Notification failed:', result.notificationError);
+      }
 
       toast({ 
         title: "Solicitação Enviada!", 
@@ -2174,11 +2199,10 @@ export default function SellerQuotationPage() {
       cancelNewBrandFlow(productId);
 
     } catch (error: any) {
-      console.error("Error submitting brand request:", error);
-      toast({ 
-        title: "Erro ao Enviar Solicitação", 
-        description: error.message || "Erro desconhecido. Tente novamente.", 
-        variant: "destructive" 
+      toast({
+        title: "Erro ao Enviar Solicitação",
+        description: error.message || "Erro desconhecido. Tente novamente.",
+        variant: "destructive"
       });
     } finally {
       setIsSubmittingNewBrand(false);
@@ -2186,8 +2210,6 @@ export default function SellerQuotationPage() {
   };
 
   const handleOfferChange = (productId: string, offerUiId: string, field: keyof OfferWithUI, value: string | number | boolean) => {
-    console.log('[OFFER_CHANGE] Called with:', { productId, offerUiId, field, value });
-    const startTime = performance.now();
     setProductsToQuote(prevProducts =>
       prevProducts.map(p =>
         p.id === productId
@@ -2200,8 +2222,6 @@ export default function SellerQuotationPage() {
           : p
       )
     );
-    const endTime = performance.now();
-    console.log(`[OFFER_CHANGE] Completed in ${(endTime - startTime).toFixed(2)}ms`);
   };
 
   // Handlers de narração para campos do formulário
@@ -2505,24 +2525,20 @@ export default function SellerQuotationPage() {
 
   const handleSaveProductOffer = async (productId: string, offerUiId: string): Promise<boolean> => {
     const totalStartTime = performance.now();
-    console.log('[SAVE] Starting handleSaveProductOffer', productId, offerUiId);
     // Debounce rapid save clicks
     const now = Date.now();
     const actionKey = `save-${productId}-${offerUiId}`;
     if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 1000) {
-      console.log('[SAVE] Debounced - too soon');
       return false;
     }
     lastClickRef.current = { action: actionKey, timestamp: now };
 
     if (!currentSupplierDetails || !quotation || !quotation.userId) {
-        console.log('[SAVE] Missing supplier/quotation data');
         toast({title: "Erro Interno", description: "Dados do fornecedor, cotação ou ID do comprador ausentes.", variant: "destructive"});
         return false;
     }
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) {
-      console.log('[SAVE] Product not found');
       return false;
     }
 
@@ -2538,16 +2554,12 @@ export default function SellerQuotationPage() {
     const unitWeight = Number(offerData.unitWeight);
     const totalPackagingPrice = Number(offerData.totalPackagingPrice);
 
-    console.log('[SAVE] Validation:', { unitsInPackaging, unitsPerPackage, unitWeight, totalPackagingPrice });
-
     if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitsPerPackage) || unitsPerPackage <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
-      console.log('[SAVE] Validation failed');
       toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive", duration: 7e3});
       return false;
     }
 
     const pricePerUnit = totalPackagingPrice / (unitsPerPackage * unitWeight);
-    console.log('[SAVE] Price per unit:', pricePerUnit);
 
     const bestCompetitorOffer = product.bestOffersByBrand.find(o => o.supplierId !== supplierId);
 
@@ -2611,38 +2623,29 @@ export default function SellerQuotationPage() {
     };
     
     const savingKey = `${productId}_${offerUiId}`;
-    console.log('[SAVE] Setting saving state to true');
     setIsSaving(prev => ({ ...prev, [savingKey]: true }));
     // Adiciona a oferta à lista de ofertas sendo salvas
     setSavingOffers(prev => new Set(prev).add(savingKey));
 
     try {
       if (offerData.id) {
-        console.log('[SAVE] Updating existing offer:', offerData.id);
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
         await updateDoc(offerRef, offerPayload);
-        console.log('[SAVE] Update complete');
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
         speak(voiceMessages.success.offerSaved);
       } else {
-        console.log('[SAVE] Creating new offer, skipping duplicate check for performance');
         // Skip duplicate check for better performance - Firebase will handle uniqueness with IDs
-
-        console.log('[SAVE] Adding new offer to Firestore');
         const addDocStartTime = performance.now();
         const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
         const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
         const addDocEndTime = performance.now();
-        console.log(`[SAVE] Add complete, doc ID: ${newOfferDocRef.id}, addDoc took ${(addDocEndTime - addDocStartTime).toFixed(2)}ms`);
 
         // Verificar variação de quantidade e registrar
         const offeredQuantity = calculateTotalOfferedQuantity(offerData, product);
         const requestedQuantity = product.quantity;
         const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-        
+
         if (!quantityValidation.isValid && quotation) {
-          console.log(`[QUANTITY_VARIATION] Detected ${quantityValidation.variationType} variation of ${quantityValidation.variationPercentage.toFixed(1)}% for product ${product.name}`);
-          
           // TODO: Implementar busca dos dados do comprador para envio de notificação
           // Para isso, seria necessário buscar os dados do comprador usando quotation.userId
         }
@@ -2650,33 +2653,26 @@ export default function SellerQuotationPage() {
         const toastStartTime = performance.now();
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
         const toastEndTime = performance.now();
-        console.log(`[SAVE] Toast took ${(toastEndTime - toastStartTime).toFixed(2)}ms`);
 
         const speakStartTime = performance.now();
         // Make speak non-blocking by deferring it
         setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
         const speakEndTime = performance.now();
-        console.log(`[SAVE] Speak took ${(speakEndTime - speakStartTime).toFixed(2)}ms`);
       }
 
       const clearingStartTime = performance.now();
-      console.log('[SAVE] Clearing alerts and flags');
-      
+
       const alertsStartTime = performance.now();
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
       const alertsEndTime = performance.now();
-      console.log(`[SAVE] setUnseenAlerts took ${(alertsEndTime - alertsStartTime).toFixed(2)}ms`);
-      
+
       const offerChangeStartTime = performance.now();
       handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false); // Reset the flag after saving
       const offerChangeEndTime = performance.now();
-      console.log(`[SAVE] handleOfferChange took ${(offerChangeEndTime - offerChangeStartTime).toFixed(2)}ms`);
 
       const totalEndTime = performance.now();
-      console.log(`[SAVE] Save complete in ${(totalEndTime - totalStartTime).toFixed(2)}ms, returning true`);
       return true;
     } catch (error: any) {
-      console.log('[SAVE] Error:', error);
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
       setTimeout(() => speak(voiceMessages.error.saveFailed), 0);
       return false;
@@ -2689,7 +2685,6 @@ export default function SellerQuotationPage() {
         return newSet;
       });
       const totalEndTime = performance.now();
-      console.log(`[SAVE] Finally block completed, total time: ${(totalEndTime - totalStartTime).toFixed(2)}ms`);
     }
   };
   
@@ -3010,14 +3005,26 @@ export default function SellerQuotationPage() {
                                   </div>
                                 )}
 
-                                {/* Render pending brand requests with orange cards */}
+                                {/* Render brand requests (pending=orange, rejected=red) */}
                                 {(() => {
-                                  const hasPendingRequests = product.pendingBrandRequests && product.pendingBrandRequests.length > 0;
-                                  return hasPendingRequests;
+                                  const hasBrandRequests = product.pendingBrandRequests && product.pendingBrandRequests.length > 0;
+                                  return hasBrandRequests;
                                 })() && (
                                   <div className="flex flex-row flex-wrap gap-2 p-1">
-                                      {product.pendingBrandRequests?.map(request => (
-                                          <div key={request.id} className="flex items-start justify-between p-3 rounded-md bg-orange-50/50 border-l-4 border-orange-500 min-w-[280px] gap-3">
+                                      {product.pendingBrandRequests?.map(request => {
+                                        // Define colors based on status (only pending or rejected shown)
+                                        const isPending = request.status === 'pending';
+                                        const isRejected = request.status === 'rejected';
+
+                                        const cardBg = isPending ? 'bg-orange-50/50' : 'bg-red-50/50';
+                                        const borderColor = isPending ? 'border-orange-500' : 'border-red-500';
+                                        const textColor = isPending ? 'text-orange-600' : 'text-red-600';
+                                        const badgeBorder = isPending ? 'border-orange-600' : 'border-red-600';
+                                        const badgeText = isPending ? 'text-orange-700' : 'text-red-700';
+                                        const badgeLabel = isPending ? 'Aguardando Aprovação' : '✗ Rejeitada';
+
+                                        return (
+                                          <div key={request.id} className={`flex items-start justify-between p-3 rounded-md ${cardBg} border-l-4 ${borderColor} min-w-[280px] gap-3`}>
                                               <div className="flex items-start gap-3 flex-1">
                                                   <TooltipProvider>
                                                       <Tooltip>
@@ -3062,7 +3069,7 @@ export default function SellerQuotationPage() {
                                                   </div>
                                               </div>
                                               <div className="text-right shrink-0">
-                                                  <p className="text-base font-bold text-orange-600 leading-tight">
+                                                  <p className={`text-base font-bold ${textColor} leading-tight`}>
                                                     {(() => {
                                                       // Fallback: recalcula preço se estiver inválido
                                                       if (request.pricePerUnit && !isNaN(request.pricePerUnit)) {
@@ -3079,13 +3086,14 @@ export default function SellerQuotationPage() {
                                                     {abbreviateUnit(product.unit)}
                                                   </p>
                                                   <div className="mt-1">
-                                                    <Badge variant="outline" className="text-xs border-orange-600 text-orange-700">
-                                                      Aguardando Aprovação
+                                                    <Badge variant="outline" className={`text-xs ${badgeBorder} ${badgeText}`}>
+                                                      {badgeLabel}
                                                     </Badge>
                                                   </div>
                                               </div>
                                           </div>
-                                      ))}
+                                        );
+                                      })}
                                   </div>
                                 )}
                                 <div className="sm:ml-auto">

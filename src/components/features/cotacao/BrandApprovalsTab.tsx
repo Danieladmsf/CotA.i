@@ -13,7 +13,7 @@ import { CheckCircle, XCircle, AlertCircle, Package, Calendar, User, DollarSign,
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
-import { createNotification } from '@/hooks/useNotifications';
+import { notifySupplierBrandApproved, notifySupplierBrandRejected } from '@/actions/notificationService';
 import type { PendingBrandRequest } from '@/types';
 
 export default function BrandApprovalsTab({ quotationId }: { quotationId: string }) {
@@ -28,19 +28,29 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
   useEffect(() => {
     if (!user?.uid || !quotationId) return;
 
+    // Query by quotationId only (buyerUserId may not exist in old docs)
     const allRequestsQuery = query(
       collection(db, 'pending_brand_requests'),
-      where('buyerUserId', '==', user.uid),
       where('quotationId', '==', quotationId)
     );
 
     const unsubscribe = onSnapshot(
       allRequestsQuery,
       (snapshot) => {
-        const requests = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as PendingBrandRequest));
+        const requests = snapshot.docs.map(doc => {
+          const data = doc.data();
+
+          // Backward compatibility: old docs use 'requestedBy' instead of 'buyerUserId'
+          const buyerUserId = data.buyerUserId || data.requestedBy;
+          const createdAt = data.createdAt || data.requestedAt;
+
+          return {
+            id: doc.id,
+            ...data,
+            buyerUserId, // Override with backward compatible value
+            createdAt    // Override with backward compatible value
+          } as PendingBrandRequest;
+        });
 
         requests.sort((a, b) => {
           const aTime = (a.createdAt as any)?.toDate?.() || new Date(0);
@@ -52,7 +62,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         setIsLoading(false);
       },
       (error) => {
-        console.error('🔴 [BrandApprovalsTab] Error in pending_brand_requests listener:', error);
         setIsLoading(false);
       }
     );
@@ -83,20 +92,25 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
   const handleApproval = async (request: PendingBrandRequest, approved: boolean) => {
     if (!request.id) return;
-    
+
+    console.log('🟢 [handleApproval] Iniciando aprovação/rejeição', { requestId: request.id, approved });
     setProcessingIds(prev => new Set(prev).add(request.id!));
 
     try {
       if (approved) {
+        console.log('✅ [handleApproval] Aprovando marca...');
         // 1. Update the pending request status
         const requestRef = doc(db, 'pending_brand_requests', request.id);
+        console.log('📝 [handleApproval] Atualizando status para approved...');
         await updateDoc(requestRef, {
           status: 'approved',
-          updatedAt: new Date()
+          updatedAt: Timestamp.now()
         });
+        console.log('✅ [handleApproval] Status atualizado com sucesso');
 
         // 2. Add brand to supplies collection (handle both string and array formats)
         try {
+          console.log('📦 [handleApproval] Adicionando marca às coleções supplies...');
           // First, check shopping_list_items to get the correct supplyId
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
@@ -135,17 +149,16 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
             await updateDoc(suppliesRef, {
               preferredBrands: updatedBrands,
-              updatedAt: new Date()
+              updatedAt: Timestamp.now()
             });
-          } else {
-            console.error('❌ Supplies document not found for actualSupplyId:', actualSupplyId);
           }
         } catch (error) {
-          console.error('❌ Error updating supplies collection:', error);
+          console.error('❌ [handleApproval] Erro ao atualizar supplies:', error);
         }
 
         // 3. Add brand to shopping_list_items collection
         try {
+          console.log('📝 [handleApproval] Adicionando marca ao shopping_list_items...');
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
           
@@ -171,20 +184,21 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
             await updateDoc(shoppingListRef, {
               preferredBrands: updatedBrands,
-              updatedAt: new Date()
+              updatedAt: Timestamp.now()
             });
-          } else {
-            console.error('❌ Shopping list document not found for productId:', request.productId);
           }
         } catch (error) {
-          console.error('❌ Error updating shopping_list_items collection:', error);
+          console.error('❌ [handleApproval] Erro ao atualizar shopping_list_items:', error);
         }
 
         // 4. Create the actual offer now that the brand is approved
         try {
+          console.log('💰 [handleApproval] Criando oferta automaticamente...');
           const offersCollectionRef = collection(db, 'quotations', request.quotationId, 'products', request.productId, 'offers');
           
           const offerPayload = {
+            quotationId: request.quotationId, // ✅ CRITICAL: Required for collectionGroup query filter
+            productId: request.productId,
             supplierId: request.supplierId,
             supplierName: request.supplierName,
             supplierInitials: request.supplierInitials,
@@ -196,13 +210,15 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             totalPackagingPrice: request.totalPackagingPrice,
             pricePerUnit: request.pricePerUnit,
             updatedAt: Timestamp.now(),
-            productId: request.productId,
           };
 
-          await addDoc(offersCollectionRef, offerPayload);
+          console.log('💰 [handleApproval] Payload da oferta:', offerPayload);
+          const newOfferRef = await addDoc(offersCollectionRef, offerPayload);
+          console.log('✅ [handleApproval] Oferta criada com sucesso! ID:', newOfferRef.id);
+          console.log('✅ [handleApproval] Path:', `quotations/${request.quotationId}/products/${request.productId}/offers`);
 
         } catch (error) {
-          console.error('❌ Error creating offer for approved brand:', error);
+          console.error('❌ [handleApproval] Erro ao criar oferta:', error);
           // We don't re-throw, as the main approval process was successful
           toast({
             title: "Erro ao Criar Oferta",
@@ -217,13 +233,15 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           variant: "default"
         });
       } else {
+        console.log('❌ [handleApproval] Rejeitando marca...');
         // Just reject the request
         const requestRef = doc(db, 'pending_brand_requests', request.id);
         await updateDoc(requestRef, {
           status: 'rejected',
           rejectionReason: 'Rejeitada pelo comprador',
-          updatedAt: new Date()
+          updatedAt: Timestamp.now()
         });
+        console.log('✅ [handleApproval] Marca rejeitada com sucesso');
 
         toast({
           title: "Marca Rejeitada",
@@ -232,10 +250,9 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         });
       }
 
-      // 5. Create notification for the supplier
+      // 5. Create notification for the supplier using server-side function
       try {
-        const notificationType: 'brand_approval_approved' | 'brand_approval_rejected' = approved ? 'brand_approval_approved' : 'brand_approval_rejected';
-        const notificationTitle = approved ? 'Sua marca foi aprovada!' : 'Sua marca foi recusada';
+        console.log('🔔 [handleApproval] Criando notificação para o fornecedor...');
 
         // Fetch product name for a more descriptive message
         let productNameForNotif = request.productName || 'Produto desconhecido';
@@ -245,27 +262,35 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
                 if (productDoc.exists()) {
                     productNameForNotif = productDoc.data().name || productNameForNotif;
                 }
-            } catch (e) { console.error("Could not fetch product name for notification", e); }
+            } catch (e) {
+              console.warn('❌ [handleApproval] Failed to fetch product name:', e);
+            }
         }
-        const notificationMessage = `Sua sugestão da marca "${request.brandName}" para o produto "${productNameForNotif}" foi ${approved ? 'aprovada' : 'recusada'}.`;
 
-        const notificationPayload = {
-          targetSupplierId: request.supplierId,
-          type: notificationType,
-          title: notificationTitle,
-          message: notificationMessage,
-          quotationId: request.quotationId,
-          brandName: request.brandName,
-          productName: productNameForNotif,
-          isRead: false,
-          priority: 'high' as const,
-          actionUrl: `/portal/${request.supplierId}/cotar/${request.quotationId}`
-        };
+        // Call the appropriate server-side notification function
+        const notificationResult = approved
+          ? await notifySupplierBrandApproved({
+              targetSupplierId: request.supplierId,
+              quotationId: request.quotationId,
+              productName: productNameForNotif,
+              brandName: request.brandName
+            })
+          : await notifySupplierBrandRejected({
+              targetSupplierId: request.supplierId,
+              quotationId: request.quotationId,
+              productName: productNameForNotif,
+              brandName: request.brandName,
+              rejectionReason: rejectionReason
+            });
 
-        await createNotification(notificationPayload);
+        if (notificationResult.success) {
+          console.log('✅ [handleApproval] Notificação criada com sucesso (server-side)');
+        } else {
+          console.error('❌ [handleApproval] Erro ao criar notificação (server-side):', notificationResult.error);
+        }
 
       } catch (notificationError) {
-        console.error('❌ [BrandApprovalsTab] Error creating notification for supplier:', notificationError);
+        console.error('❌ [handleApproval] Erro ao criar notificação:', notificationError);
         // Non-critical, so we don't show a toast to the buyer for this
       }
 
@@ -282,20 +307,22 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           if (!notificationDoc.data().isRead) {
             await updateDoc(doc(db, 'notifications', notificationDoc.id), {
               isRead: true,
-              readAt: new Date()
+              readAt: Timestamp.now()
             });
           }
         }
       } catch (notificationError) {
-        console.error('⚠️ Error marking notification as read:', notificationError);
         // Do not re-throw, as the main action (approval/rejection) was successful
       }
 
     } catch (error: any) {
-      console.error('Error processing brand request:', error);
+      console.error('🔴 [handleApproval] ERRO PRINCIPAL:', error);
+      console.error('🔴 [handleApproval] Error message:', error?.message);
+      console.error('🔴 [handleApproval] Error code:', error?.code);
+      console.error('🔴 [handleApproval] Error stack:', error?.stack);
       toast({
         title: "Erro",
-        description: "Erro ao processar a solicitação. Tente novamente.",
+        description: `Erro ao processar a solicitação: ${error?.message || 'Desconhecido'}. Tente novamente.`,
         variant: "destructive"
       });
     } finally {
@@ -309,8 +336,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
   // Diagnostic function to analyze data relationships
   const runDiagnostic = async () => {
-    console.log('🔍 STARTING COMPREHENSIVE DIAGNOSTIC');
-    
     if (allRequests.length === 0) {
       toast({
         title: "Nenhuma Solicitação Pendente",
@@ -321,69 +346,33 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
     }
 
     const request = allRequests[0]; // Use first request
-    
-    console.log('📋 Request being analyzed:', {
-      id: request.id,
-      productId: request.productId,
-      quotationId: request.quotationId,
-      brandName: request.brandName
-    });
 
     try {
       // 1. Check shopping_list_items
-      console.log('🛒 Checking shopping_list_items...');
       const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
       const shoppingListSnap = await getDoc(shoppingListRef);
-      
+
       if (shoppingListSnap.exists()) {
         const data = shoppingListSnap.data();
-        console.log('✅ Found shopping_list_items:', {
-          id: request.productId,
-          name: data.name,
-          supplyId: data.supplyId,
-          quotationId: data.quotationId,
-          preferredBrands: data.preferredBrands,
-          brandsType: typeof data.preferredBrands
-        });
 
         // 2. Check supplies using supplyId
         if (data.supplyId) {
-          console.log('📦 Checking supplies with supplyId:', data.supplyId);
           const suppliesRef = doc(db, 'supplies', data.supplyId);
           const suppliesSnap = await getDoc(suppliesRef);
-          
+
           if (suppliesSnap.exists()) {
             const suppliesData = suppliesSnap.data();
-            console.log('✅ Found supplies document:', {
-              id: data.supplyId,
-              name: suppliesData.name,
-              preferredBrands: suppliesData.preferredBrands,
-              brandsType: typeof suppliesData.preferredBrands
-            });
-          } else {
-            console.log('❌ Supplies document NOT FOUND with supplyId:', data.supplyId);
           }
         }
 
         // 3. Also check supplies using productId directly
-        console.log('📦 Checking supplies with productId:', request.productId);
         const suppliesDirectRef = doc(db, 'supplies', request.productId);
         const suppliesDirectSnap = await getDoc(suppliesDirectRef);
-        
+
         if (suppliesDirectSnap.exists()) {
           const suppliesDirectData = suppliesDirectSnap.data();
-          console.log('✅ Found supplies document with productId:', {
-            id: request.productId,
-            name: suppliesDirectData.name,
-            preferredBrands: suppliesDirectData.preferredBrands,
-            brandsType: typeof suppliesDirectData.preferredBrands
-          });
-        } else {
-          console.log('❌ Supplies document NOT FOUND with productId:', request.productId);
         }
 
-      } else {
-        console.log('❌ shopping_list_items document NOT FOUND:', request.productId);
       }
 
       toast({
@@ -393,7 +382,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
       });
 
     } catch (error) {
-      console.error('❌ Diagnostic error:', error);
       toast({
         title: "Erro no Diagnóstico",
         description: "Erro ao executar diagnóstico. Verifique o console.",
@@ -408,28 +396,23 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
       // Find the supply with name "Óleo de gergelim"
       const suppliesRef = doc(db, 'supplies', '3ho07m0dfYllf0SPqkso');
       const suppliesSnap = await getDoc(suppliesRef);
-      
+
       if (suppliesSnap.exists()) {
         const data = suppliesSnap.data();
         const currentBrands = data.preferredBrands;
-        
+
         if (typeof currentBrands === 'string' && !currentBrands.includes('Soya')) {
           const updatedBrands = currentBrands + ', Soya';
-          
+
           await updateDoc(suppliesRef, {
             preferredBrands: updatedBrands,
-            updatedAt: new Date()
+            updatedAt: Timestamp.now()
           });
-          
+
           toast({
             title: "Dados Corrigidos!",
             description: "A marca Soya foi adicionada ao supplies com sucesso.",
             variant: "default"
-          });
-          
-          console.log('✅ Fixed supplies data:', {
-            before: currentBrands,
-            after: updatedBrands
           });
         } else {
           toast({
@@ -440,7 +423,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         }
       }
     } catch (error: any) {
-      console.error('Error fixing brand data:', error);
       toast({
         title: "Erro ao Corrigir",
         description: error.message,
@@ -459,61 +441,47 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
   // Function to diagnose product ID mapping
   const diagnoseProductMapping = async () => {
     try {
-      console.log('🔍 Starting product ID diagnosis...');
-      
       // Check the latest Soya request
       const soyaProductId = "YFESxRQl0xvIXZcUNaCM";
-      console.log('🎯 Checking productId:', soyaProductId);
-      
+
       // Check supplies collection
       const suppliesRef = doc(db, 'supplies', soyaProductId);
       const suppliesSnap = await getDoc(suppliesRef);
-      console.log('📦 Supplies document exists:', suppliesSnap.exists());
-      
+
       if (suppliesSnap.exists()) {
         const suppliesData = suppliesSnap.data();
-        console.log('📊 Supplies data:', suppliesData);
       }
-      
+
       // Check shopping_list_items collection
       const shoppingListRef = doc(db, 'shopping_list_items', soyaProductId);
       const shoppingListSnap = await getDoc(shoppingListRef);
-      console.log('📋 Shopping list document exists:', shoppingListSnap.exists());
-      
+
       if (shoppingListSnap.exists()) {
         const shoppingListData = shoppingListSnap.data();
-        console.log('📊 Shopping list data:', shoppingListData);
       }
-      
+
       // Check if supplyId matches
       if (shoppingListSnap.exists()) {
         const shoppingListData = shoppingListSnap.data();
         const supplyId = shoppingListData.supplyId;
-        console.log('🔗 SupplyId from shopping_list_items:', supplyId);
-        
+
         if (supplyId && supplyId !== soyaProductId) {
-          console.log('⚠️ MISMATCH FOUND! shopping_list_items.supplyId ≠ productId');
-          console.log('📝 We should update supplies with ID:', supplyId);
-          
           // Check if supplies document exists with correct ID
           const correctSuppliesRef = doc(db, 'supplies', supplyId);
           const correctSuppliesSnap = await getDoc(correctSuppliesRef);
-          
+
           if (correctSuppliesSnap.exists()) {
-            console.log('✅ Found correct supplies document with supplyId');
             const correctSuppliesData = correctSuppliesSnap.data();
-            console.log('📊 Correct supplies data:', correctSuppliesData);
           }
         }
       }
-      
+
       toast({
         title: "Diagnóstico Concluído",
         description: "Verifique o console para detalhes.",
         variant: "default"
       });
     } catch (error: any) {
-      console.error('❌ Error in diagnosis:', error);
       toast({
         title: "Erro no Diagnóstico",
         description: error.message,
@@ -528,25 +496,25 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
       // Directly fix the Soya brand data for productId: "Dlz6iCbA7z2zh1ow5TlP"
       const productId = "Dlz6iCbA7z2zh1ow5TlP"; // Óleo de gergelim
       const brandToAdd = "Soya";
-      
+
       const suppliesRef = doc(db, 'supplies', productId);
       const suppliesSnap = await getDoc(suppliesRef);
-      
+
       if (suppliesSnap.exists()) {
         const suppliesData = suppliesSnap.data();
         const currentBrands = suppliesData.preferredBrands;
-        
+
         if (typeof currentBrands === 'string') {
           const brandsArray = currentBrands.split(',').map(b => b.trim()).filter(b => b.length > 0);
           if (!brandsArray.includes(brandToAdd)) {
             brandsArray.push(brandToAdd);
             const updatedBrands = brandsArray.join(', ');
-            
+
             await updateDoc(suppliesRef, {
               preferredBrands: updatedBrands,
-              updatedAt: new Date()
+              updatedAt: Timestamp.now()
             });
-            
+
             toast({
               title: "Dados Corrigidos!",
               description: `A marca '${brandToAdd}' foi adicionada corretamente ao supplies.`,
@@ -562,7 +530,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         }
       }
     } catch (error: any) {
-      console.error('Error fixing brand data:', error);
       toast({
         title: "Erro ao Corrigir",
         description: error.message,
@@ -704,7 +671,12 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format((request.createdAt as any).toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          {request.createdAt && (request.createdAt as any).toDate
+                            ? format((request.createdAt as any).toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                            : (request as any).requestedAt && (request as any).requestedAt.toDate
+                            ? format((request as any).requestedAt.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                            : 'Data não disponível'
+                          }
                         </span>
                       </div>
                     </div>

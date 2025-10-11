@@ -99,7 +99,13 @@ service cloud.firestore {
     match /pending_brand_requests/{requestId} {
         allow read: if true; // Allow unauthenticated supplier portal access
         allow create: if true;
-        allow update, delete: if request.auth != null && resource.data.buyerUserId == request.auth.uid;
+        // Allow update/delete if:
+        // 1. User is authenticated AND is the buyer (buyerUserId matches)
+        // 2. User is authenticated AND buyerUserId doesn't exist (backward compatibility)
+        allow update, delete: if request.auth != null && (
+          resource.data.buyerUserId == request.auth.uid ||
+          !('buyerUserId' in resource.data)
+        );
     }
 
     // WhatsApp queue - authenticated users can create and read their messages

@@ -7,7 +7,8 @@ import type { SystemNotification, NotificationType } from '@/types';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
 interface CreateNotificationParams {
-  userId: string;
+  userId?: string; // Optional for supplier notifications (use targetSupplierId instead)
+  targetSupplierId?: string; // For supplier portal notifications (unauthenticated access)
   type: NotificationType;
   title: string;
   message: string;
@@ -26,32 +27,41 @@ interface CreateNotificationParams {
 export async function createNotification(params: CreateNotificationParams) {
   try {
     const db = adminDb();
-    
-    const notification: Omit<SystemNotification, 'id'> = {
-      userId: params.userId,
+
+    // Validate that at least one identifier is present
+    if (!params.userId && !params.targetSupplierId) {
+      throw new Error('Either userId or targetSupplierId must be provided');
+    }
+
+    // Build notification object, only including defined fields to avoid Firestore undefined errors
+    const notification: any = {
       type: params.type,
       title: params.title,
       message: params.message,
-      quotationId: params.quotationId,
-      quotationName: params.quotationName,
-      productId: params.productId,
-      productName: params.productName,
-      supplierId: params.supplierId,
-      supplierName: params.supplierName,
-      brandName: params.brandName,
       isRead: false,
       priority: params.priority || 'medium',
-      createdAt: Timestamp.now(),
-      actionUrl: params.actionUrl,
-      metadata: params.metadata
+      createdAt: Timestamp.now()
     };
 
+    // Add userId or targetSupplierId (mutually exclusive usage)
+    if (params.userId !== undefined) notification.userId = params.userId;
+    if (params.targetSupplierId !== undefined) notification.targetSupplierId = params.targetSupplierId;
+
+    // Only add optional fields if they're defined
+    if (params.quotationId !== undefined) notification.quotationId = params.quotationId;
+    if (params.quotationName !== undefined) notification.quotationName = params.quotationName;
+    if (params.productId !== undefined) notification.productId = params.productId;
+    if (params.productName !== undefined) notification.productName = params.productName;
+    if (params.supplierId !== undefined) notification.supplierId = params.supplierId;
+    if (params.supplierName !== undefined) notification.supplierName = params.supplierName;
+    if (params.brandName !== undefined) notification.brandName = params.brandName;
+    if (params.actionUrl !== undefined) notification.actionUrl = params.actionUrl;
+    if (params.metadata !== undefined) notification.metadata = params.metadata;
+
     const docRef = await db.collection(NOTIFICATIONS_COLLECTION).add(notification);
-    console.log('✅ Notification created:', docRef.id, params.type);
-    
+
     return { success: true, id: docRef.id };
   } catch (error: any) {
-    console.error('❌ Error creating notification:', error);
     return { success: false, error: error.message };
   }
 }
@@ -126,6 +136,48 @@ export async function notifyBrandRejected(params: {
     priority: 'low',
     actionUrl: `/cotacao?quotation=${params.quotationId}`,
     metadata: { rejectionReason: params.rejectionReason }
+  });
+}
+
+// Supplier-facing notification functions (use targetSupplierId for anonymous portal access)
+
+export async function notifySupplierBrandApproved(params: {
+  targetSupplierId: string;
+  quotationId: string;
+  productName: string;
+  brandName: string;
+}) {
+  return createNotification({
+    targetSupplierId: params.targetSupplierId,
+    type: 'brand_approval_approved',
+    title: 'Sua marca foi aprovada!',
+    message: `Sua sugestão da marca "${params.brandName}" para o produto "${params.productName}" foi aprovada.`,
+    quotationId: params.quotationId,
+    productName: params.productName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/portal/${params.targetSupplierId}/cotar/${params.quotationId}`
+  });
+}
+
+export async function notifySupplierBrandRejected(params: {
+  targetSupplierId: string;
+  quotationId: string;
+  productName: string;
+  brandName: string;
+  rejectionReason?: string;
+}) {
+  return createNotification({
+    targetSupplierId: params.targetSupplierId,
+    type: 'brand_approval_rejected',
+    title: 'Sua marca foi recusada',
+    message: `Sua sugestão da marca "${params.brandName}" para o produto "${params.productName}" foi recusada.`,
+    quotationId: params.quotationId,
+    productName: params.productName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/portal/${params.targetSupplierId}/cotar/${params.quotationId}`,
+    metadata: params.rejectionReason ? { rejectionReason: params.rejectionReason } : undefined
   });
 }
 
@@ -271,12 +323,10 @@ export async function cleanupOldNotifications(userId: string, daysToKeep: number
     
     if (snapshot.docs.length > 0) {
       await batch.commit();
-      console.log(`🧹 Cleaned up ${snapshot.size} old notifications for user ${userId}`);
     }
-    
+
     return { success: true, deletedCount: snapshot.size };
   } catch (error: any) {
-    console.error('❌ Error cleaning up notifications:', error);
     return { success: false, error: error.message };
   }
 }

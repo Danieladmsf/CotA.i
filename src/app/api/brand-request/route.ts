@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/config/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { notifyBrandApprovalPending } from '@/actions/notificationService';
 
 export async function POST(request: NextRequest) {
+  console.log('\n==============================================');
+  console.log('🔵 API /api/brand-request CHAMADA!');
+  console.log('==============================================\n');
   try {
     const body = await request.json();
-    console.log('Received brand request body:', body);
+    console.log('🔵 Body recebido:', JSON.stringify(body, null, 2));
     
     const {
       quotationId,
@@ -79,40 +83,50 @@ export async function POST(request: NextRequest) {
     const db = adminDb();
     const docRef = await db.collection('pending_brand_requests').add(brandRequest);
 
-    // Create notification for the buyer
+    // Create notification for the buyer using centralized server-side function
     try {
-      console.log('📧 Creating notification for buyer:', { buyerUserId, brandName, productName });
+      console.log('📧 Creating notification for buyer:', { buyerUserId, brandName, productName, productId, quotationId });
 
-      const notificationData = {
+      // Fetch quotation name for a better notification message
+      let quotationName = `Cotação #${quotationId.slice(-6)}`;
+      try {
+        const quotationDoc = await db.collection('quotations').doc(quotationId).get();
+        if (quotationDoc.exists) {
+          const quotationData = quotationDoc.data();
+          quotationName = quotationData?.name || quotationName;
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to fetch quotation name, using fallback:', e);
+      }
+
+      // Use the centralized notification service
+      const notificationResult = await notifyBrandApprovalPending({
         userId: buyerUserId,
-        type: 'brand_approval_pending',
-        title: 'Nova marca para aprovação',
-        message: `${supplierName} enviou a marca "${brandName}" para aprovação no produto "${productName}".`,
         quotationId,
-        productId,
-        brandName,
+        quotationName,
         productName,
-        supplierId,
-        entityId: docRef.id, // Link to the brand request
-        isRead: false,
-        priority: 'high',
-        actionUrl: `/cotacao?quotation=${quotationId}&tab=aprovacoes`,
-        createdAt: Timestamp.now()
-      };
-
-      console.log('📧 Notification data:', notificationData);
-
-      const notificationRef = await db.collection('notifications').add(notificationData);
-      console.log('✅ Notification created successfully:', {
-        buyerUserId,
-        notificationId: notificationRef.id,
-        type: 'brand_approval_pending',
         brandName,
-        productName
+        supplierName
       });
-    } catch (notificationError) {
-      console.error('⚠️ Error creating notification for buyer:', notificationError);
-      // Don't fail the whole request if notification fails
+
+      if (notificationResult.success) {
+        console.log('\n==============================================');
+        console.log('✅ NOTIFICAÇÃO CRIADA COM SUCESSO (server-side)!');
+        console.log('✅ ID da notificação:', notificationResult.id);
+        console.log('✅ Para o usuário:', buyerUserId);
+        console.log('✅ Marca:', brandName);
+        console.log('✅ Produto:', productName);
+        console.log('==============================================\n');
+      } else {
+        console.error('❌ Erro ao criar notificação (server-side):', notificationResult.error);
+      }
+    } catch (notificationError: any) {
+      console.log('\n==============================================');
+      console.error('❌ ERRO AO CRIAR NOTIFICAÇÃO!');
+      console.error('❌ Erro:', notificationError.message);
+      console.error('❌ Stack:', notificationError.stack);
+      console.log('==============================================\n');
+      // Non-critical error - don't fail the request
     }
 
     return NextResponse.json({

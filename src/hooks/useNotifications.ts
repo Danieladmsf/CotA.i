@@ -53,13 +53,13 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
       // Determine the primary query filter
       if (canQueryBySupplier) {
         queryConstraints.push(where('targetSupplierId', '==', filters.targetSupplierId));
+        queryConstraints.push(orderBy('createdAt', 'desc'));
       } else if (canQueryByUser) {
         queryConstraints.push(where('userId', '==', user.uid));
+        queryConstraints.push(orderBy('createdAt', 'desc'));
       }
-      
-      queryConstraints.push(orderBy('createdAt', 'desc'));
 
-      // Apply other filters
+      // Apply additional filters
       if (filters.quotationId) {
         queryConstraints.push(where('quotationId', '==', filters.quotationId));
       }
@@ -70,10 +70,7 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
         queryConstraints.push(where('isRead', '==', filters.isRead));
       }
 
-      // Add pagination and limit
-      if (lastDoc) {
-        queryConstraints.push(startAfter(lastDoc));
-      }
+      // Add limit (no startAfter for real-time updates)
       queryConstraints.push(limit(pageSize));
 
       const notificationQuery = query(collection(db, 'notifications'), ...queryConstraints);
@@ -81,16 +78,17 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
       const unsubscribe = onSnapshot(
         notificationQuery,
         (snapshot) => {
-          const newNotifications = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as SystemNotification));
+          const newNotifications = snapshot.docs.map(doc => {
+            const data = doc.data();
 
-          if (lastDoc) {
-            setNotifications(prev => [...prev, ...newNotifications]);
-          } else {
-            setNotifications(newNotifications);
-          }
+            return {
+              id: doc.id,
+              ...data
+            } as SystemNotification;
+          });
+
+          // Always replace the notifications for real-time updates
+          setNotifications(newNotifications);
 
           setHasMore(snapshot.docs.length === pageSize);
           if (snapshot.docs.length > 0) {
@@ -99,8 +97,6 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
           setIsLoading(false);
         },
         (error) => {
-          console.error('🔴 [useNotifications] Error in notifications listener:', error);
-          
           // Handle specific error types
           if (error.code === 'permission-denied') {
             setNotifications([]);
@@ -108,9 +104,8 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
             setIsLoading(false);
             return;
           }
-          
+
           if (error.code === 'failed-precondition') {
-            console.warn('Missing Firestore index - using fallback approach');
             // Fallback to simpler query without complex filters
             if (user?.uid) { // Check if user exists before this query
               const simpleQuery = query(
@@ -145,7 +140,6 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
                   setIsLoading(false);
                 },
                 (fallbackError) => {
-                  console.error('Fallback query also failed:', fallbackError);
                   setNotifications([]);
                   setIsLoading(false);
                 }
@@ -167,11 +161,19 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
 
       return () => unsubscribe();
     } catch (error) {
-      console.error('Error setting up notifications listener:', error);
       setNotifications([]);
       setIsLoading(false);
     }
-  }, [user?.uid, filters, pageSize, lastDoc]);
+  }, [
+    user?.uid,
+    filters.targetSupplierId,
+    filters.quotationId,
+    filters.type,
+    filters.isRead,
+    filters.startDate,
+    filters.endDate,
+    pageSize
+  ]);
 
   // Count unread notifications separately (without pagination)
   useEffect(() => {
@@ -190,15 +192,12 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
           setUnreadCount(snapshot.size);
         },
         (error) => {
-          console.error('Error listening to unread notifications count:', error);
-          
           if (error.code === 'permission-denied') {
             setUnreadCount(0);
             return;
           }
-          
+
                 if (error.code === 'failed-precondition') {
-                  console.warn('Missing index for unread notifications - using fallback');
                   // Fallback: get all user notifications and count unread client-side
                   if (user?.uid) { // Check if user exists before this query
                       const fallbackQuery = query(
@@ -215,7 +214,6 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
                           setUnreadCount(unreadCount);
                         },
                         (fallbackError) => {
-                          console.error('Fallback unread count query failed:', fallbackError);
                           setUnreadCount(0);
                         }
                       );
@@ -231,25 +229,41 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
 
       return () => unsubscribe();
     } catch (error) {
-      console.error('Error setting up unread notifications listener:', error);
       setUnreadCount(0);
     }
   }, [user?.uid]);
 
   const markAsRead = async (notificationId: string) => {
     try {
+      // Optimistic update - update local state immediately for instant feedback
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId
+            ? { ...n, isRead: true, readAt: Timestamp.now() }
+            : n
+        )
+      );
+
+      // Update in Firestore (onSnapshot will sync it back)
       await updateDoc(doc(db, 'notifications', notificationId), {
         isRead: true,
         readAt: Timestamp.now()
       });
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      // Silent error handling - onSnapshot will revert the optimistic update if it failed
     }
   };
 
   const markAllAsRead = async () => {
     try {
       const unreadNotifications = notifications.filter(n => !n.isRead);
+
+      // Optimistic update - update local state immediately
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, isRead: true, readAt: Timestamp.now() }))
+      );
+
+      // Update in Firestore
       const updatePromises = unreadNotifications.map(notification =>
         updateDoc(doc(db, 'notifications', notification.id), {
           isRead: true,
@@ -258,7 +272,7 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
       );
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      // Silent error handling - onSnapshot will revert if it failed
     }
   };
 
@@ -296,7 +310,6 @@ export const createNotification = async (notification: Omit<SystemNotification, 
     });
     return docRef.id;
   } catch (error) {
-    console.error('Error creating notification:', error);
     throw error;
   }
 };
