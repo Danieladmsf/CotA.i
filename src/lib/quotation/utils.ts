@@ -273,6 +273,73 @@ export const validateQuantityVariation = (
   };
 };
 
+/**
+ * Validates box/package quantity variation with buyer notification rules
+ *
+ * Business Rules:
+ * - ALWAYS notify buyer if shortage (offered < requested)
+ * - ONLY notify buyer if excess > 0.5 box (offered > requested + tolerance)
+ * - No notification if within tolerance on excess side
+ *
+ * @param offeredBoxes - Number of boxes/packages supplier will send
+ * @param requestedBoxes - Number of boxes/packages buyer requested
+ * @param toleranceBoxes - Tolerance in boxes (default 0.5)
+ * @returns Validation result with buyer notification flag
+ */
+export const validateBoxQuantityVariation = (
+  offeredBoxes: number,
+  requestedBoxes: number,
+  toleranceBoxes: number = 0.5
+): {
+  isValid: boolean;
+  variationType?: 'over' | 'under';
+  variationAmount: number;
+  shouldNotifyBuyer: boolean;
+  variationPercentage: number;
+} => {
+  if (requestedBoxes <= 0) {
+    return {
+      isValid: true,
+      variationAmount: 0,
+      shouldNotifyBuyer: false,
+      variationPercentage: 0,
+    };
+  }
+
+  const variationAmount = offeredBoxes - requestedBoxes;
+  const variationPercentage = Math.abs(variationAmount / requestedBoxes) * 100;
+
+  // SHORTAGE: Always notify buyer (will be short)
+  if (offeredBoxes < requestedBoxes) {
+    return {
+      isValid: false,
+      variationType: 'under',
+      variationAmount: Math.abs(variationAmount),
+      shouldNotifyBuyer: true,
+      variationPercentage,
+    };
+  }
+
+  // EXCESS: Only notify if more than tolerance
+  if (offeredBoxes > requestedBoxes + toleranceBoxes) {
+    return {
+      isValid: false,
+      variationType: 'over',
+      variationAmount,
+      shouldNotifyBuyer: true,
+      variationPercentage,
+    };
+  }
+
+  // WITHIN TOLERANCE: Valid and no notification needed
+  return {
+    isValid: true,
+    variationAmount,
+    shouldNotifyBuyer: false,
+    variationPercentage,
+  };
+};
+
 // ============================================================================
 // TITLE BUILDING
 // ============================================================================

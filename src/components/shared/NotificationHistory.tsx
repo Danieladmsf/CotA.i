@@ -4,22 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Bell, 
-  Check, 
-  CheckCheck, 
-  Filter, 
+import {
+  Bell,
+  Filter,
   Calendar,
   ChevronDown,
   Loader2,
-  AlertCircle,
-  Package,
+  CheckCheck,
+  X,
   Building2,
-  Award,
-  Clock,
-  TrendingUp,
-  MessageSquare,
-  X
+  Package,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,48 +25,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useNotifications, type NotificationFilters } from '@/hooks/useNotifications';
 import type { SystemNotification, NotificationType } from '@/types';
+import { getNotificationConfig, buildNotificationActionUrl, NOTIFICATION_CONFIG } from '@/config/notificationConfig';
 
 interface NotificationHistoryProps {
   isOpen: boolean;
   onClose: () => void;
   quotations?: { id: string; name: string; date: Date }[];
 }
-
-const NotificationTypeLabels: Record<NotificationType, string> = {
-  brand_approval_pending: 'Aprovação de Marca Pendente',
-  brand_approval_approved: 'Marca Aprovada',
-  brand_approval_rejected: 'Marca Rejeitada',
-  quotation_started: 'Cotação Iniciada',
-  quotation_closed: 'Cotação Encerrada',
-  offer_received: 'Oferta Recebida',
-  offer_outbid: 'Oferta Superada',
-  deadline_approaching: 'Prazo se Aproximando',
-  system_message: 'Mensagem do Sistema'
-};
-
-const NotificationTypeIcons: Record<NotificationType, React.ElementType> = {
-  brand_approval_pending: AlertCircle,
-  brand_approval_approved: Check,
-  brand_approval_rejected: X,
-  quotation_started: TrendingUp,
-  quotation_closed: CheckCheck,
-  offer_received: Package,
-  offer_outbid: Award,
-  deadline_approaching: Clock,
-  system_message: MessageSquare
-};
-
-const NotificationTypeColors: Record<NotificationType, string> = {
-  brand_approval_pending: 'text-orange-600 bg-orange-100',
-  brand_approval_approved: 'text-green-600 bg-green-100',
-  brand_approval_rejected: 'text-red-600 bg-red-100',
-  quotation_started: 'text-blue-600 bg-blue-100',
-  quotation_closed: 'text-gray-600 bg-gray-100',
-  offer_received: 'text-purple-600 bg-purple-100',
-  offer_outbid: 'text-yellow-600 bg-yellow-100',
-  deadline_approaching: 'text-red-600 bg-red-100',
-  system_message: 'text-blue-600 bg-blue-100'
-};
 
 export default function NotificationHistory({ isOpen, onClose, quotations = [] }: NotificationHistoryProps) {
   const router = useRouter();
@@ -205,9 +164,9 @@ export default function NotificationHistory({ isOpen, onClose, quotations = [] }
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os tipos</SelectItem>
-                      {Object.entries(NotificationTypeLabels).map(([key, label]) => (
+                      {Object.entries(NOTIFICATION_CONFIG).map(([key, config]) => (
                         <SelectItem key={key} value={key}>
-                          {label}
+                          {config.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -263,8 +222,9 @@ export default function NotificationHistory({ isOpen, onClose, quotations = [] }
             ) : (
               <div className="divide-y">
                 {notifications.map((notification, index) => {
-                  const Icon = NotificationTypeIcons[notification.type];
-                  const colorClasses = NotificationTypeColors[notification.type];
+                  const config = getNotificationConfig(notification.type);
+                  const Icon = config.icon;
+                  const colorClasses = config.colorClasses;
                   const createdAt = (notification.createdAt as any).toDate();
 
                   return (
@@ -305,7 +265,7 @@ export default function NotificationHistory({ isOpen, onClose, quotations = [] }
                                   </span>
                                 )}
                                 <Badge variant="outline" className="text-xs">
-                                  {NotificationTypeLabels[notification.type]}
+                                  {config.label}
                                 </Badge>
                               </div>
                             </div>

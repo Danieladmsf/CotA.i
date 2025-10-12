@@ -161,10 +161,11 @@ export interface WhatsAppSessionRequest {
   processedAt?: Timestamp | FieldValue;
 }
 
-export type NotificationType = 
+export type NotificationType =
   | 'brand_approval_pending'
-  | 'brand_approval_approved' 
+  | 'brand_approval_approved'
   | 'brand_approval_rejected'
+  | 'quantity_variation_detected'
   | 'quotation_started'
   | 'quotation_closed'
   | 'offer_received'

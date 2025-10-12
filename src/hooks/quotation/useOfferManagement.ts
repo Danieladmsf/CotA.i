@@ -17,8 +17,10 @@ import {
   formatWeightInputForKg,
   calculateTotalOfferedQuantity,
   validateQuantityVariation,
+  validateBoxQuantityVariation,
 } from '@/lib/quotation/utils';
 import { handleOutbidNotification } from '@/lib/quotation/notificationHelpers';
+import { notifyQuantityVariation } from '@/actions/notificationService';
 import type { ProductToQuoteVM } from './useQuotationData';
 
 // Types
@@ -397,13 +399,86 @@ export function useOfferManagement({
         const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
         const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
 
-        // Verificar variação de quantidade
-        const offeredQuantity = calculateTotalOfferedQuantity(offerData, product);
-        const requestedQuantity = product.quantity;
-        const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
         setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
+      }
+
+      // Verificar variação de quantidade (boxes/packages) para TODAS as ofertas (novas e editadas)
+      const offeredBoxes = Number(offerData.unitsInPackaging) || 0;
+      const requestedBoxes = product.quantity;
+      const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+
+      console.log('📊 [Quantity Validation]', {
+        productName: product.name,
+        offeredBoxes,
+        requestedBoxes,
+        isValid: boxValidation.isValid,
+        shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
+        variationType: boxValidation.variationType,
+        variationAmount: boxValidation.variationAmount,
+        variationPercentage: boxValidation.variationPercentage,
+      });
+
+      // Mostrar toast informativo para o fornecedor
+      if (!boxValidation.isValid) {
+        const variationText = boxValidation.variationType === 'over'
+          ? `acima (${boxValidation.variationAmount.toFixed(1)} caixas a mais)`
+          : `abaixo (${boxValidation.variationAmount.toFixed(1)} caixas a menos)`;
+
+        toast({
+          title: "Variação de Quantidade Detectada",
+          description: `Sua oferta tem ${boxValidation.variationPercentage.toFixed(1)}% de variação ${variationText} do pedido.`,
+          duration: 5000,
+        });
+      }
+
+      // Notificar o comprador internamente (sistema de notificações do sino)
+      if (boxValidation.shouldNotifyBuyer && quotation.userId) {
+        console.log('🔔 [Quantity Notification] Creating internal notification', {
+          quotationUserId: quotation.userId,
+          variationType: boxValidation.variationType,
+          offeredBoxes,
+          requestedBoxes,
+        });
+
+        try {
+          const result = await notifyQuantityVariation({
+            userId: quotation.userId,
+            quotationId: quotationId,
+            quotationName: quotation.name || `Cotação #${quotationId.slice(-6)}`,
+            productId: productId,
+            productName: product.name,
+            supplierName: currentSupplierDetails.empresa,
+            brandName: offerData.brandOffered,
+            requestedQuantity: requestedBoxes,
+            offeredQuantity: offeredBoxes,
+            unit: product.unit,
+            variationType: boxValidation.variationType!,
+            variationPercentage: boxValidation.variationPercentage,
+            variationAmount: boxValidation.variationAmount,
+          });
+
+          if (result.success) {
+            console.log('✅ [Quantity Notification] Internal notification created successfully', {
+              productName: product.name,
+              notificationId: result.id,
+            });
+          } else {
+            console.warn('⚠️ [Quantity Notification] Failed to create notification:', result.error);
+          }
+        } catch (notifError: any) {
+          console.error('❌ [Quantity Notification] Exception while creating notification:', {
+            error: notifError.message,
+            code: notifError.code,
+            stack: notifError.stack,
+          });
+          // Don't block offer save if notification fails
+        }
+      } else {
+        console.log('ℹ️ [Quantity Notification] No notification needed', {
+          shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
+          hasUserId: !!quotation.userId,
+        });
       }
 
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));

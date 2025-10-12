@@ -97,6 +97,7 @@ export const useNotifications = (filters: NotificationFilters = {}, pageSize: nu
           setIsLoading(false);
         },
         (error) => {
+          console.error('❌ [useNotifications] Error in snapshot:', error);
           // Handle specific error types
           if (error.code === 'permission-denied') {
             setNotifications([]);

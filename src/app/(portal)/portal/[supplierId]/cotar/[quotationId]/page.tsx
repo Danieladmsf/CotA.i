@@ -50,7 +50,8 @@ import { format, intervalToDuration } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CompetitorOfferCard, BrandRequestCard, OfferFormCard } from "@/components/features/cotacao/supplier-portal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { sendCounterProposalReminder, sendQuantityVariationNotification } from "@/actions/notificationActions";
+import { sendCounterProposalReminder } from "@/actions/notificationActions";
+import { notifyQuantityVariation } from "@/actions/notificationService";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 import { formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -92,6 +93,7 @@ import {
   formatPackaging,
   calculateTotalOfferedQuantity,
   validateQuantityVariation,
+  validateBoxQuantityVariation,
   buildDynamicTitle,
   isValidImageUrl,
 } from "@/lib/quotation/utils";
@@ -344,44 +346,51 @@ const renderVendorFlowCard = (
           updatedAt: {} as any,
           productId: ''
         };
-        
+
+        // Calculate offered quantity for display
         const offeredQuantity = calculateTotalOfferedQuantity(tempOffer, product);
-        const requestedQuantity = product.quantity;
-        const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-        
+
+        const offeredBoxes = flow.requiredPackages || 0;
+        const requestedBoxes = product.quantity;
+        const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Confirme se os dados e valores estão corretos:</h4>
-            
+
             {/* Alerta de variação de quantidade */}
-            {!quantityValidation.isValid && (
+            {!boxValidation.isValid && (
               <div className={`p-3 rounded-lg border-l-4 ${
-                quantityValidation.variationType === 'over' 
-                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20' 
+                boxValidation.variationType === 'over'
+                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20'
                   : 'bg-red-50 border-red-500 dark:bg-red-950/20'
               }`}>
                 <div className="flex items-start gap-2">
                   <span className="text-lg">
-                    {quantityValidation.variationType === 'over' ? '⚠️' : '❌'}
+                    {boxValidation.variationType === 'over' ? '⚠️' : '❌'}
                   </span>
                   <div className="text-sm">
                     <p className="font-semibold">
-                      {quantityValidation.variationType === 'over' 
-                        ? 'Quantidade Acima do Pedido' 
+                      {boxValidation.variationType === 'over'
+                        ? 'Quantidade Acima do Pedido'
                         : 'Quantidade Abaixo do Pedido'}
                     </p>
                     <p className="mt-1">
-                      Pedido: <strong>{requestedQuantity} {abbreviateUnit(product.unit)}</strong> | 
-                      Oferta: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
+                      Caixas Pedidas: <strong>{requestedBoxes}</strong> |
+                      Caixas Ofertadas: <strong>{offeredBoxes}</strong>
                     </p>
                     <p className="mt-1 text-xs">
-                      Variação: <strong>{quantityValidation.variationPercentage.toFixed(1)}%</strong> 
-                      {quantityValidation.variationType === 'over' ? ' acima' : ' abaixo'} do solicitado
+                      Variação: <strong>{boxValidation.variationAmount.toFixed(1)}</strong> caixas
+                      {boxValidation.variationType === 'over' ? ' a mais' : ' a menos'}
                     </p>
-                    <p className="mt-2 text-xs">
-                      {quantityValidation.variationType === 'over' 
-                        ? 'O comprador receberá uma notificação sobre esta quantidade extra.'
-                        : 'Esta oferta não atende completamente o pedido do comprador.'}
+                    <p className="mt-2 text-xs font-semibold">
+                      {boxValidation.shouldNotifyBuyer ? (
+                        boxValidation.variationType === 'over'
+                          ? '⚠️ O comprador será notificado sobre esta quantidade extra (mais de 0,5 caixa).'
+                          : '⚠️ O comprador será notificado sobre esta falta.'
+                      ) : (
+                        '✓ Variação dentro da tolerância (0,5 caixa). Comprador não será notificado.'
+                      )}
                     </p>
                   </div>
                 </div>
@@ -726,47 +735,54 @@ const renderNewBrandFlowCard = (
           unitsPerPackage: packagingType === 'granel' ? 1 : unitsPerPackage,
           unitWeight: packageWeight
         };
-        
+
+        // Calculate offered quantity for display
         const offeredQuantity = calculateTotalOfferedQuantity(tempBrandOffer as any, product);
-        const requestedQuantity = product.quantity;
-        const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-        
+
+        const offeredBoxes = flow.requiredPackages || 0;
+        const requestedBoxes = product.quantity;
+        const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+
         const totalValue = (flow.requiredPackages || 1) * packagePrice;
         const pricePerUnit = packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1));
-        
+
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Confirme os dados da nova marca:</h4>
-            
+
             {/* Alerta de variação de quantidade */}
-            {!quantityValidation.isValid && (
+            {!boxValidation.isValid && (
               <div className={`p-3 rounded-lg border-l-4 ${
-                quantityValidation.variationType === 'over' 
-                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20' 
+                boxValidation.variationType === 'over'
+                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20'
                   : 'bg-red-50 border-red-500 dark:bg-red-950/20'
               }`}>
                 <div className="flex items-start gap-2">
                   <span className="text-lg">
-                    {quantityValidation.variationType === 'over' ? '⚠️' : '❌'}
+                    {boxValidation.variationType === 'over' ? '⚠️' : '❌'}
                   </span>
                   <div className="text-sm">
                     <p className="font-semibold">
-                      {quantityValidation.variationType === 'over' 
-                        ? 'Quantidade Acima do Pedido' 
+                      {boxValidation.variationType === 'over'
+                        ? 'Quantidade Acima do Pedido'
                         : 'Quantidade Abaixo do Pedido'}
                     </p>
                     <p className="mt-1">
-                      Pedido: <strong>{requestedQuantity} {abbreviateUnit(product.unit)}</strong> | 
-                      Oferta: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
+                      Caixas Pedidas: <strong>{requestedBoxes}</strong> |
+                      Caixas Ofertadas: <strong>{offeredBoxes}</strong>
                     </p>
                     <p className="mt-1 text-xs">
-                      Variação: <strong>{quantityValidation.variationPercentage.toFixed(1)}%</strong> 
-                      {quantityValidation.variationType === 'over' ? ' acima' : ' abaixo'} do solicitado
+                      Variação: <strong>{boxValidation.variationAmount.toFixed(1)}</strong> caixas
+                      {boxValidation.variationType === 'over' ? ' a mais' : ' a menos'}
                     </p>
-                    <p className="mt-2 text-xs">
-                      {quantityValidation.variationType === 'over' 
-                        ? 'O comprador receberá uma notificação sobre esta quantidade extra.'
-                        : 'Esta nova marca não atende completamente o pedido do comprador.'}
+                    <p className="mt-2 text-xs font-semibold">
+                      {boxValidation.shouldNotifyBuyer ? (
+                        boxValidation.variationType === 'over'
+                          ? '⚠️ O comprador será notificado sobre esta quantidade extra (mais de 0,5 caixa).'
+                          : '⚠️ O comprador será notificado sobre esta falta.'
+                      ) : (
+                        '✓ Variação dentro da tolerância (0,5 caixa). Comprador não será notificado.'
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1441,21 +1457,6 @@ export default function SellerQuotationPage() {
       isSuggestedBrand: false,
     };
 
-    // Verificar variação de quantidade
-    const offeredQuantity = calculateTotalOfferedQuantity(newOffer, product);
-    const requestedQuantity = product.quantity;
-    const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-    
-    // Se há variação significativa, registrar para possível notificação futura
-    if (!quantityValidation.isValid && quotation) {
-      // Mostrar toast informativo para o fornecedor
-      toast({
-        title: "Variação de Quantidade Detectada",
-        description: `Sua oferta tem ${quantityValidation.variationPercentage.toFixed(1)}% de variação ${quantityValidation.variationType === 'over' ? 'acima' : 'abaixo'} do pedido.`,
-        duration: 5000,
-      });
-    }
-
     try {
       // Salvar automaticamente no Firestore
       const offerPayload: Omit<Offer, 'id'> = {
@@ -1495,9 +1496,71 @@ export default function SellerQuotationPage() {
         })
       );
 
+      // Verificar variação de quantidade e notificar comprador se necessário
+      const offeredBoxes = flow.requiredPackages || 0;
+      const requestedBoxes = product.quantity;
+      const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+
+      console.log('📊 [Vendor Flow - Quantity Validation]', {
+        productName: product.name,
+        offeredBoxes,
+        requestedBoxes,
+        isValid: boxValidation.isValid,
+        shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
+        variationType: boxValidation.variationType,
+        variationAmount: boxValidation.variationAmount,
+      });
+
+      // Notificar o comprador internamente (sistema de notificações do sino)
+      if (boxValidation.shouldNotifyBuyer && quotation.userId) {
+        console.log('🔔 [Vendor Flow] Creating internal notification', {
+          quotationUserId: quotation.userId,
+          variationType: boxValidation.variationType,
+          offeredBoxes,
+          requestedBoxes,
+        });
+
+        try {
+          const result = await notifyQuantityVariation({
+            userId: quotation.userId,
+            quotationId: params.quotationId as string,
+            quotationName: quotation.name || `Cotação #${(params.quotationId as string).slice(-6)}`,
+            productId: product.id,
+            productName: product.name,
+            supplierName: currentSupplierDetails.empresa,
+            brandName: flow.selectedBrand,
+            requestedQuantity: requestedBoxes,
+            offeredQuantity: offeredBoxes,
+            unit: product.unit,
+            variationType: boxValidation.variationType!,
+            variationPercentage: boxValidation.variationPercentage,
+            variationAmount: boxValidation.variationAmount,
+          });
+
+          if (result.success) {
+            console.log('✅ [Vendor Flow] Internal notification created successfully', {
+              productName: product.name,
+              notificationId: result.id,
+            });
+          } else {
+            console.warn('⚠️ [Vendor Flow] Failed to create notification:', result.error);
+          }
+        } catch (notifError: any) {
+          console.error('❌ [Vendor Flow] Exception while creating notification:', {
+            error: notifError.message,
+            code: notifError.code,
+          });
+        }
+      } else {
+        console.log('ℹ️ [Vendor Flow] No notification needed', {
+          shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
+          hasUserId: !!quotation.userId,
+        });
+      }
+
       // Toast de sucesso
-      toast({ 
-        title: "Oferta Confirmada e Salva!", 
+      toast({
+        title: "Oferta Confirmada e Salva!",
         description: `Sua oferta para ${product.name} (${flow.selectedBrand}) foi salva automaticamente.`,
         duration: 4000
       });
@@ -1555,19 +1618,6 @@ export default function SellerQuotationPage() {
       unitsPerPackage: flow.packagingType === 'granel' ? 1 : flow.unitsPerPackage,
       unitWeight: flow.packageWeight
     };
-    
-    const offeredQuantity = calculateTotalOfferedQuantity(tempBrandOffer as any, product);
-    const requestedQuantity = product.quantity;
-    const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-    
-    // Se há variação significativa, mostrar toast informativo
-    if (!quantityValidation.isValid) {
-      toast({
-        title: "Variação de Quantidade Detectada",
-        description: `Sua nova marca tem ${quantityValidation.variationPercentage.toFixed(1)}% de variação ${quantityValidation.variationType === 'over' ? 'acima' : 'abaixo'} do pedido.`,
-        duration: 5000,
-      });
-    }
 
     // Verificar dados básicos
     if (!flow.brandName.trim() || flow.unitsPerPackage <= 0 || flow.packageWeight <= 0 || flow.packagePrice <= 0 || flow.requiredPackages <= 0) {

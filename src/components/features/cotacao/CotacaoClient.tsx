@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BrandApprovalsTab from './BrandApprovalsTab';
+import QuantityApprovalsTab from './QuantityApprovalsTab';
 import ResultadoEnvioTab from './ResultadoEnvioTab';
 import {
   Select,
@@ -158,7 +159,9 @@ export default function CotacaoClient() {
   // Novos states para a interface melhorada
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get('tab');
-    return tab === 'aprovacoes' ? 'aprovacoes' : 'overview';
+    if (tab === 'aprovacoes') return 'aprovacoes';
+    if (tab === 'aprovacoes-quantidade') return 'aprovacoes-quantidade';
+    return 'overview';
   });
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
@@ -174,6 +177,8 @@ export default function CotacaoClient() {
 
     if (tab === 'aprovacoes') {
       setActiveTab('aprovacoes');
+    } else if (tab === 'aprovacoes-quantidade') {
+      setActiveTab('aprovacoes-quantidade');
     }
     if (quotation) {
       setSelectedQuotationId(quotation);
@@ -860,6 +865,13 @@ export default function CotacaoClient() {
                 Aprovações
               </TabsTrigger>
               <TabsTrigger
+                value="aprovacoes-quantidade"
+                className="flex items-center gap-2 py-3 nav-item-modern font-heading relative"
+              >
+                <TrendingUp className="h-5 w-5 rotate-hover text-blue-600" />
+                Variações de Qtd
+              </TabsTrigger>
+              <TabsTrigger
                 value="resultado-envio"
                 className="flex items-center gap-2 py-3 nav-item-modern font-heading"
                 disabled={activeQuotationDetails?.status !== 'Fechada'}
@@ -1475,6 +1487,11 @@ export default function CotacaoClient() {
             {/* Tab: Aprovações */}
             <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 fade-in">
               <BrandApprovalsTab quotationId={selectedQuotationId} />
+            </KeepAliveTabsContent>
+
+            {/* Tab: Variações de Quantidade */}
+            <KeepAliveTabsContent value="aprovacoes-quantidade" activeTab={activeTab} className="mt-6 fade-in">
+              <QuantityApprovalsTab quotationId={selectedQuotationId} />
             </KeepAliveTabsContent>
 
             {/* Tab: Resultado & Envio */}

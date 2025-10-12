@@ -62,6 +62,7 @@ export async function createNotification(params: CreateNotificationParams) {
 
     return { success: true, id: docRef.id };
   } catch (error: any) {
+    console.error('❌ [createNotification] Error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -299,6 +300,49 @@ export async function notifyDeadlineApproaching(params: {
     priority: 'high',
     actionUrl: `/cotacao?quotation=${params.quotationId}`,
     metadata: { hoursLeft: params.hoursLeft }
+  });
+}
+
+export async function notifyQuantityVariation(params: {
+  userId: string;
+  quotationId: string;
+  quotationName: string;
+  productId: string;
+  productName: string;
+  supplierName: string;
+  brandName: string;
+  requestedQuantity: number;
+  offeredQuantity: number;
+  unit: string;
+  variationType: 'over' | 'under';
+  variationPercentage: number;
+  variationAmount: number;
+}) {
+  const variationIcon = params.variationType === 'over' ? '📈' : '📉';
+  const variationText = params.variationType === 'over' ? 'acima' : 'abaixo';
+  const variationSign = params.variationType === 'over' ? '+' : '-';
+
+  return createNotification({
+    userId: params.userId,
+    type: 'quantity_variation_detected',
+    title: `${variationIcon} Variação de Quantidade Detectada`,
+    message: `${params.supplierName} ofereceu ${params.offeredQuantity} caixas de ${params.productName} (${params.brandName}). Solicitado: ${params.requestedQuantity} caixas. Variação: ${variationSign}${params.variationAmount.toFixed(1)} caixas (${params.variationPercentage.toFixed(1)}% ${variationText})`,
+    quotationId: params.quotationId,
+    quotationName: params.quotationName,
+    productId: params.productId,
+    productName: params.productName,
+    supplierName: params.supplierName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/cotacao?quotation=${params.quotationId}&tab=aprovacoes-quantidade`,
+    metadata: {
+      requestedQuantity: params.requestedQuantity,
+      offeredQuantity: params.offeredQuantity,
+      unit: params.unit,
+      variationType: params.variationType,
+      variationPercentage: params.variationPercentage,
+      variationAmount: params.variationAmount
+    }
   });
 }
 
