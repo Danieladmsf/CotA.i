@@ -8,7 +8,7 @@ import type { CounterProposalInfo } from "./useCounterProposalLogic";
 interface ProductWithCounterProposal {
   id: string;
   name: string;
-  counterProposalInfo: CounterProposalInfo | null;
+  counterProposalInfo?: CounterProposalInfo | null;
 }
 
 export function useCounterProposalReminders(

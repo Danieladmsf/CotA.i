@@ -71,29 +71,35 @@ import {
   type CounterProposalInfo
 } from "@/hooks/quotation";
 import { handleOutbidNotification } from "@/lib/quotation/notificationHelpers";
+import { useOfferManagement } from "@/hooks/quotation/useOfferManagement";
+import { useNewBrandModal } from "@/hooks/quotation/useNewBrandModal";
+import { useQuotationData, type ProductToQuoteVM } from "@/hooks/quotation/useQuotationData";
+import { useGuidedFlows } from "@/hooks/quotation/useGuidedFlows";
+import {
+  dayMap,
+  getPreferredBrandsArray,
+  abbreviateUnit,
+  getDynamicWeightLabel,
+  getDynamicWeightPlaceholder,
+  getUnitSuffix,
+  formatCurrencyInput,
+  parseCurrencyInput,
+  handleCurrencyInputChange,
+  formatWeightInputForKg,
+  parseWeightInputForKg,
+  handleWeightInputChangeForKg,
+  formatSmartWeight,
+  formatPackaging,
+  calculateTotalOfferedQuantity,
+  validateQuantityVariation,
+  buildDynamicTitle,
+  isValidImageUrl,
+} from "@/lib/quotation/utils";
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
 const SHOPPING_LIST_ITEMS_COLLECTION = "shopping_list_items";
 const PENDING_BRAND_REQUESTS_COLLECTION = "pending_brand_requests";
-
-// Utility function to handle preferredBrands as both string and array
-const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
-  if (!preferredBrands) return [];
-  let brands: string[];
-  if (Array.isArray(preferredBrands)) {
-    brands = preferredBrands;
-  } else {
-    brands = preferredBrands.split(',').map(b => b.trim());
-  }
-  // Filter out brands that are only numbers or empty
-  return brands.filter(brand => {
-    const trimmed = brand.trim();
-    return trimmed.length > 0 && !(/^\d+$/.test(trimmed));
-  });
-};
-
-const dayMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
 interface OfferWithUI extends Offer {
   uiId: string; 
@@ -128,230 +134,7 @@ interface NewBrandForm {
   imageFile: File | null;
 }
 
-// Dynamic label and placeholder functions based on product unit
-const getDynamicWeightLabel = (unit: string): string => {
-  switch (unit) {
-    case 'Kilograma(s)':
-      return 'Peso (Kg)';
-    case 'Litro(s)':
-      return 'Volume (ml)';
-    case 'Grama(s)':
-      return 'Peso (gr)';
-    case 'Mililitro(s)':
-      return 'Volume (ml)';
-    case 'Unidade(s)':
-      return 'Qtd por Emb.';
-    case 'Pacote(s)':
-      return 'Qtd por Emb.';
-    default:
-      return `Qtd (${abbreviateUnit(unit)})`;
-  }
-};
-
-const getDynamicWeightPlaceholder = (unit: string): string => {
-  switch (unit) {
-    case 'Kilograma(s)':
-      return 'Ex: 5Kg';
-    case 'Litro(s)':
-      return 'Ex: 500ml';
-    case 'Grama(s)':
-      return 'Ex: 250gr';
-    case 'Mililitro(s)':
-      return 'Ex: 350ml';
-    case 'Unidade(s)':
-      return 'Ex: 1 unid';
-    case 'Pacote(s)':
-      return 'Ex: 1 pct';
-    default:
-      return `Ex: 1 ${abbreviateUnit(unit)}`;
-  }
-};
-
-const getUnitSuffix = (unit: string): string => {
-  switch (unit) {
-    case 'Kilograma(s)':
-      return 'Kg';
-    case 'Litro(s)':
-      return 'ml';
-    case 'Grama(s)':
-      return 'gr';
-    case 'Mililitro(s)':
-      return 'ml';
-    case 'Unidade(s)':
-      return 'unid';
-    case 'Pacote(s)':
-      return 'pct';
-    default:
-      return abbreviateUnit(unit);
-  }
-};
-
-interface ProductToQuoteVM extends ShoppingListItem {
-  supplierOffers: OfferWithUI[];
-  bestOffersByBrand: BestOfferForBrandDisplay[];
-  lowestPriceThisProductHas?: number | null;
-  isDeliveryDayMismatch: boolean;
-  counterProposalInfo: CounterProposalInfo | null;
-  isLockedOut?: boolean;
-  acknowledgedDeliveryMismatches?: string[]; // NEW FIELD
-  categoryName?: string;
-  pendingBrandRequests?: PendingBrandRequest[]; // Nova propriedade para solicitações pendentes
-}
-
-const abbreviateUnit = (unit: UnitOfMeasure | string): string => {
-  switch (unit) {
-    case "Kilograma(s)": return "Kg";
-    case "Litro(s)": return "Lt";
-    case "Unidade(s)": return "Unid.";
-    case "Grama(s)": return "g";
-    case "Mililitro(s)": return "ml";
-    case "Caixa(s)": return "Cx.";
-    case "Pacote(s)": return "Pct.";
-    case "Dúzia(s)": return "Dz.";
-    case "Peça(s)": return "Pç.";
-    case "Metro(s)": return "m";
-    case "Lata(s)": return "Lata";
-    case "Garrafa(s)": return "Gf.";
-    default:
-      if (typeof unit === 'string' && unit.includes("(")) return unit.substring(0, unit.indexOf("(")).trim();
-      return String(unit);
-  }
-};
-
-// Funções para formatação monetária
-const formatCurrencyInput = (centavos: number): string => {
-  const reais = centavos / 100;
-  return reais.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
-
-const parseCurrencyInput = (value: string): number => {
-  // Remove tudo exceto números
-  const numbersOnly = value.replace(/[^\d]/g, '');
-  // Converte para centavos (número inteiro)
-  return parseInt(numbersOnly) || 0;
-};
-
-const handleCurrencyInputChange = (value: string): string => {
-  const centavos = parseCurrencyInput(value);
-  return formatCurrencyInput(centavos);
-};
-
-// Funções para formatação de peso (Kg/L)
-const formatWeightInputForKg = (gramas: number): string => {
-  const kg = gramas / 1000;
-  return kg.toFixed(3).replace('.', ',');
-};
-
-const parseWeightInputForKg = (value: string): number => {
-  const numbersOnly = value.replace(/[^\d]/g, '');
-  return parseInt(numbersOnly) || 0;
-};
-
-const handleWeightInputChangeForKg = (value: string): string => {
-  const gramas = parseWeightInputForKg(value);
-  return formatWeightInputForKg(gramas);
-};
-
-// Funções para validação de quantidade total
-const calculateTotalOfferedQuantity = (offer: OfferWithUI, product: ProductToQuoteVM): number => {
-  const packagesCount = Number(offer.unitsInPackaging) || 0;
-  const unitsPerPackage = Number(offer.unitsPerPackage) || 0;
-  const unitWeight = Number(offer.unitWeight) || 0;
-
-  if (packagesCount <= 0) return 0;
-
-  // Para produtos vendidos por peso (Kg/L), usar peso total
-  if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
-    return packagesCount * unitWeight;
-  }
-  
-  // Para produtos vendidos por unidade, usar quantidade de unidades
-  if (product.unit === 'Unidade(s)' || product.unit === 'Peça(s)' || product.unit === 'Dúzia(s)') {
-    return packagesCount * unitsPerPackage;
-  }
-  
-  // Para outras unidades, usar peso
-  return packagesCount * unitWeight;
-};
-
-const validateQuantityVariation = (
-  offeredQuantity: number, 
-  requestedQuantity: number,
-  tolerancePercent: number = 10
-): { isValid: boolean; variationType?: 'over' | 'under'; variationPercentage: number } => {
-  if (requestedQuantity <= 0) {
-    return { isValid: true, variationPercentage: 0 };
-  }
-
-  const variationPercentage = Math.abs((offeredQuantity - requestedQuantity) / requestedQuantity) * 100;
-  
-  if (variationPercentage <= tolerancePercent) {
-    return { isValid: true, variationPercentage };
-  }
-
-  const variationType = offeredQuantity > requestedQuantity ? 'over' : 'under';
-  return { 
-    isValid: false, 
-    variationType, 
-    variationPercentage 
-  };
-};
-
-// Formatação inteligente de peso para títulos
-const formatSmartWeight = (weight: number, unit: UnitOfMeasure | string): string => {
-  if ((unit === 'Kilograma(s)' || unit === 'Kg') && weight < 1 && weight > 0) {
-    const gramas = Math.round(weight * 1000);
-    return `${gramas}g`;
-  }
-  if ((unit === 'Litro(s)' || unit === 'Lt' || unit === 'L') && weight < 1 && weight > 0) {
-    const ml = Math.round(weight * 1000);
-    return `${ml}ml`;
-  }
-  const formattedWeight = weight % 1 === 0 ? weight.toFixed(0) : weight;
-  return `${formattedWeight}${abbreviateUnit(unit)}`;
-};
-
-const formatPackaging = (quantity: number, weight: number, unit: UnitOfMeasure | string): string => {
-  return `${quantity}×${formatSmartWeight(weight, unit)}`;
-};
-
-// Gera título dinâmico do produto baseado na oferta do fornecedor
-const buildDynamicTitle = (
-  productName: string,
-  offer: OfferWithUI | undefined,
-  productUnit: UnitOfMeasure
-): string => {
-  if (!offer) return productName;
-
-  let title = productName;
-
-  // Adiciona marca com hífen se preenchida
-  if (offer.brandOffered && offer.brandOffered.trim()) {
-    title += ` - ${offer.brandOffered}`;
-  }
-
-  // Adiciona embalagem se ambos campos preenchidos
-  if (offer.unitsInPackaging > 0 && offer.unitWeight && offer.unitWeight > 0) {
-    title += ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, productUnit)}`;
-  }
-
-  // Adiciona preço se preenchido
-  if (offer.totalPackagingPrice > 0) {
-    title += ` | ${formatCurrency(offer.totalPackagingPrice)}`;
-  }
-
-  return title;
-};
-
-
-const isValidImageUrl = (url?: string): url is string => {
-  return !!url && (url.startsWith('http') || url.startsWith('data:'));
-};
+// ProductToQuoteVM is imported from useQuotationData hook
 
 // Renderiza o card do fluxo guiado do vendedor
 const renderVendorFlowCard = (
@@ -1094,83 +877,55 @@ export default function SellerQuotationPage() {
     quotationId: quotationId,
     isRead: false
   });
-  const [quotation, setQuotation] = useState<Quotation | null>(null);
-  const [currentSupplierDetails, setCurrentSupplierDetails] = useState<SupplierType | null>(null);
-  const [productsToQuote, setProductsToQuote] = useState<ProductToQuoteVM[]>([]);
-  const [pendingRequestsCache, setPendingRequestsCache] = useState<PendingBrandRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
-  const [unseenAlerts, setUnseenAlerts] = useState<string[]>([]);
-  const [weightInputValues, setWeightInputValues] = useState<Record<string, string>>({});
-  const [expandedProductIds, setExpandedProductIds] = useState<string[]>([]);
-  const [showStopQuotingModal, setShowStopQuotingModal] = useState(false);
-  const [offerToStop, setOfferToStop] = useState<{productId: string, offerUiId: string, productName: string} | null>(null);
-  const [stoppedQuotingProducts, setStoppedQuotingProducts] = useState<Set<string>>(new Set());
-  const [editingOffers, setEditingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
-  const [savingOffers, setSavingOffers] = useState<Set<string>>(new Set()); // productId_offerUiId
-  const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
-  const [hasSpokenTabMessage, setHasSpokenTabMessage] = useState(false);
-
-  // Estados para o fluxo guiado do vendedor
-  const [vendorFlow, setVendorFlow] = useState<Record<string, {
-    isActive: boolean;
-    currentStep: number;
-    selectedBrand: string;
-    packagingType: 'caixa' | 'fardo' | 'granel' | '';
-    unitsPerPackage: number;
-    packageWeight: number;
-    packagePrice: number;
-    requiredPackages: number;
-    showGuidedFlow: boolean;
-  }>>({});
-
-  // Estado para controlar o fluxo guiado de nova marca
-  const [newBrandFlow, setNewBrandFlow] = useState<Record<string, {
-    isActive: boolean;
-    currentStep: number;
-    brandName: string;
-    packagingType: 'caixa' | 'fardo' | 'granel' | '';
-    unitsPerPackage: number;
-    packageWeight: number;
-    packagePrice: number;
-    requiredPackages: number;
-    imageFile: File | null;
-    showGuidedFlow: boolean;
-  }>>({});
-
-  // Estados para o wizard do vendedor
-  const [wizardState, setWizardState] = useState<Record<string, {
-    isActive: boolean;
-    currentStep: number;
-    selectedBrand: string;
-    packagingType: 'caixa' | 'fardo' | 'granel' | '';
-    unitsPerPackage: number;
-    packageWeight: number;
-    packagePrice: number;
-    requiredPackages: number;
-  }>>({});
-
-  // Estados para o modal de nova marca
-  const [newBrandModal, setNewBrandModal] = useState({
-    isOpen: false,
-    productId: '',
-    productName: '',
-    productUnit: '' as UnitOfMeasure | ''
-  });
-  const [newBrandForm, setNewBrandForm] = useState<NewBrandForm>({
-    brandName: '',
-    packagingDescription: '',
-    unitsInPackaging: 0,
-    unitWeight: 0,
-    totalPackagingPrice: 0,
-    imageFile: null
-  });
-  const [isSubmittingNewBrand, setIsSubmittingNewBrand] = useState(false);
 
   const brandInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const supplierDetailsCache = useRef(new Map<string, SupplierType>());
   const closingQuotationsRef = useRef(new Set<string>());
   const lastClickRef = useRef<{ action: string; timestamp: number } | null>(null);
+
+  // Load quotation data with custom hook
+  const {
+    quotation,
+    setQuotation,
+    currentSupplierDetails,
+    productsToQuote,
+    setProductsToQuote,
+    isLoading,
+    pendingRequestsCache,
+  } = useQuotationData({
+    quotationId,
+    supplierId,
+    toast,
+    speak,
+    voiceMessages,
+    supplierDetailsCache,
+  });
+  const [unseenAlerts, setUnseenAlerts] = useState<string[]>([]);
+  const [expandedProductIds, setExpandedProductIds] = useState<string[]>([]);
+  const [showStopQuotingModal, setShowStopQuotingModal] = useState(false);
+  const [offerToStop, setOfferToStop] = useState<{productId: string, offerUiId: string, productName: string} | null>(null);
+  const [stoppedQuotingProducts, setStoppedQuotingProducts] = useState<Set<string>>(new Set());
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
+  const [hasSpokenTabMessage, setHasSpokenTabMessage] = useState(false);
+
+  // Loading state para o fluxo guiado de nova marca
+  const [isSubmittingGuidedBrand, setIsSubmittingGuidedBrand] = useState(false);
+
+  // Guided flows hook
+  const {
+    vendorFlow,
+    startVendorFlow,
+    updateVendorFlow,
+    cancelVendorFlow,
+    newBrandFlow,
+    startNewBrandFlow,
+    updateNewBrandFlow,
+    cancelNewBrandFlow,
+    wizardState,
+    startWizard,
+    updateWizard,
+    cancelWizard,
+  } = useGuidedFlows();
 
   // Hook de cronômetro e auto-close da cotação
   const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
@@ -1201,6 +956,47 @@ export default function SellerQuotationPage() {
   }, [toast, quotation, setQuotation]);
 
   const { timeLeft, isDeadlinePassed, isQuotationEnded } = useQuotationDeadline(quotation, handleAutoCloseQuotation);
+
+  // Helper function to check and block actions when quotation is ended
+  const checkAndBlockIfQuotationEnded = useCallback((): boolean => {
+    if (isQuotationEnded) {
+      toast({
+        title: "Ação Bloqueada",
+        description: "Não é possível adicionar marcas em cotações encerradas.",
+        variant: "destructive"
+      });
+      return true; // Blocked
+    }
+    return false; // Allowed
+  }, [isQuotationEnded, toast]);
+
+  // Custom hooks for offer and brand management
+  const offerManagement = useOfferManagement({
+    quotationId,
+    supplierId,
+    productsToQuote,
+    setProductsToQuote,
+    currentSupplierDetails,
+    quotation,
+    expandedProductIds,
+    setExpandedProductIds,
+    setUnseenAlerts,
+    brandInputRefs,
+    supplierDetailsCache,
+    speak,
+    voiceMessages,
+  });
+
+  const newBrandManagement = useNewBrandModal({
+    quotation,
+    currentSupplierDetails,
+    supplierId,
+    sellerUser,
+    speak,
+    voiceMessages,
+    checkAndBlockIfQuotationEnded,
+    startNewBrandFlow,
+  });
 
   const productsWithMyOffers = useMemo(() => {
     const productIds = new Set<string>();
@@ -1260,238 +1056,8 @@ export default function SellerQuotationPage() {
   const handleNewBrandPriceFocus = () => speak(voiceMessages.formFields.newBrand_price_prompt);
   const handleNewBrandImageFocus = () => speak(voiceMessages.formFields.newBrand_image_prompt);
 
-  // Helper function to check and block actions when quotation is ended
-  const checkAndBlockIfQuotationEnded = (): boolean => {
-    if (isQuotationEnded) {
-      toast({
-        title: "Ação Bloqueada",
-        description: "Não é possível adicionar marcas em cotações encerradas.",
-        variant: "destructive"
-      });
-      return true; // Blocked
-    }
-    return false; // Allowed
-  };
-
   // Funções para nova marca (agora usando fluxo guiado ao invés de modal)
-  const openNewBrandModal = (productId: string, productName: string, productUnit: UnitOfMeasure) => {
-    // Verificação de segurança: bloquear se cotação encerrada
-    if (checkAndBlockIfQuotationEnded()) return;
-
-    // Usar fluxo guiado ao invés de modal
-    startNewBrandFlow(productId);
-
-    // Manter dados do modal para compatibilidade (mas não abrir modal)
-    setNewBrandModal({
-      isOpen: false, // Modal fechado, usando fluxo guiado
-      productId,
-      productName,
-      productUnit
-    });
-    speak("Ok, vamos solicitar uma nova marca. Vou te guiar passo a passo para criar uma proposta. Sua sugestão será enviada para o comprador analisar.");
-  };
-
-  const closeNewBrandModal = () => {
-    setNewBrandModal({
-      isOpen: false,
-      productId: '',
-      productName: '',
-      productUnit: '' as UnitOfMeasure | ''
-    });
-    setNewBrandForm({
-      brandName: '',
-      packagingDescription: '',
-      unitsInPackaging: 0,
-      unitWeight: 0,
-      totalPackagingPrice: 0,
-      imageFile: null
-    });
-  };
-
-  const handleNewBrandFormChange = (field: keyof typeof newBrandForm, value: any) => {
-    setNewBrandForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const uploadImageToVercelBlob = async (file: File): Promise<string> => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Use filename as query parameter as expected by the API
-      const filename = `brand-images/${Date.now()}-${file.name}`;
-      const response = await fetch(`/api/upload?filename=${encodeURIComponent(filename)}`, {
-        method: 'POST',
-        body: file, // Send file directly, not FormData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Falha no upload da imagem');
-      }
-
-      const data = await response.json();
-      return data.url;
-    } catch (error: any) {
-      throw new Error('Falha no upload da imagem: ' + error.message);
-    }
-  };
-
-  const submitNewBrandRequest = async () => {
-    if (!quotation || !currentSupplierDetails || !newBrandModal.productId) {
-      toast({ title: "Erro", description: "Dados insuficientes para enviar solicitação.", variant: "destructive" });
-      return;
-    }
-
-    if (!sellerUser?.uid) {
-      toast({ title: "Erro de Autenticação", description: "Seu usuário não foi encontrado. Por favor, recarregue a página.", variant: "destructive" });
-      return;
-    }
-
-    if (newBrandForm.unitsInPackaging <= 0 || newBrandForm.unitWeight <= 0 || newBrandForm.totalPackagingPrice <= 0) {
-      toast({ title: "Erro", description: "Todos os campos são obrigatórios (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive" });
-      return;
-    }
-
-    setIsSubmittingNewBrand(true);
-
-    try {
-      let imageUrl = '';
-      if (newBrandForm.imageFile) {
-        try {
-          imageUrl = await uploadImageToVercelBlob(newBrandForm.imageFile);
-        } catch (error: any) {
-          // Image upload failed, continuing without image
-        }
-      }
-
-      // No modal de nova marca, unitsInPackaging representa "Total Un na Emb" (unidades por embalagem)
-      // O preço é da embalagem completa, então calculamos: preço_embalagem / (unidades × peso_unitário)
-      const unitsPerPackage = newBrandForm.unitsInPackaging; // "Total Un na Emb"
-      const pricePerUnit = newBrandForm.totalPackagingPrice / (unitsPerPackage * newBrandForm.unitWeight);
-
-      const brandRequestData = {
-        quotationId: quotation.id,
-        productId: newBrandModal.productId,
-        productName: newBrandModal.productName, // Added for notification context
-        supplierId: supplierId,
-        supplierName: currentSupplierDetails.empresa,
-        supplierInitials: currentSupplierDetails.vendedor.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-        brandName: newBrandForm.brandName.trim(),
-        packagingDescription: newBrandForm.packagingDescription.trim() || formatPackaging(newBrandForm.unitsInPackaging, newBrandForm.unitWeight, newBrandModal.productUnit),
-        unitsInPackaging: newBrandForm.unitsInPackaging,
-        unitsPerPackage: newBrandForm.unitsInPackaging, // No modal, unitsInPackaging = unitsPerPackage
-        unitWeight: newBrandForm.unitWeight,
-        totalPackagingPrice: newBrandForm.totalPackagingPrice,
-        pricePerUnit: pricePerUnit,
-        imageUrl: imageUrl,
-        imageFileName: newBrandForm.imageFile?.name || '',
-        buyerUserId: quotation.userId, // ID do comprador
-        sellerUserId: sellerUser?.uid || supplierId, // ID do vendedor (usa supplierId se não autenticado)
-      };
-
-      const response = await fetch('/api/brand-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(brandRequestData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao enviar solicitação');
-      }
-
-      const result = await response.json();
-
-      // Check for notification error
-      if (result.notificationError) {
-        toast({
-          title: "Solicitação Enviada com Aviso",
-          description: `Marca enviada, mas notificação falhou: ${result.notificationError}`,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Solicitação Enviada!",
-          description: "Sua nova marca foi enviada para aprovação do comprador.",
-          variant: "default"
-        });
-      }
-
-      speak(voiceMessages.success.brandRequestSent);
-
-      // Fechar modal, card e fluxo guiado
-      closeNewBrandModal();
-      if (newBrandModal.productId) {
-        cancelNewBrandFlow(newBrandModal.productId);
-      }
-
-    } catch (error: any) {
-      if (error.code === 'permission-denied') {
-        toast({ 
-          title: "Erro de Permissão", 
-          description: "As regras do Firestore precisam ser atualizadas para permitir solicitações de marca. Entre em contato com o administrador.", 
-          variant: "destructive" 
-        });
-      } else {
-        toast({ 
-          title: "Erro ao Enviar Solicitação", 
-          description: error.message || "Erro desconhecido. Tente novamente.", 
-          variant: "destructive" 
-        });
-      }
-    } finally {
-      setIsSubmittingNewBrand(false);
-    }
-  };
-
-  // Main listener for the quotation document itself
-  useEffect(() => {
-    if (!quotationId) return;
-
-    const quotationRef = doc(db, QUOTATIONS_COLLECTION, quotationId);
-    const unsubscribe = onSnapshot(quotationRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setQuotation({ id: docSnap.id, ...docSnap.data() } as Quotation);
-      } else {
-        toast({ title: "Cotação não encontrada.", variant: "destructive" });
-        setQuotation(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [quotationId, toast]);
-
-  // Effect to load supplier details only (quotation and products load via real-time listeners)
-  useEffect(() => {
-    if (!quotationId || !supplierId) {
-        setIsLoading(false);
-        toast({ title: "Erro", description: "ID da cotação ou do fornecedor ausente.", variant: "destructive" });
-        return;
-    }
-    setIsLoading(true);
-
-    const fetchSupplierData = async () => {
-      try {
-        const supplierRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
-        const supplierSnap = await getDoc(supplierRef);
-        if (!supplierSnap.exists()) throw new Error("Fornecedor não encontrado.");
-        const fetchedSupplier = { id: supplierSnap.id, ...supplierSnap.data() } as SupplierType;
-        setCurrentSupplierDetails(fetchedSupplier);
-        supplierDetailsCache.current.set(supplierId, fetchedSupplier);
-
-      } catch (error: any) {
-        toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
-        speak(voiceMessages.error.loadFailed);
-        setIsLoading(false);
-      }
-    };
-    fetchSupplierData();
-  }, [quotationId, supplierId, toast, speak]);
+  // NOTE: Quotation and supplier data loading is handled by useQuotationData hook
 
   // Handle priority notifications and welcome speech
   usePriorityNotificationHandler({
@@ -1506,53 +1072,7 @@ export default function SellerQuotationPage() {
     setHasSpokenTabMessage,
   });
 
-  // Effect to listen for brand requests
-  // NOTE: Approved brands automatically become offers and are not shown here
-  // Only pending (orange) and rejected (red) requests are displayed
-  useEffect(() => {
-    if (!quotationId || !supplierId) return;
-
-    const brandRequestsQuery = query(
-      collection(db, PENDING_BRAND_REQUESTS_COLLECTION),
-      where("quotationId", "==", quotationId),
-      where("supplierId", "==", supplierId)
-      // Query all statuses but filter client-side to show only pending/rejected
-    );
-
-    const unsubscribe = onSnapshot(brandRequestsQuery, (snapshot) => {
-      const brandRequests = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as PendingBrandRequest));
-
-      // Filtrar apenas pending e rejected (approved vira oferta automaticamente)
-      const visibleRequests = brandRequests.filter(req => req.status === 'pending' || req.status === 'rejected');
-
-      console.log('🔵 [Brand Requests] Total recebidas:', brandRequests.length);
-      console.log('🔵 [Brand Requests] Visíveis (pending/rejected):', visibleRequests.length);
-      console.log('🔵 [Brand Requests] Status:', brandRequests.map(r => ({ id: r.id, brand: r.brandName, status: r.status })));
-
-      // Armazena no cache para uso na carga inicial de produtos
-      setPendingRequestsCache(visibleRequests);
-
-      // Update products to include visible brand requests (se já existem produtos)
-      setProductsToQuote(prevProducts => {
-        if (prevProducts.length === 0) {
-          return prevProducts;
-        }
-
-        return prevProducts.map(product => {
-          const productBrandRequests = visibleRequests.filter(req => req.productId === product.id);
-          return {
-            ...product,
-            pendingBrandRequests: productBrandRequests // Mantém o nome do campo por compatibilidade
-          };
-        });
-      });
-    });
-
-    return () => unsubscribe();
-  }, [quotationId, supplierId]);
+  // NOTE: Brand requests loading is handled by useQuotationData hook
 
   // Effect to listen for real-time changes in shopping_list_items (initial load + updates)
   useEffect(() => {
@@ -1595,8 +1115,7 @@ export default function SellerQuotationPage() {
             } as ProductToQuoteVM;
           }).sort((a, b) => a.name.localeCompare(b.name));
 
-          // Set loading to false after initial products load
-          setIsLoading(false);
+          // NOTE: Loading state is managed by useQuotationData hook
           return initialProducts;
         }
 
@@ -1874,34 +1393,10 @@ export default function SellerQuotationPage() {
   };
 
   // Funções para o fluxo guiado do vendedor
-  const initVendorFlow = (productId: string, brandName: string) => {
-    const flowKey = `${productId}_vendor_flow`;
-    setVendorFlow(prev => ({
-      ...prev,
-      [flowKey]: {
-        isActive: true,
-        currentStep: 1,
-        selectedBrand: brandName,
-        packagingType: '',
-        unitsPerPackage: 0,
-        packageWeight: 0,
-        packagePrice: 0,
-        requiredPackages: 0,
-        showGuidedFlow: true
-      }
-    }));
-  };
+  // NOTE: initVendorFlow and updateVendorFlowStep are provided by useGuidedFlows hook as startVendorFlow and updateVendorFlow
 
   const updateVendorFlowStep = (productId: string, field: string, value: any, nextStep?: number) => {
-    const flowKey = `${productId}_vendor_flow`;
-    setVendorFlow(prev => ({
-      ...prev,
-      [flowKey]: {
-        ...prev[flowKey],
-        [field]: value,
-        currentStep: nextStep || prev[flowKey]?.currentStep || 1
-      }
-    }));
+    updateVendorFlow(productId, field as any, value, nextStep);
   };
 
   const completeVendorFlow = async (productId: string) => {
@@ -2031,64 +1526,17 @@ export default function SellerQuotationPage() {
       });
     } finally {
       // Limpar o fluxo independente do resultado
-      setVendorFlow(prev => {
-        const newFlow = { ...prev };
-        delete newFlow[flowKey];
-        return newFlow;
-      });
+      cancelVendorFlow(productId);
     }
   };
 
-  const cancelVendorFlow = (productId: string) => {
-    const flowKey = `${productId}_vendor_flow`;
-    setVendorFlow(prev => {
-      const newFlow = { ...prev };
-      delete newFlow[flowKey];
-      return newFlow;
-    });
-  };
+  // NOTE: cancelVendorFlow is provided by useGuidedFlows hook
 
   // Funções para controlar o fluxo guiado de nova marca
-  const startNewBrandFlow = (productId: string) => {
-    const flowKey = `${productId}_brand_flow`;
-    setNewBrandFlow(prev => ({
-      ...prev,
-      [flowKey]: {
-        isActive: true,
-        currentStep: 1,
-        brandName: '',
-        packagingType: '',
-        unitsPerPackage: 0,
-        packageWeight: 0,
-        packagePrice: 0,
-        requiredPackages: 0,
-        imageFile: null,
-        showGuidedFlow: true
-      }
-    }));
-    // Fechar modal se estiver aberto
-    closeNewBrandModal();
-  };
+  // NOTE: startNewBrandFlow, updateNewBrandFlow, cancelNewBrandFlow are provided by useGuidedFlows hook
 
   const updateNewBrandFlowStep = (productId: string, field: string, value: any, nextStep?: number) => {
-    const flowKey = `${productId}_brand_flow`;
-    setNewBrandFlow(prev => ({
-      ...prev,
-      [flowKey]: {
-        ...prev[flowKey],
-        [field]: value,
-        ...(nextStep && { currentStep: nextStep })
-      }
-    }));
-  };
-
-  const cancelNewBrandFlow = (productId: string) => {
-    const flowKey = `${productId}_brand_flow`;
-    setNewBrandFlow(prev => {
-      const newFlow = { ...prev };
-      delete newFlow[flowKey];
-      return newFlow;
-    });
+    updateNewBrandFlow(productId, field as any, value, nextStep);
   };
 
   const completeNewBrandFlow = async (productId: string) => {
@@ -2131,7 +1579,7 @@ export default function SellerQuotationPage() {
     }
 
     try {
-      setIsSubmittingNewBrand(true);
+      setIsSubmittingGuidedBrand(true);
 
       // Upload da imagem se fornecida
       let imageUrl = '';
@@ -2206,24 +1654,38 @@ export default function SellerQuotationPage() {
         variant: "destructive"
       });
     } finally {
-      setIsSubmittingNewBrand(false);
+      setIsSubmittingGuidedBrand(false);
     }
   };
 
-  const handleOfferChange = (productId: string, offerUiId: string, field: keyof OfferWithUI, value: string | number | boolean) => {
-    setProductsToQuote(prevProducts =>
-      prevProducts.map(p =>
-        p.id === productId
-          ? {
-              ...p,
-              supplierOffers: p.supplierOffers.map((offer) =>
-                offer.uiId === offerUiId ? { ...offer, [field]: value, updatedAt: serverTimestamp() as Timestamp } : offer
-              ),
-            }
-          : p
-      )
-    );
-  };
+  // Destructure offer management functions from hook
+  const {
+    isSaving,
+    weightInputValues,
+    editingOffers,
+    savingOffers,
+    handleOfferChange,
+    handlePriceChange,
+    handleWeightChange,
+    getWeightDisplayValue,
+    toggleEditMode,
+    isInEditMode,
+    addOfferField,
+    removeOfferField,
+    handleSaveProductOffer,
+  } = offerManagement;
+
+  // Destructure new brand management functions from hook
+  const {
+    newBrandModal,
+    newBrandForm,
+    isSubmittingNewBrand,
+    openNewBrandModal,
+    closeNewBrandModal,
+    handleNewBrandFormChange,
+    uploadImageToVercelBlob,
+    submitNewBrandRequest,
+  } = newBrandManagement;
 
   // Handlers de narração para campos do formulário
   const handlePackagingDescriptionBlur = (productId: string, offerUiId: string) => {
@@ -2261,57 +1723,6 @@ export default function SellerQuotationPage() {
     }
   };
 
-  const handlePriceChange = (productId: string, offerUiId: string, inputValue: string) => {
-    // Parse centavos do input formatado
-    const centavos = parseCurrencyInput(inputValue);
-    // Converte para valor decimal para armazenamento
-    const decimalValue = centavos / 100;
-    // Atualiza o estado com o valor decimal
-    handleOfferChange(productId, offerUiId, 'totalPackagingPrice', decimalValue);
-  };
-
-  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>, product: ProductToQuoteVM, offer: OfferWithUI) => {
-    const inputValue = e.target.value;
-    const key = `${product.id}_${offer.uiId}`;
-
-    // Para Kg e Litros: usuário digita em gramas/ml, sistema converte para Kg/L
-    if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
-      const gramas = parseWeightInputForKg(inputValue);
-      const kg = gramas / 1000;
-
-      // Atualiza o display value (formatado com vírgula)
-      const formattedValue = formatWeightInputForKg(gramas);
-      setWeightInputValues(prev => ({ ...prev, [key]: formattedValue }));
-
-      // Atualiza o valor real em Kg/L
-      handleOfferChange(product.id, offer.uiId, 'unitWeight', kg);
-    } else {
-      // Para outras unidades: valor direto
-      const numericValue = parseFloat(inputValue.replace(',', '.')) || 0;
-      handleOfferChange(product.id, offer.uiId, 'unitWeight', numericValue);
-    }
-  };
-
-  const getWeightDisplayValue = (product: ProductToQuoteVM, offer: OfferWithUI): string => {
-    const key = `${product.id}_${offer.uiId}`;
-
-    // Para Kg/L: usa o valor formatado do state
-    if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
-      if (weightInputValues[key] !== undefined) {
-        return weightInputValues[key];
-      }
-      // Valor inicial: converte Kg para gramas e formata
-      if (offer.unitWeight) {
-        const gramas = Math.round(offer.unitWeight * 1000);
-        return formatWeightInputForKg(gramas);
-      }
-      return '0,000';
-    }
-
-    // Para outras unidades: valor direto
-    return offer.unitWeight?.toString().replace('.', ',') || '';
-  };
-
   const handleStopQuotingClick = (productId: string, offerUiId: string, productName: string) => {
     setOfferToStop({ productId, offerUiId, productName });
     setShowStopQuotingModal(true);
@@ -2340,117 +1751,12 @@ export default function SellerQuotationPage() {
     });
   };
 
-  const toggleEditMode = (productId: string, offerUiId: string) => {
-    const editKey = `${productId}_${offerUiId}`;
-    setEditingOffers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(editKey)) {
-        newSet.delete(editKey);
-      } else {
-        newSet.add(editKey);
-      }
-      return newSet;
-    });
-  };
-
-  const isInEditMode = (productId: string, offerUiId: string): boolean => {
-    return editingOffers.has(`${productId}_${offerUiId}`);
-  };
-
-  const addOfferField = (productId: string, brandToPreFill?: string, isSuggested?: boolean) => {
-
-    // Prevent duplicate execution
-    const executionKey = `addOffer-${productId}-${brandToPreFill}-${isSuggested}`;
-    if (lastClickRef.current?.action === executionKey && Date.now() - lastClickRef.current.timestamp < 500) {
-      return;
-    }
-    lastClickRef.current = { action: executionKey, timestamp: Date.now() };
-
-    if (!currentSupplierDetails) {
-        toast({title: "Erro", description: "Dados do fornecedor não carregados.", variant: "destructive"});
-        return;
-    }
-
-    if (!expandedProductIds.includes(productId)) {
-      setExpandedProductIds(prev => [...prev, productId]);
-    }
-
-    const newOfferUiId = Date.now().toString() + Math.random().toString(36).substring(2,7);
-
-    setProductsToQuote(prevProducts => {
-      const targetProduct = prevProducts.find(p => p.id === productId);
-      if (targetProduct) {
-      }
-      const updatedProducts = prevProducts.map(p => {
-        if (p.id === productId) {
-            const newOffer: OfferWithUI = {
-                uiId: newOfferUiId,
-                quotationId: quotationId, // Adicionar campo obrigatório
-                supplierId: supplierId,
-                supplierName: currentSupplierDetails.empresa || "N/A",
-                supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase() || "XX",
-                brandOffered: brandToPreFill || "",
-                packagingDescription: "",
-                unitsInPackaging: 0,
-                unitsPerPackage: 0,
-                unitWeight: 0,
-                totalPackagingPrice: 0,
-                pricePerUnit: 0,
-                updatedAt: serverTimestamp() as Timestamp,
-                productId: productId,
-                isSuggestedBrand: isSuggested || false,
-            };
-
-            const updatedProduct = {
-                ...p,
-                supplierOffers: [...p.supplierOffers, newOffer],
-            };
-             // Don't auto-focus for suggested brands - they should appear pre-filled but not editable
-             if (!brandToPreFill) {
-               setTimeout(() => {
-                  const brandInputRef = brandInputRefs.current[`${productId}_${newOfferUiId}`];
-                  brandInputRef?.focus();
-              }, 0);
-             } else {
-             }
-            return updatedProduct;
-        }
-        return p;
-      });
-      return updatedProducts;
-    });
-  };
-  
-  const removeOfferField = async (productId: string, offerToRemove: OfferWithUI) => {
-    if (offerToRemove.id) { 
-        setIsSaving(prev => ({ ...prev, [`${productId}_${offerToRemove.uiId}`]: true }));
-        try {
-            const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerToRemove.id}`);
-            await deleteDoc(offerRef);
-            toast({ title: "Oferta Removida", description: "A oferta foi removida do banco de dados." });
-        } catch (error: any) {
-            toast({ title: "Erro ao Remover", description: error.message, variant: "destructive" });
-            setIsSaving(prev => ({ ...prev, [`${productId}_${offerToRemove.uiId}`]: false }));
-            return; 
-        } finally {
-             setIsSaving(prev => ({ ...prev, [`${productId}_${offerToRemove.uiId}`]: false }));
-        }
-    }
-    setProductsToQuote(prevProducts =>
-      prevProducts.map(p =>
-        p.id === productId
-          ? { ...p, supplierOffers: p.supplierOffers.filter(offer => offer.uiId !== offerToRemove.uiId) }
-          : p
-      )
-    );
-  };
-
   const handleSuggestedBrandClick = (productId: string, brandName: string) => {
     // Verificação de segurança: bloquear se cotação encerrada
     if (checkAndBlockIfQuotationEnded()) return;
 
     // Iniciar o fluxo guiado do vendedor
-    initVendorFlow(productId, brandName);
+    startVendorFlow(productId, brandName);
 
     // Narração após selecionar marca
     const product = productsToQuote.find(p => p.id === productId);
@@ -2524,171 +1830,6 @@ export default function SellerQuotationPage() {
     return null;
   };
 
-  const handleSaveProductOffer = async (productId: string, offerUiId: string): Promise<boolean> => {
-    const totalStartTime = performance.now();
-    // Debounce rapid save clicks
-    const now = Date.now();
-    const actionKey = `save-${productId}-${offerUiId}`;
-    if (lastClickRef.current?.action === actionKey && now - lastClickRef.current.timestamp < 1000) {
-      return false;
-    }
-    lastClickRef.current = { action: actionKey, timestamp: now };
-
-    if (!currentSupplierDetails || !quotation || !quotation.userId) {
-        toast({title: "Erro Interno", description: "Dados do fornecedor, cotação ou ID do comprador ausentes.", variant: "destructive"});
-        return false;
-    }
-    const product = productsToQuote.find(p => p.id === productId);
-    if (!product) {
-      return false;
-    }
-
-    const offerToSaveIndex = product.supplierOffers.findIndex(o => o.uiId === offerUiId);
-    if (offerToSaveIndex === -1) {
-        toast({title: "Erro", description: "Oferta não encontrada para salvar.", variant: "destructive"});
-        return false;
-    }
-    const offerData = product.supplierOffers[offerToSaveIndex];
-
-    const unitsInPackaging = Number(offerData.unitsInPackaging);
-    const unitsPerPackage = Number(offerData.unitsPerPackage);
-    const unitWeight = Number(offerData.unitWeight);
-    const totalPackagingPrice = Number(offerData.totalPackagingPrice);
-
-    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitsPerPackage) || unitsPerPackage <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
-      toast({title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive", duration: 7e3});
-      return false;
-    }
-
-    const pricePerUnit = totalPackagingPrice / (unitsPerPackage * unitWeight);
-
-    const bestCompetitorOffer = product.bestOffersByBrand.find(o => o.supplierId !== supplierId);
-
-    if (bestCompetitorOffer && pricePerUnit < bestCompetitorOffer.pricePerUnit && pricePerUnit > bestCompetitorOffer.pricePerUnit * 0.99) {
-        toast({
-            title: "Oferta Inválida",
-            description: `Sua oferta deve ser pelo menos 1% menor que a melhor oferta atual de ${formatCurrency(bestCompetitorOffer.pricePerUnit)}. O valor mínimo para cobrir esta oferta é de ${formatCurrency(bestCompetitorOffer.pricePerUnit * 0.99)}. `,
-            variant: "destructive",
-        });
-        return false;
-    }
-
-    const isDuplicatePrice = product.bestOffersByBrand.some(
-        (offer) => offer.pricePerUnit === pricePerUnit && offer.supplierId !== supplierId
-    );
-
-    if (isDuplicatePrice) {
-        toast({
-            title: "Preço Duplicado",
-            description: "Este preço já foi ofertado por outro fornecedor. Por favor, insira um valor diferente.",
-            variant: "destructive",
-        });
-        return false;
-    }
-
-    const brandName = offerData.brandOffered.trim();
-
-    const previousBestOffer = product.bestOffersByBrand.length > 0 ? product.bestOffersByBrand[0] : null;
-
-    // Handle outbid notification
-    await handleOutbidNotification({
-      previousBestOffer,
-      newPricePerUnit: pricePerUnit,
-      product,
-      quotation,
-      currentSupplierDetails,
-      supplierDetailsCache: supplierDetailsCache.current,
-      onError: (message) => {
-        toast({
-          title: "Falha na Notificação",
-          description: message,
-          variant: "destructive"
-        });
-      }
-    });
-
-    const offerPayload: Omit<Offer, 'id'> = {
-      quotationId: quotationId, // Adicionar campo obrigatório
-      supplierId: currentSupplierDetails.id,
-      supplierName: currentSupplierDetails.empresa,
-      supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase(),
-      brandOffered: offerData.brandOffered,
-      packagingDescription: offerData.packagingDescription,
-      unitsInPackaging,
-      unitsPerPackage: offerData.unitsPerPackage || 0,
-      unitWeight,
-      totalPackagingPrice,
-      pricePerUnit,
-      updatedAt: serverTimestamp() as Timestamp,
-      productId: productId,
-    };
-    
-    const savingKey = `${productId}_${offerUiId}`;
-    setIsSaving(prev => ({ ...prev, [savingKey]: true }));
-    // Adiciona a oferta à lista de ofertas sendo salvas
-    setSavingOffers(prev => new Set(prev).add(savingKey));
-
-    try {
-      if (offerData.id) {
-        const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
-        await updateDoc(offerRef, offerPayload);
-        toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
-        speak(voiceMessages.success.offerSaved);
-      } else {
-        // Skip duplicate check for better performance - Firebase will handle uniqueness with IDs
-        const addDocStartTime = performance.now();
-        const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
-        const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
-        const addDocEndTime = performance.now();
-
-        // Verificar variação de quantidade e registrar
-        const offeredQuantity = calculateTotalOfferedQuantity(offerData, product);
-        const requestedQuantity = product.quantity;
-        const quantityValidation = validateQuantityVariation(offeredQuantity, requestedQuantity);
-
-        if (!quantityValidation.isValid && quotation) {
-          // TODO: Implementar busca dos dados do comprador para envio de notificação
-          // Para isso, seria necessário buscar os dados do comprador usando quotation.userId
-        }
-
-        const toastStartTime = performance.now();
-        toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
-        const toastEndTime = performance.now();
-
-        const speakStartTime = performance.now();
-        // Make speak non-blocking by deferring it
-        setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
-        const speakEndTime = performance.now();
-      }
-
-      const clearingStartTime = performance.now();
-
-      const alertsStartTime = performance.now();
-      setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
-      const alertsEndTime = performance.now();
-
-      const offerChangeStartTime = performance.now();
-      handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false); // Reset the flag after saving
-      const offerChangeEndTime = performance.now();
-
-      const totalEndTime = performance.now();
-      return true;
-    } catch (error: any) {
-      toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
-      setTimeout(() => speak(voiceMessages.error.saveFailed), 0);
-      return false;
-    } finally {
-      setIsSaving(prev => ({ ...prev, [savingKey]: false }));
-      // Remove a oferta da lista de ofertas sendo salvas
-      setSavingOffers(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(savingKey);
-        return newSet;
-      });
-      const totalEndTime = performance.now();
-    }
-  };
-  
   const handleBeatOfferClick = (productId: string, offerUiId: string, discountPercentage: number) => {
     const product = productsToQuote.find((p) => p.id === productId);
     const offer = product?.supplierOffers.find((o) => o.uiId === offerUiId);
@@ -3180,6 +2321,7 @@ export default function SellerQuotationPage() {
                                            handlePriceChange={handlePriceChange}
                                            handleSaveProductOffer={handleSaveProductOffer}
                                            removeOfferField={removeOfferField}
+                                           onRequestStopQuoting={(productId) => handleStopQuotingClick(productId, offer.uiId, product.name)}
                                            formatCurrency={formatCurrency}
                                            formatCurrencyInput={formatCurrencyInput}
                                            abbreviateUnit={abbreviateUnit}

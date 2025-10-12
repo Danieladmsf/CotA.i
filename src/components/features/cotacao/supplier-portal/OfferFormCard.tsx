@@ -27,6 +27,7 @@ interface OfferFormCardProps {
   handlePriceChange: (productId: string, offerUiId: string, value: string) => void;
   handleSaveProductOffer: (productId: string, offerUiId: string) => Promise<boolean>;
   removeOfferField: (productId: string, offer: any) => void;
+  onRequestStopQuoting?: (productId: string) => void;
 
   // Format functions
   formatCurrency: (value: number | null) => string;
@@ -47,6 +48,7 @@ export function OfferFormCard({
   handlePriceChange,
   handleSaveProductOffer,
   removeOfferField,
+  onRequestStopQuoting,
   formatCurrency,
   formatCurrencyInput,
   abbreviateUnit,
@@ -160,17 +162,33 @@ export function OfferFormCard({
       </div>
 
       {/* Botões na linha de baixo */}
-      <div className="flex justify-end gap-2 pt-2 border-t">
-        <div className="flex gap-2">
+      <div className="flex justify-between gap-2 pt-2 border-t">
+        {/* Botão para deixar de cotar (à esquerda) */}
+        {onRequestStopQuoting && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => removeOfferField(product.id, offer)}
+            onClick={() => onRequestStopQuoting(product.id)}
             disabled={isOfferDisabled}
-            className="text-destructive hover:text-destructive"
+            className="text-amber-600 hover:text-amber-700 border-amber-300 hover:border-amber-400"
           >
-            Remover Oferta
+            Deixar de Cotar Este Item
           </Button>
+        )}
+
+        {/* Botões de ação (à direita) */}
+        <div className="flex gap-2 ml-auto">
+          {offer.id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => removeOfferField(product.id, offer)}
+              disabled={isOfferDisabled}
+              className="text-destructive hover:text-destructive"
+            >
+              Remover Oferta
+            </Button>
+          )}
           <Button
             onClick={async () => {
               await handleSaveProductOffer(product.id, offer.uiId);
@@ -178,7 +196,7 @@ export function OfferFormCard({
             disabled={isOfferDisabled}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Salvar Nova Oferta
+            {offer.id ? 'Editar Oferta' : 'Salvar Nova Oferta'}
           </Button>
         </div>
       </div>
