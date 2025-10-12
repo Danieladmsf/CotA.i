@@ -91,6 +91,7 @@ export function useQuotationData({
   const [currentSupplierDetails, setCurrentSupplierDetails] = useState<SupplierType | null>(null);
   const [productsToQuote, setProductsToQuote] = useState<ProductToQuoteVM[]>([]);
   const [pendingRequestsCache, setPendingRequestsCache] = useState<PendingBrandRequest[]>([]);
+  const [stoppedQuotingProducts, setStoppedQuotingProducts] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
   // Listen to quotation document changes
@@ -212,9 +213,15 @@ export function useQuotationData({
         const allOffers = allOffersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Offer));
 
         const initialProducts = snapshot.docs.map(docSnap => {
-          const itemData = docSnap.data() as ShoppingListItem;
+          const itemData = docSnap.data() as ShoppingListItem & { stoppedQuotingSuppliers?: string[] };
           const deliveryDateStr = typeof (itemData.deliveryDate as any) === 'string' ? (itemData.deliveryDate as any).toLowerCase() : '';
           const isDeliveryDayMismatch = deliveryDateStr && !supplierDeliveryDays.includes(deliveryDateStr);
+
+          // Check if this supplier stopped quoting this product
+          const hasStoppedQuoting = itemData.stoppedQuotingSuppliers?.includes(supplierId) || false;
+          if (hasStoppedQuoting) {
+            setStoppedQuotingProducts(prev => new Set(prev).add(docSnap.id));
+          }
 
           // Get offers for this product
           const productOffers = allOffers.filter(o => o.productId === docSnap.id);
@@ -258,8 +265,14 @@ export function useQuotationData({
         // Real-time update: update products incrementally
         setProductsToQuote(prevProducts => {
           return snapshot.docs.map(docSnap => {
-            const itemData = docSnap.data() as ShoppingListItem;
+            const itemData = docSnap.data() as ShoppingListItem & { stoppedQuotingSuppliers?: string[] };
             const existingProduct = prevProducts.find(p => p.id === docSnap.id);
+
+            // Check if this supplier stopped quoting this product
+            const hasStoppedQuoting = itemData.stoppedQuotingSuppliers?.includes(supplierId) || false;
+            if (hasStoppedQuoting) {
+              setStoppedQuotingProducts(prev => new Set(prev).add(docSnap.id));
+            }
 
             if (existingProduct) {
               // Update existing product while preserving offers and recalculating mismatch
@@ -348,6 +361,8 @@ export function useQuotationData({
     setProductsToQuote,
     isLoading,
     pendingRequestsCache,
+    stoppedQuotingProducts,
+    setStoppedQuotingProducts,
   };
 }
 

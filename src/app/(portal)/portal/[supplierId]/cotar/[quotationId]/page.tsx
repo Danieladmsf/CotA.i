@@ -892,6 +892,8 @@ export default function SellerQuotationPage() {
     setProductsToQuote,
     isLoading,
     pendingRequestsCache,
+    stoppedQuotingProducts,
+    setStoppedQuotingProducts,
   } = useQuotationData({
     quotationId,
     supplierId,
@@ -904,7 +906,6 @@ export default function SellerQuotationPage() {
   const [expandedProductIds, setExpandedProductIds] = useState<string[]>([]);
   const [showStopQuotingModal, setShowStopQuotingModal] = useState(false);
   const [offerToStop, setOfferToStop] = useState<{productId: string, offerUiId: string, productName: string} | null>(null);
-  const [stoppedQuotingProducts, setStoppedQuotingProducts] = useState<Set<string>>(new Set());
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
   const [hasSpokenTabMessage, setHasSpokenTabMessage] = useState(false);
 
@@ -1729,26 +1730,40 @@ export default function SellerQuotationPage() {
   };
 
   const confirmStopQuoting = async () => {
-    if (!offerToStop) return;
+    if (!offerToStop || !supplierId) return;
 
     const { productId, offerUiId } = offerToStop;
     const product = productsToQuote.find(p => p.id === productId);
     const offer = product?.supplierOffers.find(o => o.uiId === offerUiId);
 
-    if (offer && offer.id) {
-      // Remove a oferta do banco de dados
-      await removeOfferField(productId, offer);
+    try {
+      // 1. Remove a oferta do banco de dados (se existir)
+      if (offer && offer.id) {
+        await removeOfferField(productId, offer);
+      }
+
+      // 2. Salva no banco que este fornecedor parou de cotar este produto
+      const productRef = doc(db, SHOPPING_LIST_ITEMS_COLLECTION, productId);
+      await updateDoc(productRef, {
+        stoppedQuotingSuppliers: arrayUnion(supplierId)
+      });
+
+      // 3. Atualiza estado local
+      setStoppedQuotingProducts(prev => new Set(prev).add(productId));
+
+      setShowStopQuotingModal(false);
+      setOfferToStop(null);
+      toast({
+        title: "Parou de Cotar",
+        description: `Você parou de cotar "${offerToStop.productName}". Não poderá mais fazer ofertas para este item nesta cotação.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao Parar de Cotar",
+        description: error.message,
+        variant: "destructive"
+      });
     }
-
-    // Marca o produto como "parado de cotar"
-    setStoppedQuotingProducts(prev => new Set(prev).add(productId));
-
-    setShowStopQuotingModal(false);
-    setOfferToStop(null);
-    toast({
-      title: "Parou de Cotar",
-      description: `Você parou de cotar "${offerToStop.productName}". Não poderá mais fazer ofertas para este item nesta cotação.`,
-    });
   };
 
   const handleSuggestedBrandClick = (productId: string, brandName: string) => {
@@ -2316,11 +2331,12 @@ export default function SellerQuotationPage() {
                                            pricePerUnitClasses={pricePerUnitClasses}
                                            totalOrderValue={totalOrderValue}
                                            isOfferDisabled={isOfferDisabled}
+                                           isButtonDisabled={isButtonDisabled}
+                                           isQuotationEnded={isQuotationEnded}
                                            handleOfferChange={handleOfferChange}
                                            handleWeightChange={handleWeightChange}
                                            handlePriceChange={handlePriceChange}
                                            handleSaveProductOffer={handleSaveProductOffer}
-                                           removeOfferField={removeOfferField}
                                            onRequestStopQuoting={(productId) => handleStopQuotingClick(productId, offer.uiId, product.name)}
                                            formatCurrency={formatCurrency}
                                            formatCurrencyInput={formatCurrencyInput}

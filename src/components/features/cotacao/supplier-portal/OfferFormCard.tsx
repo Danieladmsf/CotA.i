@@ -20,13 +20,14 @@ interface OfferFormCardProps {
 
   // State
   isOfferDisabled: boolean;
+  isButtonDisabled: boolean;
+  isQuotationEnded: boolean;
 
   // Handlers
   handleOfferChange: (productId: string, offerUiId: string, field: any, value: any) => void;
   handleWeightChange: (e: React.ChangeEvent<HTMLInputElement>, product: any, offer: any) => void;
   handlePriceChange: (productId: string, offerUiId: string, value: string) => void;
   handleSaveProductOffer: (productId: string, offerUiId: string) => Promise<boolean>;
-  removeOfferField: (productId: string, offer: any) => void;
   onRequestStopQuoting?: (productId: string) => void;
 
   // Format functions
@@ -43,11 +44,12 @@ export function OfferFormCard({
   pricePerUnitClasses,
   totalOrderValue,
   isOfferDisabled,
+  isButtonDisabled,
+  isQuotationEnded,
   handleOfferChange,
   handleWeightChange,
   handlePriceChange,
   handleSaveProductOffer,
-  removeOfferField,
   onRequestStopQuoting,
   formatCurrency,
   formatCurrencyInput,
@@ -162,43 +164,31 @@ export function OfferFormCard({
       </div>
 
       {/* Botões na linha de baixo */}
-      <div className="flex justify-between gap-2 pt-2 border-t">
-        {/* Botão para deixar de cotar (à esquerda) */}
+      <div className="flex justify-between items-center gap-2 pt-2 border-t">
+        {/* Botão para deixar de cotar (à esquerda) - SEMPRE VISÍVEL */}
         {onRequestStopQuoting && (
           <Button
             variant="outline"
             size="sm"
             onClick={() => onRequestStopQuoting(product.id)}
-            disabled={isOfferDisabled}
+            disabled={isQuotationEnded}
             className="text-amber-600 hover:text-amber-700 border-amber-300 hover:border-amber-400"
           >
             Deixar de Cotar Este Item
           </Button>
         )}
 
-        {/* Botões de ação (à direita) */}
-        <div className="flex gap-2 ml-auto">
-          {offer.id && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => removeOfferField(product.id, offer)}
-              disabled={isOfferDisabled}
-              className="text-destructive hover:text-destructive"
-            >
-              Remover Oferta
-            </Button>
-          )}
-          <Button
-            onClick={async () => {
-              await handleSaveProductOffer(product.id, offer.uiId);
-            }}
-            disabled={isOfferDisabled}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {offer.id ? 'Editar Oferta' : 'Salvar Nova Oferta'}
-          </Button>
-        </div>
+        {/* Botão de salvar/editar (à direita) */}
+        <Button
+          size="sm"
+          onClick={async () => {
+            await handleSaveProductOffer(product.id, offer.uiId);
+          }}
+          disabled={isButtonDisabled}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {offer.id ? 'Editar Oferta' : 'Salvar Nova Oferta'}
+        </Button>
       </div>
     </div>
   );
