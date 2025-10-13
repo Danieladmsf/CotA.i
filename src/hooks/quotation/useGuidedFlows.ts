@@ -82,14 +82,17 @@ export function useGuidedFlows() {
     nextStep?: number
   ) => {
     const flowKey = `${productId}_vendor_flow`;
-    setVendorFlow(prev => ({
-      ...prev,
-      [flowKey]: {
-        ...prev[flowKey],
-        [field]: value,
-        ...(nextStep && { currentStep: nextStep })
-      }
-    }));
+    setVendorFlow(prev => {
+      const updated = {
+        ...prev,
+        [flowKey]: {
+          ...prev[flowKey],
+          [field]: value,
+          ...(nextStep && { currentStep: nextStep })
+        }
+      };
+      return updated;
+    });
   }, []);
 
   const cancelVendorFlow = useCallback((productId: string) => {

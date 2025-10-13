@@ -85,6 +85,31 @@ export function useOfferManagement({
   const [editingOffers, setEditingOffers] = useState<Set<string>>(new Set());
   const [savingOffers, setSavingOffers] = useState<Set<string>>(new Set());
 
+  // Quantity shortage modal states
+  const [showQuantityShortageModal, setShowQuantityShortageModal] = useState(false);
+  const [quantityShortageContext, setQuantityShortageContext] = useState<{
+    product: ProductToQuoteVM;
+    offerData: OfferWithUI;
+    offerUiId: string;
+    productId: string;
+    scenario: 'adequate' | 'insufficient' | 'very_insufficient' | 'exact' | 'excess' | 'valid';
+    variationPercentage: number;
+    variationAmount: number;
+  } | null>(null);
+  const [quantityDecision, setQuantityDecision] = useState<{
+    decision: 'stock_shortage' | 'request_approval' | 'typing_error' | 'send_excess' | 'adjust_to_request' | 'buyer_approval_excess';
+    suggestedQuantity?: number;
+    correctedData?: {
+      unitsPerPackage?: number;
+      unitWeight?: number;
+      totalPackagingPrice?: number;
+      packages?: number;
+      // Legacy fields for backward compatibility
+      quantity?: number;
+      weight?: number;
+    };
+  } | null>(null);
+
   const lastClickRef = useRef<{ action: string; timestamp: number } | null>(null);
 
   // Handle offer field change
@@ -229,6 +254,7 @@ export function useOfferManagement({
             updatedAt: serverTimestamp() as Timestamp,
             productId: productId,
             isSuggestedBrand: isSuggested || false,
+            packagingType: 'closed_package', // Default to closed_package for manual offers
           };
 
           const updatedProduct = {
@@ -383,35 +409,120 @@ export function useOfferManagement({
       pricePerUnit,
       updatedAt: serverTimestamp() as Timestamp,
       productId: productId,
+      packagingType: offerData.packagingType || 'closed_package', // Default to closed_package for backward compatibility
     };
 
     const savingKey = `${productId}_${offerUiId}`;
+
+    // Check for quantity variation BEFORE saving
+    // Calculate offered quantity in product's unit (kg/L for weight, units for count)
+    const offeredAmount = calculateTotalOfferedQuantity(offerData, product);
+    const requestedAmount = product.quantity;
+    const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
+
+    // If modal is required and no decision has been made yet, show modal
+    if (boxValidation.requiresModal && !quantityDecision) {
+      setQuantityShortageContext({
+        product,
+        offerData,
+        offerUiId,
+        productId,
+        scenario: boxValidation.scenario,
+        variationPercentage: boxValidation.variationPercentage,
+        variationAmount: boxValidation.variationAmount,
+      });
+      setShowQuantityShortageModal(true);
+      return false; // Don't proceed with save yet
+    }
+
+    // If corrected data exists, apply it (regardless of decision type)
+    let finalOfferPayload = { ...offerPayload };
+    if (quantityDecision?.correctedData) {
+      const data = quantityDecision.correctedData;
+
+      console.log('🔧 [Corrected Data] Applying corrected values:', data);
+
+      // Support both new and legacy field names
+      const packages = data.packages ?? data.quantity;
+      const weight = data.unitWeight ?? data.weight;
+      const unitsPerPkg = data.unitsPerPackage;
+      const price = (data as any).price ?? data.totalPackagingPrice;
+
+      console.log('🔧 [Corrected Data] Extracted values:', { packages, weight, unitsPerPkg, price });
+
+      if (packages !== undefined) {
+        finalOfferPayload.unitsInPackaging = packages;
+      }
+      if (weight !== undefined) {
+        finalOfferPayload.unitWeight = weight;
+      }
+      if (unitsPerPkg !== undefined) {
+        finalOfferPayload.unitsPerPackage = unitsPerPkg;
+      }
+      if (price !== undefined) {
+        finalOfferPayload.totalPackagingPrice = price;
+        // Recalculate price per unit
+        const finalPackages = finalOfferPayload.unitsInPackaging || packages || 1;
+        const finalWeight = finalOfferPayload.unitWeight || weight || 1;
+        finalOfferPayload.pricePerUnit = price / (finalPackages * finalWeight);
+      }
+
+      console.log('🔧 [Corrected Data] Final payload:', finalOfferPayload);
+    }
+
+    // If decision was 'adjust_to_request', adjust to requested quantity
+    if (quantityDecision?.decision === 'adjust_to_request') {
+      // Calculate how many packages needed to meet requested amount
+      // Use corrected values from finalOfferPayload if they exist, otherwise use original values
+      const packageWeight = Number(finalOfferPayload.unitWeight) || 1;
+      const unitsPerPackage = Number(finalOfferPayload.unitsPerPackage) || 1;
+      const requestedAmount = product.quantity;
+
+      let requiredPackages;
+      if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
+        // Weight-based: divide requested weight by weight per package
+        requiredPackages = Math.ceil(requestedAmount / packageWeight);
+      } else {
+        // Unit-based: divide requested units by units per package
+        requiredPackages = Math.ceil(requestedAmount / unitsPerPackage);
+      }
+
+      finalOfferPayload = {
+        ...finalOfferPayload,
+        unitsInPackaging: requiredPackages,
+      };
+    }
+
     setIsSaving(prev => ({ ...prev, [savingKey]: true }));
     setSavingOffers(prev => new Set(prev).add(savingKey));
+    let savedOfferId: string | undefined = offerData.id; // Track offer ID for notifications
 
     try {
       if (offerData.id) {
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
-        await updateDoc(offerRef, offerPayload);
+        await updateDoc(offerRef, finalOfferPayload);
         toast({ title: "Oferta Atualizada!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi atualizada.` });
         speak(voiceMessages.success.offerSaved);
       } else {
         const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
-        const newOfferDocRef = await addDoc(offerCollectionRef, offerPayload);
+        const newOfferDocRef = await addDoc(offerCollectionRef, finalOfferPayload);
+        savedOfferId = newOfferDocRef.id; // Update with new offer ID
 
         toast({ title: "Oferta Salva!", description: `Sua oferta para ${product.name} (${offerData.brandOffered}) foi salva.` });
         setTimeout(() => speak(voiceMessages.success.offerSaved), 0);
       }
 
-      // Verificar variação de quantidade (boxes/packages) para TODAS as ofertas (novas e editadas)
-      const offeredBoxes = Number(offerData.unitsInPackaging) || 0;
-      const requestedBoxes = product.quantity;
-      const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+      // Verificar variação de quantidade para TODAS as ofertas (novas e editadas)
+      // Calculate in product's unit (kg/L for weight products, units for count products)
+      // Use finalOfferPayload to get corrected values, not offerData
+      const offeredAmount = calculateTotalOfferedQuantity(finalOfferPayload, product);
+      const requestedAmount = product.quantity;
+      const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
 
       console.log('📊 [Quantity Validation]', {
         productName: product.name,
-        offeredBoxes,
-        requestedBoxes,
+        offeredAmount,
+        requestedAmount,
         isValid: boxValidation.isValid,
         shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
         variationType: boxValidation.variationType,
@@ -433,13 +544,24 @@ export function useOfferManagement({
       }
 
       // Notificar o comprador internamente (sistema de notificações do sino)
-      if (boxValidation.shouldNotifyBuyer && quotation.userId) {
+      // Don't notify if variationType is 'exact' (no variation)
+      if (boxValidation.shouldNotifyBuyer && quotation.userId && boxValidation.variationType !== 'exact') {
         console.log('🔔 [Quantity Notification] Creating internal notification', {
           quotationUserId: quotation.userId,
           variationType: boxValidation.variationType,
-          offeredBoxes,
-          requestedBoxes,
+          offeredAmount,
+          requestedAmount,
         });
+
+        // Map decision types to shortageReason types
+        const shortageReasonMap: Record<string, 'stock_shortage' | 'request_approval' | 'buyer_approval_excess' | undefined> = {
+          'stock_shortage': 'stock_shortage',
+          'request_approval': 'request_approval',
+          'buyer_approval_excess': 'buyer_approval_excess',
+        };
+        const mappedShortageReason = quantityDecision?.decision
+          ? shortageReasonMap[quantityDecision.decision]
+          : undefined;
 
         try {
           const result = await notifyQuantityVariation({
@@ -449,13 +571,15 @@ export function useOfferManagement({
             productId: productId,
             productName: product.name,
             supplierName: currentSupplierDetails.empresa,
+            supplierId: supplierId,
             brandName: offerData.brandOffered,
-            requestedQuantity: requestedBoxes,
-            offeredQuantity: offeredBoxes,
+            requestedQuantity: requestedAmount,
+            offeredPackages: finalOfferPayload.unitsInPackaging, // Number of packages
             unit: product.unit,
-            variationType: boxValidation.variationType!,
-            variationPercentage: boxValidation.variationPercentage,
-            variationAmount: boxValidation.variationAmount,
+            offerId: savedOfferId,
+            unitsPerPackage: finalOfferPayload.unitsPerPackage, // Units per package
+            unitWeight: finalOfferPayload.unitWeight,
+            totalPackagingPrice: finalOfferPayload.totalPackagingPrice,
           });
 
           if (result.success) {
@@ -484,6 +608,24 @@ export function useOfferManagement({
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
       handleOfferChange(productId, offerUiId, 'showBeatOfferOptions', false);
 
+      // Update local state with final values to sync UI immediately
+      // This ensures the form fields show the correct values that were saved
+      if (finalOfferPayload.unitsInPackaging !== offerData.unitsInPackaging && finalOfferPayload.unitsInPackaging !== undefined) {
+        handleOfferChange(productId, offerUiId, 'unitsInPackaging', finalOfferPayload.unitsInPackaging);
+      }
+      if (finalOfferPayload.unitWeight !== offerData.unitWeight && finalOfferPayload.unitWeight !== undefined) {
+        handleOfferChange(productId, offerUiId, 'unitWeight', finalOfferPayload.unitWeight);
+      }
+      if (finalOfferPayload.unitsPerPackage !== offerData.unitsPerPackage && finalOfferPayload.unitsPerPackage !== undefined) {
+        handleOfferChange(productId, offerUiId, 'unitsPerPackage', finalOfferPayload.unitsPerPackage);
+      }
+      if (finalOfferPayload.totalPackagingPrice !== offerData.totalPackagingPrice && finalOfferPayload.totalPackagingPrice !== undefined) {
+        handleOfferChange(productId, offerUiId, 'totalPackagingPrice', finalOfferPayload.totalPackagingPrice);
+      }
+      if (finalOfferPayload.pricePerUnit !== offerData.pricePerUnit && finalOfferPayload.pricePerUnit !== undefined) {
+        handleOfferChange(productId, offerUiId, 'pricePerUnit', finalOfferPayload.pricePerUnit);
+      }
+
       return true;
     } catch (error: any) {
       toast({ title: "Erro ao Salvar Oferta", description: error.message, variant: "destructive" });
@@ -510,12 +652,59 @@ export function useOfferManagement({
     voiceMessages,
   ]);
 
+  // Handle quantity shortage modal decision
+  const handleQuantityShortageDecision = useCallback(async (
+    decision: 'stock_shortage' | 'request_approval' | 'typing_error' | 'send_excess' | 'adjust_to_request' | 'buyer_approval_excess',
+    correctedData?: {
+      unitsPerPackage?: number;
+      unitWeight?: number;
+      totalPackagingPrice?: number;
+      packages?: number;
+      quantity?: number;
+      weight?: number;
+    }
+  ) => {
+    console.log('🔧 [Decision Handler] Received decision:', decision);
+    console.log('🔧 [Decision Handler] Received correctedData:', correctedData);
+
+    const suggestedQuantity = quantityShortageContext
+      ? Math.ceil(quantityShortageContext.product.quantity)
+      : undefined;
+
+    setQuantityDecision({
+      decision,
+      suggestedQuantity: decision === 'request_approval' ? suggestedQuantity : undefined,
+      correctedData: correctedData // Always pass correctedData if it exists, regardless of decision
+    });
+    setShowQuantityShortageModal(false);
+
+    // Resume the save process with the decision
+    if (quantityShortageContext) {
+      const { product, offerData, offerUiId, productId } = quantityShortageContext;
+
+      // Call handleSaveProductOffer again, now with quantityDecision set
+      // The save will proceed this time
+      await handleSaveProductOffer(productId, offerUiId);
+
+      // Clear the context and decision after save
+      setQuantityShortageContext(null);
+      setQuantityDecision(null);
+    }
+  }, [quantityShortageContext, handleSaveProductOffer]);
+
+  const handleCloseQuantityShortageModal = useCallback(() => {
+    setShowQuantityShortageModal(false);
+    setQuantityShortageContext(null);
+  }, []);
+
   return {
     // States
     isSaving,
     weightInputValues,
     editingOffers,
     savingOffers,
+    showQuantityShortageModal,
+    quantityShortageContext,
 
     // Handlers
     handleOfferChange,
@@ -527,5 +716,7 @@ export function useOfferManagement({
     addOfferField,
     removeOfferField,
     handleSaveProductOffer,
+    handleQuantityShortageDecision,
+    handleCloseQuantityShortageModal,
   };
 }

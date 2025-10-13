@@ -220,31 +220,56 @@ export const formatPackaging = (quantity: number, weight: number, unit: UnitOfMe
 };
 
 // ============================================================================
-// QUANTITY CALCULATIONS
+// QUANTITY CALCULATIONS - LÓGICA MACRO
 // ============================================================================
 
 /**
- * Calculates total offered quantity based on offer and product unit
+ * Detecta se o tipo de embalagem é GRANEL
+ * @param packagingType - Tipo de embalagem ('bulk' ou 'closed_package')
+ */
+export const isGranelPackaging = (packagingType: string): boolean => {
+  return packagingType === 'bulk' || packagingType === 'granel' || packagingType === 'a granel';
+};
+
+/**
+ * Calcula quantidade total oferecida baseado no tipo de embalagem E unidade do produto
+ *
+ * LÓGICA COMPLETA:
+ * 1. GRANEL: sempre packagesCount × unitWeight
+ * 2. CAIXA/FARDO + KG/LITROS: packagesCount × unitWeight
+ * 3. CAIXA/FARDO + UNIDADES: packagesCount × unitsPerPackage
  */
 export const calculateTotalOfferedQuantity = (offer: any, product: any): number => {
   const packagesCount = Number(offer.unitsInPackaging) || 0;
   const unitsPerPackage = Number(offer.unitsPerPackage) || 0;
   const unitWeight = Number(offer.unitWeight) || 0;
+  const packagingType = offer.packagingType || 'closed_package';
 
-  if (packagesCount <= 0) return 0;
+  // Detectar unidade do produto
+  const productUnit = product?.unit || '';
+  const isWeightVolume =
+    productUnit === 'Kilograma(s)' ||
+    productUnit === 'Grama(s)' ||
+    productUnit === 'Litro(s)' ||
+    productUnit === 'Mililitro(s)';
 
-  // Para produtos vendidos por peso (Kg/L), usar peso total
-  if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
+  // 🌾 MODO 1: GRANEL
+  // Sempre usa: packagesCount × unitWeight
+  if (isGranelPackaging(packagingType)) {
     return packagesCount * unitWeight;
   }
 
-  // Para produtos vendidos por unidade, usar quantidade de unidades
-  if (product.unit === 'Unidade(s)' || product.unit === 'Peça(s)' || product.unit === 'Dúzia(s)') {
-    return packagesCount * unitsPerPackage;
+  // 📦 MODO 2: CAIXA/FARDO com KG/LITROS
+  // Usa: packagesCount × unitWeight
+  // Exemplo: 3 caixas × 30 kg = 90 kg
+  if (isWeightVolume) {
+    return packagesCount * unitWeight;
   }
 
-  // Para outras unidades, usar peso
-  return packagesCount * unitWeight;
+  // 📦 MODO 3: CAIXA/FARDO com UNIDADES
+  // Usa: packagesCount × unitsPerPackage
+  // Exemplo: 3 caixas × 30 unid = 90 unidades
+  return packagesCount * unitsPerPackage;
 };
 
 /**
@@ -273,70 +298,77 @@ export const validateQuantityVariation = (
   };
 };
 
-/**
- * Validates box/package quantity variation with buyer notification rules
- *
- * Business Rules:
- * - ALWAYS notify buyer if shortage (offered < requested)
- * - ONLY notify buyer if excess > 0.5 box (offered > requested + tolerance)
- * - No notification if within tolerance on excess side
- *
- * @param offeredBoxes - Number of boxes/packages supplier will send
- * @param requestedBoxes - Number of boxes/packages buyer requested
- * @param toleranceBoxes - Tolerance in boxes (default 0.5)
- * @returns Validation result with buyer notification flag
- */
 export const validateBoxQuantityVariation = (
-  offeredBoxes: number,
-  requestedBoxes: number,
-  toleranceBoxes: number = 0.5
+  offeredQuantity: number,
+  requestedQuantity: number
 ): {
   isValid: boolean;
-  variationType?: 'over' | 'under';
+  variationType?: 'over' | 'under' | 'exact';
   variationAmount: number;
   shouldNotifyBuyer: boolean;
   variationPercentage: number;
+  scenario: 'adequate' | 'insufficient' | 'very_insufficient' | 'exact' | 'excess' | 'valid';
+  requiresModal: boolean;
 } => {
-  if (requestedBoxes <= 0) {
+  if (requestedQuantity <= 0) {
     return {
       isValid: true,
       variationAmount: 0,
       shouldNotifyBuyer: false,
       variationPercentage: 0,
+      scenario: 'valid',
+      requiresModal: false,
     };
   }
 
-  const variationAmount = offeredBoxes - requestedBoxes;
-  const variationPercentage = Math.abs(variationAmount / requestedBoxes) * 100;
+  const variationAmount = offeredQuantity - requestedQuantity;
+  const variationPercentage = Math.abs(variationAmount / requestedQuantity) * 100;
 
-  // SHORTAGE: Always notify buyer (will be short)
-  if (offeredBoxes < requestedBoxes) {
+  if (offeredQuantity === requestedQuantity) {
+    return {
+      isValid: true,
+      variationType: 'exact',
+      variationAmount: 0,
+      shouldNotifyBuyer: false,
+      variationPercentage: 0,
+      scenario: 'exact',
+      requiresModal: false,
+    };
+  }
+
+  if (offeredQuantity < requestedQuantity) {
+    // SEMPRE mostrar modal se faltou QUALQUER quantidade (sem tolerância)
+    if (variationPercentage <= 50) {
+      return {
+        isValid: false,
+        variationType: 'under',
+        variationAmount: Math.abs(variationAmount),
+        shouldNotifyBuyer: true,
+        variationPercentage,
+        scenario: 'insufficient',
+        requiresModal: true, // SEMPRE mostrar modal se faltou
+      };
+    }
     return {
       isValid: false,
       variationType: 'under',
       variationAmount: Math.abs(variationAmount),
       shouldNotifyBuyer: true,
       variationPercentage,
+      scenario: 'very_insufficient',
+      requiresModal: true,
     };
   }
 
-  // EXCESS: Only notify if more than tolerance
-  if (offeredBoxes > requestedBoxes + toleranceBoxes) {
-    return {
-      isValid: false,
-      variationType: 'over',
-      variationAmount,
-      shouldNotifyBuyer: true,
-      variationPercentage,
-    };
-  }
-
-  // WITHIN TOLERANCE: Valid and no notification needed
+  // Excesso
   return {
-    isValid: true,
-    variationAmount,
-    shouldNotifyBuyer: false,
+    isValid: false,
+    variationType: 'over',
+    variationAmount: variationAmount,
+    shouldNotifyBuyer: true,
     variationPercentage,
+    scenario: 'excess',
+    requiresModal: true,
   };
 };
 

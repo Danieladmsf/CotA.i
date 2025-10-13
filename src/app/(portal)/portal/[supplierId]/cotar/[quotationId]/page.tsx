@@ -73,6 +73,7 @@ import {
 } from "@/hooks/quotation";
 import { handleOutbidNotification } from "@/lib/quotation/notificationHelpers";
 import { useOfferManagement } from "@/hooks/quotation/useOfferManagement";
+import QuantityShortageModal from "@/components/features/cotacao/QuantityShortageModal";
 import { useNewBrandModal } from "@/hooks/quotation/useNewBrandModal";
 import { useQuotationData, type ProductToQuoteVM } from "@/hooks/quotation/useQuotationData";
 import { useGuidedFlows } from "@/hooks/quotation/useGuidedFlows";
@@ -96,6 +97,7 @@ import {
   validateBoxQuantityVariation,
   buildDynamicTitle,
   isValidImageUrl,
+  isGranelPackaging,
 } from "@/lib/quotation/utils";
 
 const QUOTATIONS_COLLECTION = "quotations";
@@ -144,11 +146,45 @@ const renderVendorFlowCard = (
   product: ProductToQuoteVM,
   flow: any,
   updateVendorFlowStep: (productId: string, field: string, value: any, nextStep?: number) => void,
-  completeVendorFlow: (productId: string) => void,
+  completeVendorFlow: (productId: string, correctedData?: any) => void,
   cancelVendorFlow: (productId: string) => void,
-  formatCurrency: (value: number | null) => string
+  formatCurrency: (value: number | null) => string,
+  vendorFlowModalStates: Record<string, boolean>,
+  setVendorFlowModalStates: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
+  vendorFlowDecisions: Record<string, {
+    decision: string;
+    correctedData?: {
+      unitsPerPackage?: number;
+      unitWeight?: number;
+      totalPackagingPrice?: number;
+      packages?: number;
+      quantity?: number;
+      weight?: number;
+    };
+  }>,
+  setVendorFlowDecisions: React.Dispatch<React.SetStateAction<Record<string, {
+    decision: string;
+    correctedData?: {
+      unitsPerPackage?: number;
+      unitWeight?: number;
+      totalPackagingPrice?: number;
+      packages?: number;
+      quantity?: number;
+      weight?: number;
+    };
+  }>>>
 ) => {
   const { currentStep, selectedBrand, packagingType, unitsPerPackage, packageWeight, packagePrice, requiredPackages } = flow;
+  
+  console.log('🔍 [renderVendorFlowCard] Flow extraction:', {
+    'flow_raw': flow,
+    'currentStep': currentStep,
+    'packagingType': packagingType,
+    'unitsPerPackage_extracted': unitsPerPackage,
+    'packageWeight_extracted': packageWeight,
+    'requiredPackages_extracted': requiredPackages,
+    'productUnit': product.unit
+  });
 
   const renderStep = () => {
     switch (currentStep) {
@@ -159,21 +195,46 @@ const renderVendorFlowCard = (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Button
                 variant={packagingType === 'caixa' ? 'default' : 'outline'}
-                onClick={() => updateVendorFlowStep(productId, 'packagingType', 'caixa', 2)}
+                onClick={() => {
+                  updateVendorFlowStep(productId, 'packagingType', 'caixa');
+                  // Para UNIDADES: pular Step 2, ir direto para Step 3
+                  if (product.unit === 'Unidade(s)') {
+                    updateVendorFlowStep(productId, 'unitsPerPackage', 1); // placeholder
+                    updateVendorFlowStep(productId, 'currentStep', '', 3);
+                  } else {
+                    // Para KG/LITROS: ir para Step 2
+                    updateVendorFlowStep(productId, 'currentStep', '', 2);
+                  }
+                }}
                 className="h-16 text-base"
               >
                 📦 Caixa
               </Button>
               <Button
                 variant={packagingType === 'fardo' ? 'default' : 'outline'}
-                onClick={() => updateVendorFlowStep(productId, 'packagingType', 'fardo', 2)}
+                onClick={() => {
+                  updateVendorFlowStep(productId, 'packagingType', 'fardo');
+                  // Para UNIDADES: pular Step 2, ir direto para Step 3
+                  if (product.unit === 'Unidade(s)') {
+                    updateVendorFlowStep(productId, 'unitsPerPackage', 1); // placeholder
+                    updateVendorFlowStep(productId, 'currentStep', '', 3);
+                  } else {
+                    // Para KG/LITROS: ir para Step 2
+                    updateVendorFlowStep(productId, 'currentStep', '', 2);
+                  }
+                }}
                 className="h-16 text-base"
               >
                 📄 Fardo
               </Button>
               <Button
                 variant={packagingType === 'granel' ? 'default' : 'outline'}
-                onClick={() => updateVendorFlowStep(productId, 'packagingType', 'granel', 3)} // Pula etapa 2 para granel
+                onClick={() => {
+                  // Para granel, pular etapa 2 (unidades por caixa) e ir direto para peso/volume
+                  updateVendorFlowStep(productId, 'packagingType', 'granel');
+                  updateVendorFlowStep(productId, 'unitsPerPackage', 1); // Definir como 1 para granel (correto)
+                  updateVendorFlowStep(productId, 'currentStep', '', 3);
+                }}
                 className="h-16 text-base"
               >
                 🌾 A Granel
@@ -183,6 +244,8 @@ const renderVendorFlowCard = (
         );
 
       case 2:
+        // Step 2: Só para KG/LITROS com CAIXA/FARDO
+        // Pergunta sempre "Quantas unidades" (geralmente resposta = 1, ignorada no cálculo)
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
@@ -191,9 +254,12 @@ const renderVendorFlowCard = (
             <div className="space-y-2">
               <Input
                 type="number"
-                placeholder="Ex: 12"
+                placeholder="Ex: 1"
                 value={unitsPerPackage > 0 ? unitsPerPackage : ''}
-                onChange={(e) => updateVendorFlowStep(productId, 'unitsPerPackage', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  updateVendorFlowStep(productId, 'unitsPerPackage', value);
+                }}
                 className="text-lg h-12"
               />
               <Button
@@ -209,19 +275,64 @@ const renderVendorFlowCard = (
 
       case 3:
         const isLiquid = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
-        const weightLabel = isLiquid ? 'volume (Litros)' : 'peso (Kg)';
-        const weightKey = `${productId}_weight`;
+        const isGranelWeight = packagingType === 'granel';
+        const isUnitProduct = product.unit === 'Unidade(s)';
+
+        // Para UNIDADES com CAIXA/FARDO: perguntar quantidade de unidades
+        if (isUnitProduct && !isGranelWeight) {
+          return (
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold">
+                Quantas unidades vêm na {packagingType}?
+              </h4>
+              <div className="space-y-2">
+                <Input
+                  type="number"
+                  placeholder="Ex: 30"
+                  value={unitsPerPackage > 0 ? unitsPerPackage : ''}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    updateVendorFlowStep(productId, 'unitsPerPackage', value);
+                  }}
+                  className="text-lg h-12"
+                />
+                <Button
+                  onClick={() => updateVendorFlowStep(productId, 'currentStep', '', 4)}
+                  disabled={unitsPerPackage <= 0}
+                  className="w-full"
+                >
+                  Próximo
+                </Button>
+              </div>
+            </div>
+          );
+        }
+
+        // Para KG/LITROS ou GRANEL: perguntar peso/volume
+        const weightLabel = isGranelWeight
+          ? (isLiquid ? 'volume por embalagem individual (Litros)' : 'peso por embalagem individual (Kg)')
+          : (isLiquid ? `volume da ${packagingType} completa (Litros)` : `peso da ${packagingType} completa (Kg)`);
+
+        const weightPlaceholder = isGranelWeight
+          ? (isLiquid ? "Ex: 2,000" : "Ex: 1,000")
+          : (isLiquid ? "Ex: 30,000" : "Ex: 25,000");
+
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
-              Qual é o {weightLabel} da embalagem?
+              Qual é o {weightLabel}?
             </h4>
+            {!isGranelWeight && (
+              <p className="text-sm text-muted-foreground">
+                Este é o peso/volume total da {packagingType} completa com todas as {unitsPerPackage} unidades
+              </p>
+            )}
             <div className="space-y-2">
               <div className="relative">
                 <Input
                   type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
                   step="0.001"
-                  placeholder={isLiquid ? "Ex: 1,500" : "Ex: 2,500"}
+                  placeholder={weightPlaceholder}
                   value={(() => {
                     if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
                       // Usar formatação de peso para Kg/L
@@ -266,10 +377,15 @@ const renderVendorFlowCard = (
         );
 
       case 4:
+        const isGranelPrice = packagingType === 'granel';
+        const priceLabel = isGranelPrice 
+          ? 'preço por embalagem individual'
+          : `preço ${packagingType === 'caixa' ? 'da caixa' : 'do fardo'} completa`;
+          
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
-              Qual o preço d{packagingType === 'caixa' ? 'a caixa' : packagingType === 'fardo' ? 'o fardo' : 'a unidade a granel'}?
+              Qual o {priceLabel}?
             </h4>
             <div className="space-y-2">
               <Input
@@ -299,11 +415,16 @@ const renderVendorFlowCard = (
                          product.unit === 'Litro(s)' ? 'Litros' : 
                          product.unit === 'Unidade(s)' ? 'unidades' : product.unit;
         
+        const isGranelQuantity = packagingType === 'granel';
+        const packageLabel = isGranelQuantity 
+          ? 'embalagens individuais'
+          : `${packagingType === 'caixa' ? 'caixas' : 'fardos'}`;
+        
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
               Para atender {product.quantity} {unitLabel} do pedido do comprador, 
-              quantas {packagingType === 'caixa' ? 'caixas' : packagingType === 'fardo' ? 'fardos' : 'unidades a granel'} você precisa enviar?
+              quantas {packageLabel} você precisa enviar?
             </h4>
             <div className="space-y-2">
               <Input
@@ -326,13 +447,43 @@ const renderVendorFlowCard = (
 
       case 6:
         const totalValue = requiredPackages * packagePrice;
-        const pricePerUnit = packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1));
+        const isGranel = isGranelPackaging(packagingType);
+
+        // CÁLCULO DO PREÇO POR UNIDADE
+        // Para CAIXA/FARDO: preço_caixa / (unidades_por_caixa × peso_por_unidade)
+        // Para GRANEL: preço_embalagem / peso_por_embalagem
+        const pricePerUnit = isGranel
+          ? packagePrice / (packageWeight || 1)  // Para granel: preço por embalagem / peso por embalagem
+          : packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
         
         // Calcular quantidade total oferecida
+        console.log('🔍 [Vendor Flow Step 6] Before tempOffer creation:', {
+          requiredPackages,
+          unitsPerPackage,
+          packageWeight,
+          packagingType,
+          isGranel,
+          productUnit: product.unit,
+          expectedCalculation: `${requiredPackages} caixas × ${unitsPerPackage} unid = ${requiredPackages * unitsPerPackage} unid`,
+          'FLOW_DEBUG': {
+            'COMPLETE_FLOW_OBJECT': JSON.stringify(flow, null, 2),
+            'flow.unitsPerPackage': flow.unitsPerPackage,
+            'flow.packageWeight': flow.packageWeight,
+            'WHERE_DOES_UNITS_COME_FROM': 'Checking if flow.unitsPerPackage is correct',
+            'packagingType_analysis': {
+              'flow.packagingType': flow.packagingType,
+              'packagingType_variable': packagingType,
+              'IS_GRANEL': packagingType === 'granel',
+              'isGranel': isGranel
+            }
+          }
+        });
+        
         const tempOffer: OfferWithUI = {
           unitsInPackaging: requiredPackages,
-          unitsPerPackage: unitsPerPackage,
+          unitsPerPackage: isGranel ? 1 : unitsPerPackage, // Para granel, sempre 1
           unitWeight: packageWeight,
+          packagingType: isGranel ? 'bulk' : 'closed_package', // Adicionar tipo de embalagem
           // outros campos necessários para compilação
           uiId: '',
           quotationId: '',
@@ -346,102 +497,216 @@ const renderVendorFlowCard = (
           updatedAt: {} as any,
           productId: ''
         };
+        
+        console.log('🔍 [Vendor Flow Step 6] tempOffer created:', {
+          tempOffer,
+          'PROBLEM_ANALYSIS': {
+            unitsPerPackage_in_tempOffer: tempOffer.unitsPerPackage,
+            unitsPerPackage_from_flow: unitsPerPackage,
+            packageWeight_from_flow: packageWeight,
+            isGranel,
+            'EXPECTED_FOR_AMIDO': 'unitsPerPackage should be 30 for Amido de milho'
+          }
+        });
 
         // Calculate offered quantity for display
         const offeredQuantity = calculateTotalOfferedQuantity(tempOffer, product);
+        
+        console.log('🔍 [Vendor Flow Step 6] After calculateTotalOfferedQuantity:', {
+          tempOffer,
+          offeredQuantity,
+          expectedForAmido: `Should be ${requiredPackages} × ${unitsPerPackage} = ${requiredPackages * unitsPerPackage} for Amido de milho`
+        });
 
+        // For validation, compare in the same unit as the product
+        const offeredAmount = offeredQuantity; // Already calculated in product's unit
+        const requestedAmount = product.quantity; // Already in product's unit
+        const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
+
+        // Also store box count for display
         const offeredBoxes = flow.requiredPackages || 0;
-        const requestedBoxes = product.quantity;
-        const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+
+        // Get modal state for this product
+        const vendorFlowModalOpen = vendorFlowModalStates[productId] !== undefined
+          ? vendorFlowModalStates[productId]
+          : boxValidation.requiresModal;
+        const vendorFlowDecision = vendorFlowDecisions[productId];
+
+        // Open modal automatically if needed and not yet decided
+        if (boxValidation.requiresModal && !vendorFlowDecision && !vendorFlowModalOpen) {
+          setVendorFlowModalStates(prev => ({ ...prev, [productId]: true }));
+        }
+
+        const handleVendorFlowModalConfirm = async (
+          decision: string,
+          correctedData?: {
+            unitsPerPackage?: number;
+            unitWeight?: number;
+            totalPackagingPrice?: number;
+            packages?: number;
+            quantity?: number;
+            weight?: number;
+            price?: number;
+          }
+        ) => {
+          console.log('🔧 [Vendor Flow Modal Confirm] Received:', { decision, correctedData });
+
+          setVendorFlowDecisions(prev => ({ ...prev, [productId]: { decision, correctedData } }));
+          setVendorFlowModalStates(prev => ({ ...prev, [productId]: false }));
+
+          if ((decision === 'typing_error' || decision === 'buyer_approval_excess') && correctedData) {
+            const price = (correctedData as any).price ?? correctedData.totalPackagingPrice;
+            
+            const correctedFlowData = {
+              requiredPackages: correctedData.packages,
+              packageWeight: correctedData.unitWeight,
+              unitsPerPackage: !isGranel ? correctedData.unitsPerPackage : undefined,
+              packagePrice: price,
+            };
+
+            // Filtra chaves com valor undefined para não sobrescrever dados existentes desnecessariamente
+            const payload = Object.fromEntries(
+              Object.entries(correctedFlowData).filter(([, value]) => value !== undefined)
+            );
+
+            console.log('🔧 [Vendor Flow] Passing corrected data directly to completeVendorFlow:', payload);
+            await completeVendorFlow(productId, payload);
+
+          } else if (decision === 'adjust_to_request') {
+            let requiredPackages;
+            if (isGranel) {
+              requiredPackages = Math.ceil(requestedAmount / packageWeight);
+            } else {
+              requiredPackages = Math.ceil(requestedAmount / unitsPerPackage);
+            }
+            console.log('🔧 [Vendor Flow] Adjusting to request, passing new requiredPackages:', requiredPackages);
+            await completeVendorFlow(productId, { requiredPackages });
+          
+          } else if (decision !== 'cancel') {
+            // Para outras decisões (como 'confirm_anyway'), completa com os dados do fluxo atual
+            await completeVendorFlow(productId);
+          }
+          // Se a decisão for 'cancel', não faz nada, apenas fecha o modal
+        };
 
         return (
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">Confirme se os dados e valores estão corretos:</h4>
+          <>
+            {/* Modal for quantity validation */}
+            {boxValidation.requiresModal && (
+              <>
+                {console.log('🔍 [Vendor Flow Modal] Data being passed to modal:', {
+                  productName: product.name,
+                  requestedQuantity: requestedAmount,
+                  offeredQuantity: offeredAmount,
+                  offeredPackages: offeredBoxes,
+                  unit: product.unit,
+                  unitsPerPackage: unitsPerPackage,
+                  unitWeight: packageWeight,
+                  totalPackagingPrice: packagePrice,
+                  packagingType: isGranel ? 'bulk' : 'closed_package',
+                  boxValidation
+                })}
+                <QuantityShortageModal
+                  isOpen={vendorFlowModalOpen}
+                  onClose={() => {
+                    setVendorFlowModalStates(prev => ({ ...prev, [productId]: false }));
+                    cancelVendorFlow(productId);
+                  }}
+                  onConfirm={handleVendorFlowModalConfirm}
+                  productName={product.name}
+                  requestedQuantity={requestedAmount}
+                  offeredQuantity={offeredAmount}
+                  offeredPackages={offeredBoxes}
+                  unit={product.unit}
+                  unitsPerPackage={unitsPerPackage}
+                  unitWeight={packageWeight}
+                  totalPackagingPrice={packagePrice}
+                  scenario={boxValidation.scenario}
+                  variationAmount={boxValidation.variationAmount}
+                  variationPercentage={boxValidation.variationPercentage}
+                  packagingType={isGranel ? 'bulk' : 'closed_package'}
+                />
+              </>
+            )}
 
-            {/* Alerta de variação de quantidade */}
-            {!boxValidation.isValid && (
-              <div className={`p-3 rounded-lg border-l-4 ${
-                boxValidation.variationType === 'over'
-                  ? 'bg-orange-50 border-orange-500 dark:bg-orange-950/20'
-                  : 'bg-red-50 border-red-500 dark:bg-red-950/20'
-              }`}>
-                <div className="flex items-start gap-2">
-                  <span className="text-lg">
-                    {boxValidation.variationType === 'over' ? '⚠️' : '❌'}
-                  </span>
-                  <div className="text-sm">
-                    <p className="font-semibold">
-                      {boxValidation.variationType === 'over'
-                        ? 'Quantidade Acima do Pedido'
-                        : 'Quantidade Abaixo do Pedido'}
+            {/* Simple confirmation if no modal required */}
+            {!boxValidation.requiresModal && (
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold">Confirme se os dados e valores estão corretos:</h4>
+
+                {/* Mostrar aviso se houver variação */}
+                {boxValidation.scenario !== 'exact' && (
+                  <div className={`p-3 rounded-lg border ${
+                    boxValidation.scenario === 'adequate'
+                      ? 'bg-green-50 border-green-300 text-green-900'
+                      : 'bg-yellow-50 border-yellow-300 text-yellow-900'
+                  }`}>
+                    <p className="text-sm font-semibold">
+                      Pedido: {requestedAmount} {abbreviateUnit(product.unit)} |
+                      Oferta: {offeredAmount.toFixed(3)} {abbreviateUnit(product.unit)}
                     </p>
-                    <p className="mt-1">
-                      Caixas Pedidas: <strong>{requestedBoxes}</strong> |
-                      Caixas Ofertadas: <strong>{offeredBoxes}</strong>
-                    </p>
-                    <p className="mt-1 text-xs">
-                      Variação: <strong>{boxValidation.variationAmount.toFixed(1)}</strong> caixas
-                      {boxValidation.variationType === 'over' ? ' a mais' : ' a menos'}
-                    </p>
-                    <p className="mt-2 text-xs font-semibold">
-                      {boxValidation.shouldNotifyBuyer ? (
-                        boxValidation.variationType === 'over'
-                          ? '⚠️ O comprador será notificado sobre esta quantidade extra (mais de 0,5 caixa).'
-                          : '⚠️ O comprador será notificado sobre esta falta.'
-                      ) : (
-                        '✓ Variação dentro da tolerância (0,5 caixa). Comprador não será notificado.'
-                      )}
+                    <p className="text-xs mt-1">
+                      {boxValidation.variationType === 'under'
+                        ? `Faltam ${Math.abs(boxValidation.variationAmount).toFixed(3)} ${abbreviateUnit(product.unit)} (${Math.round(boxValidation.variationPercentage)}% a menos)`
+                        : `Excesso de ${boxValidation.variationAmount.toFixed(3)} ${abbreviateUnit(product.unit)} (${Math.round(boxValidation.variationPercentage)}% a mais)`
+                      }
                     </p>
                   </div>
+                )}
+
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div><strong>Marca:</strong> {selectedBrand}</div>
+                    <div><strong>Embalagem:</strong> {packagingType}</div>
+
+                    {/* Para CAIXA/FARDO: mostrar unidades por embalagem */}
+                    {!isGranel && (
+                      <div><strong>Unidades por {packagingType}:</strong> {unitsPerPackage || 'N/A'}</div>
+                    )}
+
+                    {/* Para GRANEL: não mostrar unidades por embalagem, apenas peso/volume */}
+                    <div><strong>{isGranel ? 'Peso/Volume por embalagem individual:' : `Peso/Volume da ${packagingType} completa:`}</strong> {(() => {
+                      const isLiquidUnit = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
+                      if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
+                        if (packageWeight < 1 && packageWeight > 0) {
+                          const gramas = Math.round(packageWeight * 1000);
+                          return `${gramas}${isLiquidUnit ? 'ml' : 'g'}`;
+                        }
+                        return `${packageWeight.toFixed(3).replace('.', ',')}${isLiquidUnit ? 'L' : 'Kg'}`;
+                      } else {
+                        return `${packageWeight} ${isLiquidUnit ? 'L' : 'Kg'}`;
+                      }
+                    })()}</div>
+
+                    <div><strong>{isGranel ? 'Preço por embalagem individual:' : `Preço por ${packagingType}:`}</strong> {formatCurrency(packagePrice)}</div>
+                    <div><strong>Quantidade a enviar:</strong> {requiredPackages} {isGranel ? 'embalagem(ns)' : `${packagingType}(s)`}</div>
+                  </div>
+                  <div className="border-t pt-3">
+                    <div className="text-lg font-bold">Preço por unidade: {formatCurrency(pricePerUnit)}</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Total oferecido: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
+                    </div>
+                    <div className="text-lg font-bold text-primary mt-2">Valor Total do Pedido: {formatCurrency(totalValue)}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => cancelVendorFlow(productId)}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => completeVendorFlow(productId)}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    ✅ Confirmar Oferta
+                  </Button>
                 </div>
               </div>
             )}
-            
-            <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><strong>Marca:</strong> {selectedBrand}</div>
-                <div><strong>Embalagem:</strong> {packagingType}</div>
-                <div><strong>Unidades por {packagingType}:</strong> {unitsPerPackage || 'N/A'}</div>
-                <div><strong>Peso/Volume por {packagingType}:</strong> {(() => {
-                  const isLiquidUnit = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
-                  if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
-                    // Usar formatação inteligente para Kg/L
-                    if (packageWeight < 1 && packageWeight > 0) {
-                      const gramas = Math.round(packageWeight * 1000);
-                      return `${gramas}${isLiquidUnit ? 'ml' : 'g'}`;
-                    }
-                    return `${packageWeight.toFixed(3).replace('.', ',')}${isLiquidUnit ? 'L' : 'Kg'}`;
-                  } else {
-                    return `${packageWeight} ${isLiquidUnit ? 'L' : 'Kg'}`;
-                  }
-                })()}</div>
-                <div><strong>Preço por {packagingType}:</strong> {formatCurrency(packagePrice)}</div>
-                <div><strong>Quantidade a enviar:</strong> {requiredPackages} {packagingType}(s)</div>
-              </div>
-              <div className="border-t pt-3">
-                <div className="text-lg font-bold">Preço por unidade: {formatCurrency(pricePerUnit)}</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Total oferecido: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
-                </div>
-                <div className="text-lg font-bold text-primary mt-2">Valor Total do Pedido: {formatCurrency(totalValue)}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={() => cancelVendorFlow(productId)}
-                className="w-full"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => completeVendorFlow(productId)}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                ✅ Confirmar Oferta
-              </Button>
-            </div>
-          </div>
+          </>
         );
 
       default:
@@ -537,21 +802,46 @@ const renderNewBrandFlowCard = (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Button
                 variant={packagingType === 'caixa' ? 'default' : 'outline'}
-                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'caixa', 3)}
+                onClick={() => {
+                  updateNewBrandFlowStep(productId, 'packagingType', 'caixa');
+                  // Para UNIDADES: pular Step 3, ir direto para Step 4
+                  if (product.unit === 'Unidade(s)') {
+                    updateNewBrandFlowStep(productId, 'unitsPerPackage', 1); // placeholder
+                    updateNewBrandFlowStep(productId, 'currentStep', '', 4);
+                  } else {
+                    // Para KG/LITROS: ir para Step 3
+                    updateNewBrandFlowStep(productId, 'currentStep', '', 3);
+                  }
+                }}
                 className="h-16 text-base"
               >
                 📦 Caixa
               </Button>
               <Button
                 variant={packagingType === 'fardo' ? 'default' : 'outline'}
-                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'fardo', 3)}
+                onClick={() => {
+                  updateNewBrandFlowStep(productId, 'packagingType', 'fardo');
+                  // Para UNIDADES: pular Step 3, ir direto para Step 4
+                  if (product.unit === 'Unidade(s)') {
+                    updateNewBrandFlowStep(productId, 'unitsPerPackage', 1); // placeholder
+                    updateNewBrandFlowStep(productId, 'currentStep', '', 4);
+                  } else {
+                    // Para KG/LITROS: ir para Step 3
+                    updateNewBrandFlowStep(productId, 'currentStep', '', 3);
+                  }
+                }}
                 className="h-16 text-base"
               >
                 📄 Fardo
               </Button>
               <Button
                 variant={packagingType === 'granel' ? 'default' : 'outline'}
-                onClick={() => updateNewBrandFlowStep(productId, 'packagingType', 'granel', 4)} // Pula etapa 3 para granel
+                onClick={() => {
+                  // Para granel, pular etapa 3 (unidades por caixa) e ir direto para peso/volume
+                  updateNewBrandFlowStep(productId, 'packagingType', 'granel');
+                  updateNewBrandFlowStep(productId, 'unitsPerPackage', 1); // Definir como 1 para granel
+                  updateNewBrandFlowStep(productId, 'currentStep', '', 4);
+                }}
                 className="h-16 text-base"
               >
                 🌾 A Granel
@@ -561,6 +851,8 @@ const renderNewBrandFlowCard = (
         );
 
       case 3:
+        // Step 3: Só para KG/LITROS com CAIXA/FARDO
+        // Pergunta sempre "Quantas unidades" (geralmente resposta = 1, ignorada no cálculo)
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
@@ -569,7 +861,7 @@ const renderNewBrandFlowCard = (
             <div className="space-y-2">
               <Input
                 type="number"
-                placeholder="Ex: 12"
+                placeholder="Ex: 1"
                 value={unitsPerPackage > 0 ? unitsPerPackage : ''}
                 onChange={(e) => updateNewBrandFlowStep(productId, 'unitsPerPackage', parseInt(e.target.value) || 0)}
                 className="text-lg h-12"
@@ -587,18 +879,59 @@ const renderNewBrandFlowCard = (
 
       case 4:
         const isLiquid = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
-        const weightLabel = isLiquid ? 'volume (Litros)' : 'peso (Kg)';
+        const isGranelWeight = packagingType === 'granel';
+        const isUnitProduct = product.unit === 'Unidade(s)';
+
+        // Para UNIDADES com CAIXA/FARDO: perguntar quantidade de unidades
+        if (isUnitProduct && !isGranelWeight) {
+          return (
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold">
+                Quantas unidades vêm na {packagingType} desta marca?
+              </h4>
+              <div className="space-y-2">
+                <Input
+                  type="number"
+                  placeholder="Ex: 30"
+                  value={unitsPerPackage > 0 ? unitsPerPackage : ''}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    updateNewBrandFlowStep(productId, 'unitsPerPackage', value);
+                  }}
+                  className="text-lg h-12"
+                />
+                <Button
+                  onClick={() => updateNewBrandFlowStep(productId, 'currentStep', '', 5)}
+                  disabled={unitsPerPackage <= 0}
+                  className="w-full bg-orange-600 hover:bg-orange-700"
+                >
+                  Próximo
+                </Button>
+              </div>
+            </div>
+          );
+        }
+
+        // Para KG/LITROS ou GRANEL: perguntar peso/volume
+        const weightLabel = isGranelWeight
+          ? (isLiquid ? 'volume por embalagem individual desta marca (Litros)' : 'peso por embalagem individual desta marca (Kg)')
+          : (isLiquid ? `volume da ${packagingType} completa desta marca (Litros)` : `peso da ${packagingType} completa desta marca (Kg)`);
+
+        const weightPlaceholder = isGranelWeight
+          ? (isLiquid ? "Ex: 2,000" : "Ex: 1,000")
+          : (isLiquid ? "Ex: 30,000" : "Ex: 25,000");
+
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
-              Qual é o {weightLabel} da embalagem desta marca?
+              Qual é o {weightLabel}?
             </h4>
             <div className="space-y-2">
               <div className="relative">
                 <Input
                   type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
                   step="0.001"
-                  placeholder={isLiquid ? "Ex: 1,500" : "Ex: 2,500"}
+                  placeholder={weightPlaceholder}
                   value={(() => {
                     if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
                       if (packageWeight > 0) {
@@ -639,9 +972,14 @@ const renderNewBrandFlowCard = (
         );
 
       case 5:
+        const isGranelPrice = packagingType === 'granel';
+        const priceLabel = isGranelPrice 
+          ? 'preço por embalagem individual desta marca'
+          : `preço ${packagingType === 'caixa' ? 'da caixa' : 'do fardo'} completo desta marca`;
+          
         return (
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold">Qual o preço da embalagem desta marca?</h4>
+            <h4 className="text-lg font-semibold">Qual o {priceLabel}?</h4>
             <div className="space-y-2">
               <Input
                 type="text"
@@ -670,11 +1008,16 @@ const renderNewBrandFlowCard = (
                          product.unit === 'Litro(s)' ? 'Litros' : 
                          product.unit === 'Unidade(s)' ? 'unidades' : product.unit;
         
+        const isGranelQuantity = packagingType === 'granel';
+        const packageLabel = isGranelQuantity 
+          ? 'embalagens individuais desta marca'
+          : `${packagingType === 'caixa' ? 'caixas' : 'fardos'} desta marca`;
+        
         return (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">
               Para atender {product.quantity} {unitLabel} do pedido do comprador, 
-              quantas embalagens você precisa enviar?
+              quantas {packageLabel} você precisa enviar?
             </h4>
             <div className="space-y-2">
               <Input
@@ -729,11 +1072,14 @@ const renderNewBrandFlowCard = (
         );
 
       case 8:
+        const isGranelConfirm = packagingType === 'granel';
+        
         // Calcular a quantidade oferecida baseada nos dados preenchidos
         const tempBrandOffer = {
-          unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
-          unitsPerPackage: packagingType === 'granel' ? 1 : unitsPerPackage,
-          unitWeight: packageWeight
+          unitsInPackaging: flow.requiredPackages || 1,
+          unitsPerPackage: isGranelConfirm ? 1 : unitsPerPackage,
+          unitWeight: packageWeight,
+          packagingType: isGranelConfirm ? 'bulk' : 'closed_package'
         };
 
         // Calculate offered quantity for display
@@ -741,10 +1087,14 @@ const renderNewBrandFlowCard = (
 
         const offeredBoxes = flow.requiredPackages || 0;
         const requestedBoxes = product.quantity;
-        const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+        const boxValidation = validateBoxQuantityVariation(offeredQuantity, requestedBoxes); // Usar offeredQuantity ao invés de offeredBoxes
 
         const totalValue = (flow.requiredPackages || 1) * packagePrice;
-        const pricePerUnit = packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1));
+        
+        // CÁLCULO DO PREÇO POR UNIDADE para nova marca
+        const pricePerUnit = isGranelConfirm 
+          ? packagePrice / (packageWeight || 1)  // Para granel: preço por embalagem / peso por embalagem
+          : packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
 
         return (
           <div className="space-y-4">
@@ -768,20 +1118,20 @@ const renderNewBrandFlowCard = (
                         : 'Quantidade Abaixo do Pedido'}
                     </p>
                     <p className="mt-1">
-                      Caixas Pedidas: <strong>{requestedBoxes}</strong> |
-                      Caixas Ofertadas: <strong>{offeredBoxes}</strong>
+                      Pedido: <strong>{requestedBoxes} {abbreviateUnit(product.unit)}</strong> |
+                      Oferta: <strong>{offeredQuantity.toFixed(3)} {abbreviateUnit(product.unit)}</strong>
                     </p>
                     <p className="mt-1 text-xs">
-                      Variação: <strong>{boxValidation.variationAmount.toFixed(1)}</strong> caixas
+                      Variação: <strong>{boxValidation.variationAmount.toFixed(1)} {abbreviateUnit(product.unit)}</strong>
                       {boxValidation.variationType === 'over' ? ' a mais' : ' a menos'}
                     </p>
                     <p className="mt-2 text-xs font-semibold">
                       {boxValidation.shouldNotifyBuyer ? (
                         boxValidation.variationType === 'over'
-                          ? '⚠️ O comprador será notificado sobre esta quantidade extra (mais de 0,5 caixa).'
+                          ? '⚠️ O comprador será notificado sobre esta quantidade extra.'
                           : '⚠️ O comprador será notificado sobre esta falta.'
                       ) : (
-                        '✓ Variação dentro da tolerância (0,5 caixa). Comprador não será notificado.'
+                        '✓ Variação dentro da tolerância. Comprador não será notificado.'
                       )}
                     </p>
                   </div>
@@ -794,8 +1144,13 @@ const renderNewBrandFlowCard = (
                 <div><strong>Nova Marca:</strong> {brandName}</div>
                 <div><strong>Para Produto:</strong> {product.name}</div>
                 <div><strong>Embalagem:</strong> {packagingType}</div>
-                <div><strong>Unidades por embalagem:</strong> {packagingType === 'granel' ? 'N/A' : unitsPerPackage}</div>
-                <div><strong>Peso/Volume por embalagem:</strong> {(() => {
+                
+                {/* Para CAIXA/FARDO: mostrar unidades por embalagem */}
+                {!isGranelConfirm && (
+                  <div><strong>Unidades por embalagem:</strong> {unitsPerPackage}</div>
+                )}
+                
+                <div><strong>{isGranelConfirm ? 'Peso/Volume por embalagem individual:' : `Peso/Volume por ${packagingType}:`}</strong> {(() => {
                   const isLiquidUnit = product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
                   if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
                     if (packageWeight < 1 && packageWeight > 0) {
@@ -807,8 +1162,9 @@ const renderNewBrandFlowCard = (
                     return `${packageWeight} ${isLiquidUnit ? 'L' : 'Kg'}`;
                   }
                 })()}</div>
-                <div><strong>Preço por embalagem:</strong> {formatCurrency(packagePrice)}</div>
-                <div><strong>Quantidade a enviar:</strong> {flow.requiredPackages || 1} embalagem(s)</div>
+                
+                <div><strong>{isGranelConfirm ? 'Preço por embalagem individual:' : `Preço por ${packagingType}:`}</strong> {formatCurrency(packagePrice)}</div>
+                <div><strong>Quantidade a enviar:</strong> {flow.requiredPackages || 1} {isGranelConfirm ? 'embalagem(ns)' : `${packagingType}(s)`}</div>
                 <div><strong>Imagem:</strong> {imageFile ? imageFile.name : 'Nenhuma'}</div>
               </div>
               <div className="border-t border-orange-200 dark:border-orange-700 pt-3">
@@ -927,6 +1283,20 @@ export default function SellerQuotationPage() {
 
   // Loading state para o fluxo guiado de nova marca
   const [isSubmittingGuidedBrand, setIsSubmittingGuidedBrand] = useState(false);
+
+  // Vendor flow modal states (Etapa 6)
+  const [vendorFlowModalStates, setVendorFlowModalStates] = useState<Record<string, boolean>>({});
+  const [vendorFlowDecisions, setVendorFlowDecisions] = useState<Record<string, {
+    decision: string;
+    correctedData?: {
+      unitsPerPackage?: number;
+      unitWeight?: number;
+      totalPackagingPrice?: number;
+      packages?: number;
+      quantity?: number;
+      weight?: number;
+    };
+  }>>({});
 
   // Guided flows hook
   const {
@@ -1413,14 +1783,24 @@ export default function SellerQuotationPage() {
   // NOTE: initVendorFlow and updateVendorFlowStep are provided by useGuidedFlows hook as startVendorFlow and updateVendorFlow
 
   const updateVendorFlowStep = (productId: string, field: string, value: any, nextStep?: number) => {
+    console.log('🔍 [updateVendorFlowStep] Called with:', {
+      productId,
+      field,
+      value,
+      nextStep,
+      currentFlow: vendorFlow[`${productId}_vendor_flow`]
+    });
     updateVendorFlow(productId, field as any, value, nextStep);
   };
 
-  const completeVendorFlow = async (productId: string) => {
+  const completeVendorFlow = async (productId: string, correctedFlowData?: Partial<typeof vendorFlow[string]>) => {
     const flowKey = `${productId}_vendor_flow`;
-    const flow = vendorFlow[flowKey];
+    const originalFlow = vendorFlow[flowKey];
     
-    if (!flow || !currentSupplierDetails || !quotation) return;
+    if (!originalFlow || !currentSupplierDetails || !quotation) return;
+
+    const flow = { ...originalFlow, ...correctedFlowData };
+    console.log('✅ [completeVendorFlow] Using flow data:', { original: originalFlow, corrected: correctedFlowData, final: flow });
 
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
@@ -1435,9 +1815,18 @@ export default function SellerQuotationPage() {
       return;
     }
 
+    // Determinar se é granel ou caixa/fardo
+    const isGranelComplete = flow.packagingType === 'granel';
+    
+    // CÁLCULO DO PREÇO POR UNIDADE
+    // Para GRANEL: preço_embalagem / peso_por_embalagem
+    // Para CAIXA/FARDO: preço_caixa / (unidades_por_caixa × peso_por_unidade)
+    const pricePerUnit = isGranelComplete 
+      ? flow.packagePrice / (flow.packageWeight || 1)  // Para granel: preço por embalagem / peso por embalagem
+      : flow.packagePrice / ((flow.unitsPerPackage || 1) * (flow.packageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
+
     // Criar nova oferta com dados do fluxo guiado
     const newOfferUiId = Date.now().toString() + Math.random().toString(36).substring(2,7);
-    const pricePerUnit = flow.packagePrice / ((flow.unitsPerPackage || 1) * (flow.packageWeight || 1));
     
     const newOffer: OfferWithUI = {
       uiId: newOfferUiId,
@@ -1446,15 +1835,16 @@ export default function SellerQuotationPage() {
       supplierName: currentSupplierDetails.empresa || "N/A",
       supplierInitials: currentSupplierDetails.empresa?.substring(0, 2).toUpperCase() || "XX",
       brandOffered: flow.selectedBrand,
-      packagingDescription: `${flow.requiredPackages} ${flow.packagingType}(s)`,
+      packagingDescription: `${flow.requiredPackages} ${isGranelComplete ? 'embalagem(ns)' : `${flow.packagingType}(s)`}`,
       unitsInPackaging: flow.requiredPackages,
-      unitsPerPackage: flow.unitsPerPackage,
+      unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage, // Para granel, sempre 1
       unitWeight: flow.packageWeight,
       totalPackagingPrice: flow.packagePrice,
       pricePerUnit: pricePerUnit,
       updatedAt: serverTimestamp() as Timestamp,
       productId: productId,
       isSuggestedBrand: false,
+      packagingType: isGranelComplete ? 'bulk' : 'closed_package', // Adicionar tipo de embalagem
     };
 
     try {
@@ -1465,14 +1855,15 @@ export default function SellerQuotationPage() {
         supplierName: currentSupplierDetails.empresa,
         supplierInitials: currentSupplierDetails.empresa.substring(0, 2).toUpperCase(),
         brandOffered: flow.selectedBrand,
-        packagingDescription: `${flow.requiredPackages} ${flow.packagingType}(s)`,
+        packagingDescription: `${flow.requiredPackages} ${isGranelComplete ? 'embalagem(ns)' : `${flow.packagingType}(s)`}`,
         unitsInPackaging: flow.requiredPackages,
-        unitsPerPackage: flow.unitsPerPackage,
+        unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage, // Para granel, sempre 1
         unitWeight: flow.packageWeight,
         totalPackagingPrice: flow.packagePrice,
         pricePerUnit: pricePerUnit,
         updatedAt: serverTimestamp() as Timestamp,
         productId: productId,
+        packagingType: isGranelComplete ? 'bulk' : 'closed_package', // Adicionar tipo de embalagem
       };
 
       const offerCollectionRef = collection(db, `quotations/${quotationId}/products/${productId}/offers`);
@@ -1512,7 +1903,8 @@ export default function SellerQuotationPage() {
       });
 
       // Notificar o comprador internamente (sistema de notificações do sino)
-      if (boxValidation.shouldNotifyBuyer && quotation.userId) {
+      // Don't notify if variationType is 'exact' (no variation)
+      if (boxValidation.shouldNotifyBuyer && quotation.userId && boxValidation.variationType !== 'exact') {
         console.log('🔔 [Vendor Flow] Creating internal notification', {
           quotationUserId: quotation.userId,
           variationType: boxValidation.variationType,
@@ -1523,18 +1915,20 @@ export default function SellerQuotationPage() {
         try {
           const result = await notifyQuantityVariation({
             userId: quotation.userId,
-            quotationId: params.quotationId as string,
-            quotationName: quotation.name || `Cotação #${(params.quotationId as string).slice(-6)}`,
+            quotationId: quotationId,
+            quotationName: quotation.name || `Cotação #${quotationId.slice(-6)}`,
             productId: product.id,
             productName: product.name,
             supplierName: currentSupplierDetails.empresa,
+            supplierId: supplierId,
             brandName: flow.selectedBrand,
-            requestedQuantity: requestedBoxes,
-            offeredQuantity: offeredBoxes,
+            requestedQuantity: product.quantity,
+            offeredPackages: flow.requiredPackages,
             unit: product.unit,
-            variationType: boxValidation.variationType!,
-            variationPercentage: boxValidation.variationPercentage,
-            variationAmount: boxValidation.variationAmount,
+            offerId: newOfferDocRef.id,
+            unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage,
+            unitWeight: flow.packageWeight,
+            totalPackagingPrice: flow.packagePrice,
           });
 
           if (result.success) {
@@ -2290,7 +2684,11 @@ export default function SellerQuotationPage() {
                                            updateVendorFlowStep,
                                            completeVendorFlow,
                                            cancelVendorFlow,
-                                           formatCurrency
+                                           formatCurrency,
+                                           vendorFlowModalStates,
+                                           setVendorFlowModalStates,
+                                           vendorFlowDecisions,
+                                           setVendorFlowDecisions
                                          );
                                        }
                                        return null;
@@ -2353,21 +2751,7 @@ export default function SellerQuotationPage() {
                                           }
                                        }
       
-                                       // Verificar se há fluxo guiado ativo para este produto
-                                       const flowKey = `${product.id}_vendor_flow`;
-                                       const activeFlow = vendorFlow[flowKey];
-                                       
-                                       if (activeFlow && activeFlow.showGuidedFlow) {
-                                         return renderVendorFlowCard(
-                                           product.id,
-                                           product,
-                                           activeFlow,
-                                           updateVendorFlowStep,
-                                           completeVendorFlow,
-                                           cancelVendorFlow,
-                                           formatCurrency
-                                         );
-                                       }
+
                                        
                                        // Card padrão (formulário) - usando componente
                                        const totalOrderValue = (Number(offer.unitsInPackaging) || 0) * (Number(offer.totalPackagingPrice) || 0);
@@ -2563,6 +2947,34 @@ export default function SellerQuotationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quantity Shortage Modal */}
+      {offerManagement.showQuantityShortageModal && offerManagement.quantityShortageContext && (() => {
+        const ctx = offerManagement.quantityShortageContext;
+        // Calculate offered quantity in product's unit
+        const offeredAmount = calculateTotalOfferedQuantity(ctx.offerData, ctx.product);
+        const offeredPackages = Number(ctx.offerData.unitsInPackaging) || 0;
+
+        return (
+          <QuantityShortageModal
+            isOpen={offerManagement.showQuantityShortageModal}
+            onClose={offerManagement.handleCloseQuantityShortageModal}
+            onConfirm={offerManagement.handleQuantityShortageDecision}
+            productName={ctx.product.name}
+            requestedQuantity={ctx.product.quantity}
+            offeredQuantity={offeredAmount}
+            offeredPackages={offeredPackages}
+            unit={ctx.product.unit}
+            unitsPerPackage={Number(ctx.offerData.unitsPerPackage) || 0}
+            unitWeight={Number(ctx.offerData.unitWeight) || 0}
+            totalPackagingPrice={Number(ctx.offerData.totalPackagingPrice) || 0}
+            scenario={ctx.scenario}
+            variationPercentage={ctx.variationPercentage}
+            variationAmount={ctx.variationAmount}
+            packagingType={ctx.offerData.packagingType || 'closed_package'}
+          />
+        );
+      })()}
     </div>
   );
 }

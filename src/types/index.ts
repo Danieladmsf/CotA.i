@@ -95,9 +95,10 @@ export interface Offer {
   pricePerUnit: number;
   brandOffered: string;
   packagingDescription: string;
+  packagingType?: 'closed_package' | 'bulk'; // 'closed_package' = Caixa/Fardo fechado, 'bulk' = A Granel
   unitsInPackaging: number;
-  unitsPerPackage?: number; // Quantas unidades vêm em cada embalagem/caixa
-  unitWeight?: number; // Peso unitário da embalagem
+  unitsPerPackage?: number; // Para 'closed_package': quantas unidades vêm em cada caixa
+  unitWeight?: number; // Para 'bulk': peso/volume de cada embalagem individual
   totalPackagingPrice: number;
   updatedAt: Timestamp | FieldValue;
   createdAt?: Timestamp | FieldValue; // Added to track when offer was created
@@ -166,6 +167,9 @@ export type NotificationType =
   | 'brand_approval_approved'
   | 'brand_approval_rejected'
   | 'quantity_variation_detected'
+  | 'buyer_quantity_adjustment_requested'
+  | 'quantity_adjustment_approved'
+  | 'quantity_adjustment_rejected'
   | 'quotation_started'
   | 'quotation_closed'
   | 'offer_received'

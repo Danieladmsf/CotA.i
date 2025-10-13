@@ -15,6 +15,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // TEMPORARILY BYPASS MIDDLEWARE FOR TESTING
+  return NextResponse.next();
+
+  /*
   // Extrair subdomínio
   const subdomain = hostname.split('.')[0];
 
@@ -66,6 +70,7 @@ export function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
+  */
 }
 
 export const config = {

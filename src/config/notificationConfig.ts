@@ -21,7 +21,10 @@ import {
   Package,
   Award,
   Clock,
-  MessageSquare
+  MessageSquare,
+  Edit3,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -113,6 +116,36 @@ export const NOTIFICATION_CONFIG: Record<NotificationType, NotificationTypeConfi
     defaultPriority: 'high',
     defaultActionUrl: '/cotacao?quotation={quotationId}&tab=aprovacoes-quantidade',
     description: 'Fornecedor ofereceu quantidade diferente da solicitada'
+  },
+
+  buyer_quantity_adjustment_requested: {
+    label: 'Ajuste de Quantidade Solicitado',
+    icon: Edit3,
+    colorClasses: 'text-purple-600 bg-purple-100',
+    context: 'supplier',
+    defaultPriority: 'high',
+    defaultActionUrl: '/portal/{supplierId}/cotar/{quotationId}?tab=ajustes',
+    description: 'Comprador solicitou ajuste nas quantidades oferecidas'
+  },
+
+  quantity_adjustment_approved: {
+    label: 'Ajuste de Quantidade Aprovado',
+    icon: CheckCircle2,
+    colorClasses: 'text-green-600 bg-green-100',
+    context: 'buyer',
+    defaultPriority: 'high',
+    defaultActionUrl: '/cotacao?quotation={quotationId}&tab=aprovacoes-quantidade',
+    description: 'Fornecedor aprovou o ajuste de quantidade solicitado'
+  },
+
+  quantity_adjustment_rejected: {
+    label: 'Ajuste de Quantidade Recusado',
+    icon: XCircle,
+    colorClasses: 'text-red-600 bg-red-100',
+    context: 'buyer',
+    defaultPriority: 'high',
+    defaultActionUrl: '/cotacao?quotation={quotationId}&tab=aprovacoes-quantidade',
+    description: 'Fornecedor recusou o ajuste de quantidade solicitado'
   },
 
   // ============================================================================

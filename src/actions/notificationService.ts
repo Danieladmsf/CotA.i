@@ -27,13 +27,9 @@ interface CreateNotificationParams {
 export async function createNotification(params: CreateNotificationParams) {
   try {
     const db = adminDb();
-
-    // Validate that at least one identifier is present
     if (!params.userId && !params.targetSupplierId) {
       throw new Error('Either userId or targetSupplierId must be provided');
     }
-
-    // Build notification object, only including defined fields to avoid Firestore undefined errors
     const notification: any = {
       type: params.type,
       title: params.title,
@@ -42,12 +38,8 @@ export async function createNotification(params: CreateNotificationParams) {
       priority: params.priority || 'medium',
       createdAt: Timestamp.now()
     };
-
-    // Add userId or targetSupplierId (mutually exclusive usage)
     if (params.userId !== undefined) notification.userId = params.userId;
     if (params.targetSupplierId !== undefined) notification.targetSupplierId = params.targetSupplierId;
-
-    // Only add optional fields if they're defined
     if (params.quotationId !== undefined) notification.quotationId = params.quotationId;
     if (params.quotationName !== undefined) notification.quotationName = params.quotationName;
     if (params.productId !== undefined) notification.productId = params.productId;
@@ -56,18 +48,24 @@ export async function createNotification(params: CreateNotificationParams) {
     if (params.supplierName !== undefined) notification.supplierName = params.supplierName;
     if (params.brandName !== undefined) notification.brandName = params.brandName;
     if (params.actionUrl !== undefined) notification.actionUrl = params.actionUrl;
-    if (params.metadata !== undefined) notification.metadata = params.metadata;
-
+    if (params.metadata !== undefined) {
+      const cleanedMetadata: Record<string, any> = {};
+      Object.entries(params.metadata).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanedMetadata[key] = value;
+        }
+      });
+      if (Object.keys(cleanedMetadata).length > 0) {
+        notification.metadata = cleanedMetadata;
+      }
+    }
     const docRef = await db.collection(NOTIFICATIONS_COLLECTION).add(notification);
-
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error('❌ [createNotification] Error:', error);
     return { success: false, error: error.message };
   }
 }
-
-// Specific notification creators for common scenarios
 
 export async function notifyBrandApprovalPending(params: {
   userId: string;
@@ -139,8 +137,6 @@ export async function notifyBrandRejected(params: {
     metadata: { rejectionReason: params.rejectionReason }
   });
 }
-
-// Supplier-facing notification functions (use targetSupplierId for anonymous portal access)
 
 export async function notifySupplierBrandApproved(params: {
   targetSupplierId: string;
@@ -310,23 +306,148 @@ export async function notifyQuantityVariation(params: {
   productId: string;
   productName: string;
   supplierName: string;
+  supplierId: string;
   brandName: string;
   requestedQuantity: number;
-  offeredQuantity: number;
+  offeredPackages: number;
   unit: string;
-  variationType: 'over' | 'under';
-  variationPercentage: number;
-  variationAmount: number;
+  offerId?: string;
+  unitsPerPackage?: number;
+  unitWeight?: number;
+  totalPackagingPrice?: number;
 }) {
-  const variationIcon = params.variationType === 'over' ? '📈' : '📉';
-  const variationText = params.variationType === 'over' ? 'acima' : 'abaixo';
-  const variationSign = params.variationType === 'over' ? '+' : '-';
+  const { 
+    requestedQuantity, 
+    offeredPackages, 
+    unit, 
+    unitWeight, 
+    unitsPerPackage, 
+    totalPackagingPrice 
+  } = params;
+
+  const isWeightVolume = unit === 'Kilograma(s)' || unit === 'Grama(s)' || unit === 'Litro(s)' || unit === 'Mililitro(s)';
+  const quantityPerPackage = isWeightVolume ? (unitWeight || 0) : (unitsPerPackage || 0);
+  const actualOfferedQuantity = offeredPackages * quantityPerPackage;
+
+  let suggestions = null;
+  if (quantityPerPackage > 0 && requestedQuantity > 0) {
+    const idealPackages = requestedQuantity / quantityPerPackage;
+    const floorPackages = Math.floor(idealPackages);
+    const ceilPackages = Math.ceil(idealPackages);
+
+    const floorSuggestion = {
+      packages: floorPackages,
+      totalQuantity: floorPackages * quantityPerPackage,
+      variation: (floorPackages * quantityPerPackage) - requestedQuantity,
+      totalPrice: totalPackagingPrice ? floorPackages * totalPackagingPrice : undefined,
+    };
+
+    const ceilSuggestion = {
+      packages: ceilPackages,
+      totalQuantity: ceilPackages * quantityPerPackage,
+      variation: (ceilPackages * quantityPerPackage) - requestedQuantity,
+      totalPrice: totalPackagingPrice ? ceilPackages * totalPackagingPrice : undefined,
+    };
+    
+    suggestions = {
+        floor: floorPackages > 0 ? floorSuggestion : undefined,
+        ceil: ceilPackages > 0 && ceilPackages !== floorPackages ? ceilSuggestion : undefined,
+    };
+  }
+
+  const actualVariationAmount = actualOfferedQuantity - requestedQuantity;
+  const actualVariationPercentage = requestedQuantity > 0 ? (actualVariationAmount / requestedQuantity) * 100 : 0;
+  const variationIcon = actualVariationAmount > 0 ? '📈' : '📉';
+
+  const message = `${params.supplierName} ofereceu uma quantidade diferente para ${params.productName} (${params.brandName}). Solicitado: ${requestedQuantity} ${unit}. Oferecido: ${actualOfferedQuantity.toFixed(1)} ${unit}.`;
 
   return createNotification({
     userId: params.userId,
     type: 'quantity_variation_detected',
-    title: `${variationIcon} Variação de Quantidade Detectada`,
-    message: `${params.supplierName} ofereceu ${params.offeredQuantity} caixas de ${params.productName} (${params.brandName}). Solicitado: ${params.requestedQuantity} caixas. Variação: ${variationSign}${params.variationAmount.toFixed(1)} caixas (${params.variationPercentage.toFixed(1)}% ${variationText})`,
+    title: `${variationIcon} Variação de Quantidade em ${params.productName}`,
+    message: message,
+    quotationId: params.quotationId,
+    quotationName: params.quotationName,
+    productId: params.productId,
+    productName: params.productName,
+    supplierId: params.supplierId,
+    supplierName: params.supplierName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/cotacao?quotation=${params.quotationId}&tab=aprovacoes-quantidade`,
+    metadata: {
+      requestedQuantity: params.requestedQuantity,
+      offeredQuantity: actualOfferedQuantity,
+      unit: params.unit,
+      variationType: actualVariationAmount > 0 ? 'over' : 'under',
+      variationPercentage: actualVariationPercentage,
+      variationAmount: actualVariationAmount,
+      offerId: params.offerId,
+      originalOffer: {
+          packages: offeredPackages,
+          unitsPerPackage: params.unitsPerPackage,
+          unitWeight: params.unitWeight,
+          totalPackagingPrice: params.totalPackagingPrice,
+      },
+      suggestions: suggestions
+    }
+  });
+}
+
+export async function notifyBuyerQuantityAdjustmentRequested(params: {
+  targetSupplierId: string;
+  quotationId: string;
+  quotationName: string;
+  productId: string;
+  productName: string;
+  brandName: string;
+  originalOfferedBoxes: number;
+  adjustedBoxes: number;
+  originalUnitsInPackaging: number;
+  adjustedUnitsInPackaging: number;
+  offerId: string;
+  notificationId: string;
+}) {
+  return createNotification({
+    targetSupplierId: params.targetSupplierId,
+    type: 'buyer_quantity_adjustment_requested',
+    title: '✏️ Comprador Solicitou Ajuste de Quantidade',
+    message: `O comprador solicitou ajuste para ${params.productName} (${params.brandName}): ${params.adjustedBoxes} caixas com ${params.adjustedUnitsInPackaging} un/emb (original: ${params.originalOfferedBoxes} caixas, ${params.originalUnitsInPackaging} un/emb)`,
+    quotationId: params.quotationId,
+    quotationName: params.quotationName,
+    productId: params.productId,
+    productName: params.productName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/portal/${params.targetSupplierId}/cotar/${params.quotationId}?tab=ajustes`,
+    metadata: {
+      originalOfferedBoxes: params.originalOfferedBoxes,
+      adjustedBoxes: params.adjustedBoxes,
+      originalUnitsInPackaging: params.originalUnitsInPackaging,
+      adjustedUnitsInPackaging: params.adjustedUnitsInPackaging,
+      offerId: params.offerId,
+      buyerNotificationId: params.notificationId
+    }
+  });
+}
+
+export async function notifyQuantityAdjustmentApproved(params: {
+  userId: string;
+  quotationId: string;
+  quotationName: string;
+  productId: string;
+  productName: string;
+  supplierName: string;
+  brandName: string;
+  adjustedBoxes: number;
+  adjustedUnitsInPackaging: number;
+  notificationId: string;
+}) {
+  return createNotification({
+    userId: params.userId,
+    type: 'quantity_adjustment_approved',
+    title: '✅ Ajuste de Quantidade Aprovado',
+    message: `${params.supplierName} aprovou o ajuste para ${params.productName} (${params.brandName}): ${params.adjustedBoxes} caixas com ${params.adjustedUnitsInPackaging} un/emb`,
     quotationId: params.quotationId,
     quotationName: params.quotationName,
     productId: params.productId,
@@ -336,12 +457,40 @@ export async function notifyQuantityVariation(params: {
     priority: 'high',
     actionUrl: `/cotacao?quotation=${params.quotationId}&tab=aprovacoes-quantidade`,
     metadata: {
-      requestedQuantity: params.requestedQuantity,
-      offeredQuantity: params.offeredQuantity,
-      unit: params.unit,
-      variationType: params.variationType,
-      variationPercentage: params.variationPercentage,
-      variationAmount: params.variationAmount
+      adjustedBoxes: params.adjustedBoxes,
+      adjustedUnitsInPackaging: params.adjustedUnitsInPackaging,
+      originalNotificationId: params.notificationId
+    }
+  });
+}
+
+export async function notifyQuantityAdjustmentRejected(params: {
+  userId: string;
+  quotationId: string;
+  quotationName: string;
+  productId: string;
+  productName: string;
+  supplierName: string;
+  brandName: string;
+  rejectionReason?: string;
+  notificationId: string;
+}) {
+  return createNotification({
+    userId: params.userId,
+    type: 'quantity_adjustment_rejected',
+    title: '❌ Ajuste de Quantidade Recusado',
+    message: `${params.supplierName} recusou o ajuste para ${params.productName} (${params.brandName})${params.rejectionReason ? `: ${params.rejectionReason}` : ''}`,
+    quotationId: params.quotationId,
+    quotationName: params.quotationName,
+    productId: params.productId,
+    productName: params.productName,
+    supplierName: params.supplierName,
+    brandName: params.brandName,
+    priority: 'high',
+    actionUrl: `/cotacao?quotation=${params.quotationId}&tab=aprovacoes-quantidade`,
+    metadata: {
+      rejectionReason: params.rejectionReason,
+      originalNotificationId: params.notificationId
     }
   });
 }
