@@ -521,7 +521,10 @@ const renderVendorFlowCard = (
         // For validation, compare in the same unit as the product
         const offeredAmount = offeredQuantity; // Already calculated in product's unit
         const requestedAmount = product.quantity; // Already in product's unit
+
         const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
+
+
 
         // Also store box count for display
         const offeredBoxes = flow.requiredPackages || 0;
@@ -1888,14 +1891,19 @@ export default function SellerQuotationPage() {
       );
 
       // Verificar variação de quantidade e notificar comprador se necessário
-      const offeredBoxes = flow.requiredPackages || 0;
-      const requestedBoxes = product.quantity;
-      const boxValidation = validateBoxQuantityVariation(offeredBoxes, requestedBoxes);
+      const offeredQuantity = calculateTotalOfferedQuantity({
+        unitsInPackaging: flow.requiredPackages || 0,
+        unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage,
+        unitWeight: flow.packageWeight,
+        packagingType: isGranelComplete ? 'bulk' : 'closed_package',
+      }, product);
+      const requestedQuantity = product.quantity;
+      const boxValidation = validateBoxQuantityVariation(offeredQuantity, requestedQuantity);
 
       console.log('📊 [Vendor Flow - Quantity Validation]', {
         productName: product.name,
-        offeredBoxes,
-        requestedBoxes,
+        offeredQuantity,
+        requestedQuantity,
         isValid: boxValidation.isValid,
         shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
         variationType: boxValidation.variationType,
@@ -1905,12 +1913,7 @@ export default function SellerQuotationPage() {
       // Notificar o comprador internamente (sistema de notificações do sino)
       // Don't notify if variationType is 'exact' (no variation)
       if (boxValidation.shouldNotifyBuyer && quotation.userId && boxValidation.variationType !== 'exact') {
-        console.log('🔔 [Vendor Flow] Creating internal notification', {
-          quotationUserId: quotation.userId,
-          variationType: boxValidation.variationType,
-          offeredBoxes,
-          requestedBoxes,
-        });
+
 
         try {
           const result = await notifyQuantityVariation({

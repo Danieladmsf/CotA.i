@@ -128,6 +128,16 @@ export const NOTIFICATION_CONFIG: Record<NotificationType, NotificationTypeConfi
     description: 'Comprador solicitou ajuste nas quantidades oferecidas'
   },
 
+  buyer_adjustment_applied: {
+    label: 'Oferta Ajustada pelo Comprador',
+    icon: Edit3,
+    colorClasses: 'text-blue-600 bg-blue-100',
+    context: 'supplier',
+    defaultPriority: 'medium',
+    defaultActionUrl: '/portal/{supplierId}/cotar/{quotationId}',
+    description: 'Comprador ajustou automaticamente sua oferta'
+  },
+
   quantity_adjustment_approved: {
     label: 'Ajuste de Quantidade Aprovado',
     icon: CheckCircle2,

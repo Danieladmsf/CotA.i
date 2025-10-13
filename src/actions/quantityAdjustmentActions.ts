@@ -3,14 +3,13 @@
 import { adminDb } from '@/lib/config/firebase-admin';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import {
-  notifyBuyerQuantityAdjustmentRequested,
-  notifyQuantityAdjustmentApproved,
-  notifyQuantityAdjustmentRejected
+  notifySellerOfBuyerAdjustment
 } from './notificationService';
 
 /**
- * Request a quantity adjustment from the supplier
+ * Apply a quantity adjustment directly to the supplier's offer
  * Called by the buyer when they want to adjust the quantities offered
+ * The adjustment is applied immediately without requiring supplier approval
  */
 export async function requestQuantityAdjustment(params: {
   notificationId: string; // The original quantity_variation_detected notification
@@ -40,158 +39,73 @@ export async function requestQuantityAdjustment(params: {
 
     const metadata = notification.metadata || {};
 
-    // Update the original notification with adjustment request status
-    await notificationRef.update({
-      'metadata.adjustmentRequested': true,
-      'metadata.adjustedBoxes': params.adjustedBoxes,
-      'metadata.adjustedUnitsInPackaging': params.adjustedUnitsInPackaging,
-      'metadata.adjustmentRequestedAt': Timestamp.now(),
-      'metadata.adjustmentStatus': 'pending'
+    // Get the offer to calculate total quantity
+    const offerRef = db.collection('quotations')
+      .doc(params.quotationId)
+      .collection('products')
+      .doc(params.productId)
+      .collection('offers')
+      .doc(params.offerId);
+
+    const offerDoc = await offerRef.get();
+
+    if (!offerDoc.exists) {
+      return { success: false, error: 'Offer not found' };
+    }
+
+    const offerData = offerDoc.data();
+
+    // Calculate total quantity (boxes * unitsInPackaging * weight per unit)
+    const totalQuantity = params.adjustedBoxes * params.adjustedUnitsInPackaging * (offerData?.weightPerUnit || 1);
+
+    // Update the offer directly with new quantities
+    await offerRef.update({
+      unitsInPackaging: params.adjustedBoxes,
+      unitsPerPackage: params.adjustedUnitsInPackaging,
+      updatedAt: Timestamp.now(),
+      adjustmentHistory: FieldValue.arrayUnion({
+        adjustedAt: Timestamp.now(),
+        originalBoxes: metadata.offeredQuantity || offerData?.unitsInPackaging || 0,
+        originalUnitsInPackaging: metadata.unitsInPackaging || offerData?.unitsPerPackage || 0,
+        newBoxes: params.adjustedBoxes,
+        newUnitsInPackaging: params.adjustedUnitsInPackaging,
+        reason: 'buyer_adjustment',
+        adjustedBy: 'buyer'
+      })
     });
 
-    // Create notification for supplier
-    const result = await notifyBuyerQuantityAdjustmentRequested({
+    // Update the original notification to mark it as applied
+    // Note: We don't mark as read here - user should manually review
+    await notificationRef.update({
+      'metadata.adjustmentApplied': true,
+      'metadata.adjustedBoxes': params.adjustedBoxes,
+      'metadata.adjustedUnitsInPackaging': params.adjustedUnitsInPackaging,
+      'metadata.adjustedWeightPerUnit': offerData?.weightPerUnit || 1,
+      'metadata.adjustedTotalQuantity': totalQuantity,
+      'metadata.adjustmentAppliedAt': Timestamp.now(),
+      'metadata.adjustmentStatus': 'applied'
+    });
+
+    // Notify supplier that their offer was adjusted
+    const result = await notifySellerOfBuyerAdjustment({
       targetSupplierId: params.supplierId,
       quotationId: params.quotationId,
-      quotationName: notification.quotationName || `Cotação #${params.quotationId.slice(-6)}`,
-      productId: params.productId,
       productName: notification.productName || '',
       brandName: notification.brandName || '',
-      originalOfferedBoxes: metadata.offeredQuantity || 0,
+      originalBoxes: metadata.offeredQuantity || offerData?.unitsInPackaging || 0,
       adjustedBoxes: params.adjustedBoxes,
-      originalUnitsInPackaging: metadata.unitsInPackaging || 0,
-      adjustedUnitsInPackaging: params.adjustedUnitsInPackaging,
-      offerId: params.offerId,
-      notificationId: params.notificationId
+      totalQuantity: totalQuantity,
+      unit: offerData?.unit || 'un'
     });
 
     if (!result.success) {
       return { success: false, error: result.error };
     }
 
-    return { success: true, message: 'Ajuste solicitado com sucesso' };
+    return { success: true, message: 'Oferta ajustada com sucesso' };
   } catch (error: any) {
     console.error('❌ [requestQuantityAdjustment] Error:', error);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * Handle supplier's response to a quantity adjustment request
- * Called by the supplier when they approve or reject the adjustment
- */
-export async function handleQuantityAdjustmentResponse(params: {
-  supplierNotificationId: string; // The buyer_quantity_adjustment_requested notification
-  approved: boolean;
-  rejectionReason?: string;
-}) {
-  try {
-    const db = adminDb();
-
-    // Get the supplier notification
-    const supplierNotificationRef = db.collection('notifications').doc(params.supplierNotificationId);
-    const supplierNotificationDoc = await supplierNotificationRef.get();
-
-    if (!supplierNotificationDoc.exists) {
-      return { success: false, error: 'Supplier notification not found' };
-    }
-
-    const supplierNotification = supplierNotificationDoc.data();
-
-    if (!supplierNotification) {
-      return { success: false, error: 'Supplier notification data is missing' };
-    }
-
-    const metadata = supplierNotification.metadata || {};
-    const buyerNotificationId = metadata.buyerNotificationId;
-    const offerId = metadata.offerId;
-
-    if (!buyerNotificationId) {
-      return { success: false, error: 'Buyer notification ID not found' };
-    }
-
-    if (!supplierNotification.quotationId || !supplierNotification.productId) {
-      return { success: false, error: 'Quotation or product ID not found' };
-    }
-
-    // Update supplier notification as read/processed
-    await supplierNotificationRef.update({
-      isRead: true,
-      readAt: Timestamp.now(),
-      'metadata.adjustmentApproved': params.approved,
-      'metadata.rejectionReason': params.rejectionReason,
-      'metadata.processedAt': Timestamp.now()
-    });
-
-    // Update the original buyer notification
-    const buyerNotificationRef = db.collection('notifications').doc(buyerNotificationId);
-    await buyerNotificationRef.update({
-      'metadata.adjustmentStatus': params.approved ? 'approved' : 'rejected',
-      'metadata.adjustmentProcessedAt': Timestamp.now(),
-      'metadata.rejectionReason': params.rejectionReason
-    });
-
-    if (params.approved) {
-      // Update the offer with new quantities
-      const offerRef = db.collection('quotations')
-        .doc(supplierNotification.quotationId)
-        .collection('products')
-        .doc(supplierNotification.productId)
-        .collection('offers')
-        .doc(offerId);
-
-      const offerDoc = await offerRef.get();
-
-      if (offerDoc.exists) {
-        await offerRef.update({
-          unitsInPackaging: metadata.adjustedBoxes,
-          unitsPerPackage: metadata.adjustedUnitsInPackaging,
-          updatedAt: Timestamp.now(),
-          adjustmentHistory: FieldValue.arrayUnion({
-            adjustedAt: Timestamp.now(),
-            originalBoxes: metadata.originalOfferedBoxes,
-            originalUnitsInPackaging: metadata.originalUnitsInPackaging,
-            newBoxes: metadata.adjustedBoxes,
-            newUnitsInPackaging: metadata.adjustedUnitsInPackaging,
-            reason: 'buyer_request'
-          })
-        });
-      }
-
-      // Notify buyer of approval
-      await notifyQuantityAdjustmentApproved({
-        userId: supplierNotification.userId,
-        quotationId: supplierNotification.quotationId,
-        quotationName: supplierNotification.quotationName || '',
-        productId: supplierNotification.productId,
-        productName: supplierNotification.productName || '',
-        supplierName: supplierNotification.supplierName || '',
-        brandName: supplierNotification.brandName || '',
-        adjustedBoxes: metadata.adjustedBoxes,
-        adjustedUnitsInPackaging: metadata.adjustedUnitsInPackaging,
-        notificationId: buyerNotificationId
-      });
-    } else {
-      // Notify buyer of rejection
-      await notifyQuantityAdjustmentRejected({
-        userId: supplierNotification.userId,
-        quotationId: supplierNotification.quotationId,
-        quotationName: supplierNotification.quotationName || '',
-        productId: supplierNotification.productId,
-        productName: supplierNotification.productName || '',
-        supplierName: supplierNotification.supplierName || '',
-        brandName: supplierNotification.brandName || '',
-        rejectionReason: params.rejectionReason,
-        notificationId: buyerNotificationId
-      });
-    }
-
-    return {
-      success: true,
-      message: params.approved ? 'Ajuste aprovado com sucesso' : 'Ajuste recusado'
-    };
-  } catch (error: any) {
-    console.error('❌ [handleQuantityAdjustmentResponse] Error:', error);
-    return { success: false, error: error.message };
-  }
-}

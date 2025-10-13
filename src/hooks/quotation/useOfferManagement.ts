@@ -470,28 +470,7 @@ export function useOfferManagement({
       console.log('🔧 [Corrected Data] Final payload:', finalOfferPayload);
     }
 
-    // If decision was 'adjust_to_request', adjust to requested quantity
-    if (quantityDecision?.decision === 'adjust_to_request') {
-      // Calculate how many packages needed to meet requested amount
-      // Use corrected values from finalOfferPayload if they exist, otherwise use original values
-      const packageWeight = Number(finalOfferPayload.unitWeight) || 1;
-      const unitsPerPackage = Number(finalOfferPayload.unitsPerPackage) || 1;
-      const requestedAmount = product.quantity;
 
-      let requiredPackages;
-      if (product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)') {
-        // Weight-based: divide requested weight by weight per package
-        requiredPackages = Math.ceil(requestedAmount / packageWeight);
-      } else {
-        // Unit-based: divide requested units by units per package
-        requiredPackages = Math.ceil(requestedAmount / unitsPerPackage);
-      }
-
-      finalOfferPayload = {
-        ...finalOfferPayload,
-        unitsInPackaging: requiredPackages,
-      };
-    }
 
     setIsSaving(prev => ({ ...prev, [savingKey]: true }));
     setSavingOffers(prev => new Set(prev).add(savingKey));
@@ -667,13 +646,8 @@ export function useOfferManagement({
     console.log('🔧 [Decision Handler] Received decision:', decision);
     console.log('🔧 [Decision Handler] Received correctedData:', correctedData);
 
-    const suggestedQuantity = quantityShortageContext
-      ? Math.ceil(quantityShortageContext.product.quantity)
-      : undefined;
-
     setQuantityDecision({
       decision,
-      suggestedQuantity: decision === 'request_approval' ? suggestedQuantity : undefined,
       correctedData: correctedData // Always pass correctedData if it exists, regardless of decision
     });
     setShowQuantityShortageModal(false);

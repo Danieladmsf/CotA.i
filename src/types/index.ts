@@ -168,6 +168,7 @@ export type NotificationType =
   | 'brand_approval_rejected'
   | 'quantity_variation_detected'
   | 'buyer_quantity_adjustment_requested'
+  | 'buyer_adjustment_applied'
   | 'quantity_adjustment_approved'
   | 'quantity_adjustment_rejected'
   | 'quotation_started'

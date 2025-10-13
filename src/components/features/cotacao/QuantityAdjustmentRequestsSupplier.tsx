@@ -13,7 +13,8 @@ import { CheckCircle, XCircle, AlertCircle, Package, Calendar, Loader2, ChevronD
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { SystemNotification } from '@/types';
-import { handleQuantityAdjustmentResponse } from '@/actions/quantityAdjustmentActions';
+// NOTE: This component is now obsolete - buyer adjustments are applied directly without supplier approval
+// import { handleQuantityAdjustmentResponse } from '@/actions/quantityAdjustmentActions';
 
 interface QuantityAdjustmentRequestsSupplierProps {
   supplierId: string;
@@ -81,94 +82,23 @@ export default function QuantityAdjustmentRequestsSupplier({
     });
   };
 
+  // NOTE: These functions are now obsolete as adjustments are applied directly
   const handleApprove = async (notification: SystemNotification) => {
-    if (!notification.id) return;
-
-    setProcessingIds(prev => new Set(prev).add(notification.id));
-
-    try {
-      const result = await handleQuantityAdjustmentResponse({
-        supplierNotificationId: notification.id,
-        approved: true
-      });
-
-      if (result.success) {
-        toast({
-          title: "Ajuste Aprovado",
-          description: `O ajuste de quantidade para "${notification.productName}" foi aprovado com sucesso.`,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Erro",
-          description: result.error || "Erro ao aprovar ajuste",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      console.error('[QuantityAdjustmentRequestsSupplier] Error approving:', error);
-      toast({
-        title: "Erro",
-        description: `Erro ao aprovar ajuste: ${error?.message || 'Desconhecido'}`,
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(notification.id);
-        return newSet;
-      });
-    }
+    // Functionality removed - adjustments are now applied directly by buyer
+    toast({
+      title: "Funcionalidade Desabilitada",
+      description: "Os ajustes agora são aplicados automaticamente pelo comprador.",
+      variant: "default"
+    });
   };
 
   const handleReject = async (notification: SystemNotification) => {
-    if (!notification.id) return;
-
-    const reason = rejectionReasons[notification.id];
-
-    setProcessingIds(prev => new Set(prev).add(notification.id));
-
-    try {
-      const result = await handleQuantityAdjustmentResponse({
-        supplierNotificationId: notification.id,
-        approved: false,
-        rejectionReason: reason
-      });
-
-      if (result.success) {
-        toast({
-          title: "Ajuste Recusado",
-          description: `O ajuste de quantidade para "${notification.productName}" foi recusado.`,
-          variant: "default"
-        });
-
-        // Clear rejection reason
-        setRejectionReasons(prev => {
-          const newReasons = { ...prev };
-          delete newReasons[notification.id];
-          return newReasons;
-        });
-      } else {
-        toast({
-          title: "Erro",
-          description: result.error || "Erro ao recusar ajuste",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      console.error('[QuantityAdjustmentRequestsSupplier] Error rejecting:', error);
-      toast({
-        title: "Erro",
-        description: `Erro ao recusar ajuste: ${error?.message || 'Desconhecido'}`,
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(notification.id);
-        return newSet;
-      });
-    }
+    // Functionality removed - adjustments are now applied directly by buyer
+    toast({
+      title: "Funcionalidade Desabilitada",
+      description: "Os ajustes agora são aplicados automaticamente pelo comprador.",
+      variant: "default"
+    });
   };
 
   if (isLoading) {

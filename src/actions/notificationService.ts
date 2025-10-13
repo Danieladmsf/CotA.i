@@ -7,8 +7,8 @@ import type { SystemNotification, NotificationType } from '@/types';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
 interface CreateNotificationParams {
-  userId?: string; // Optional for supplier notifications (use targetSupplierId instead)
-  targetSupplierId?: string; // For supplier portal notifications (unauthenticated access)
+  userId?: string;
+  targetSupplierId?: string;
   type: NotificationType;
   title: string;
   message: string;
@@ -328,6 +328,8 @@ export async function notifyQuantityVariation(params: {
   const isWeightVolume = unit === 'Kilograma(s)' || unit === 'Grama(s)' || unit === 'Litro(s)' || unit === 'Mililitro(s)';
   const quantityPerPackage = isWeightVolume ? (unitWeight || 0) : (unitsPerPackage || 0);
   const actualOfferedQuantity = offeredPackages * quantityPerPackage;
+  const actualVariationAmount = actualOfferedQuantity - requestedQuantity;
+  const actualVariationPercentage = requestedQuantity > 0 ? (actualVariationAmount / requestedQuantity) * 100 : 0;
 
   let suggestions = null;
   if (quantityPerPackage > 0 && requestedQuantity > 0) {
@@ -335,28 +337,41 @@ export async function notifyQuantityVariation(params: {
     const floorPackages = Math.floor(idealPackages);
     const ceilPackages = Math.ceil(idealPackages);
 
+    const pricePerPackage = offeredPackages > 0 ? (totalPackagingPrice || 0) / offeredPackages : 0;
+
     const floorSuggestion = {
       packages: floorPackages,
       totalQuantity: floorPackages * quantityPerPackage,
       variation: (floorPackages * quantityPerPackage) - requestedQuantity,
-      totalPrice: totalPackagingPrice ? floorPackages * totalPackagingPrice : undefined,
+      totalPrice: pricePerPackage > 0 ? floorPackages * pricePerPackage : undefined,
     };
 
     const ceilSuggestion = {
       packages: ceilPackages,
       totalQuantity: ceilPackages * quantityPerPackage,
       variation: (ceilPackages * quantityPerPackage) - requestedQuantity,
-      totalPrice: totalPackagingPrice ? ceilPackages * totalPackagingPrice : undefined,
+      totalPrice: pricePerPackage > 0 ? ceilPackages * pricePerPackage : undefined,
     };
-    
+
+    // Always include the actual offered quantity as a third option
+    const offeredSuggestion = {
+      packages: offeredPackages,
+      totalQuantity: actualOfferedQuantity,
+      variation: actualVariationAmount,
+      totalPrice: totalPackagingPrice,
+    };
+
+    // Build suggestions object with smart logic:
+    // - floor: lower option (if different from offered)
+    // - ceil: higher option (if different from floor and offered)
+    // - offered: what supplier actually sent (always included)
     suggestions = {
-        floor: floorPackages > 0 ? floorSuggestion : undefined,
-        ceil: ceilPackages > 0 && ceilPackages !== floorPackages ? ceilSuggestion : undefined,
+        floor: (floorPackages > 0 && floorPackages !== offeredPackages) ? floorSuggestion : null,
+        ceil: (ceilPackages > 0 && ceilPackages !== floorPackages && ceilPackages !== offeredPackages) ? ceilSuggestion : null,
+        offered: offeredSuggestion,
     };
   }
 
-  const actualVariationAmount = actualOfferedQuantity - requestedQuantity;
-  const actualVariationPercentage = requestedQuantity > 0 ? (actualVariationAmount / requestedQuantity) * 100 : 0;
   const variationIcon = actualVariationAmount > 0 ? '📈' : '📉';
 
   const message = `${params.supplierName} ofereceu uma quantidade diferente para ${params.productName} (${params.brandName}). Solicitado: ${requestedQuantity} ${unit}. Oferecido: ${actualOfferedQuantity.toFixed(1)} ${unit}.`;
@@ -491,6 +506,35 @@ export async function notifyQuantityAdjustmentRejected(params: {
     metadata: {
       rejectionReason: params.rejectionReason,
       originalNotificationId: params.notificationId
+    }
+  });
+}
+
+export async function notifySellerOfBuyerAdjustment(params: {
+  targetSupplierId: string;
+  quotationId: string;
+  productName: string;
+  brandName: string;
+  originalBoxes: number;
+  adjustedBoxes: number;
+  totalQuantity: number;
+  unit: string;
+}) {
+  return createNotification({
+    targetSupplierId: params.targetSupplierId,
+    type: 'buyer_adjustment_applied',
+    title: 'Sua oferta foi ajustada pelo comprador',
+    message: `Para o item ${params.productName} (${params.brandName}), o comprador ajustou sua oferta de ${params.originalBoxes} para ${params.adjustedBoxes} caixas, totalizando ${params.totalQuantity.toFixed(1)} ${params.unit}.`,
+    quotationId: params.quotationId,
+    productName: params.productName,
+    brandName: params.brandName,
+    priority: 'medium',
+    actionUrl: `/portal/${params.targetSupplierId}/cotar/${params.quotationId}`,
+    metadata: {
+      originalBoxes: params.originalBoxes,
+      adjustedBoxes: params.adjustedBoxes,
+      totalQuantity: params.totalQuantity,
+      unit: params.unit,
     }
   });
 }
