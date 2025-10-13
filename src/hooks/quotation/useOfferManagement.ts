@@ -342,11 +342,34 @@ export function useOfferManagement({
 
     const unitsInPackaging = Number(offerData.unitsInPackaging);
     const unitsPerPackage = Number(offerData.unitsPerPackage);
-    const unitWeight = Number(offerData.unitWeight);
+    let unitWeight = Number(offerData.unitWeight);
     const totalPackagingPrice = Number(offerData.totalPackagingPrice);
 
-    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0 || isNaN(unitsPerPackage) || unitsPerPackage <= 0 || isNaN(unitWeight) || unitWeight <= 0 || isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
-      toast({ title: "Dados Inválidos", description: "Preencha todos os campos da oferta corretamente (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive", duration: 7e3 });
+    // For unit-based products (Unidade(s)), unitWeight is not required - default to 1
+    const isUnitProduct = product.unit === 'Unidade(s)';
+    if (isUnitProduct && (isNaN(unitWeight) || unitWeight <= 0)) {
+      unitWeight = 1; // Default to 1 for unit products
+    }
+
+    // Validate required fields based on product type
+    if (isNaN(unitsInPackaging) || unitsInPackaging <= 0) {
+      toast({ title: "Dados Inválidos", description: "Preencha a quantidade de caixas/embalagens.", variant: "destructive", duration: 7e3 });
+      return false;
+    }
+
+    if (isNaN(unitsPerPackage) || unitsPerPackage <= 0) {
+      toast({ title: "Dados Inválidos", description: "Preencha quantas unidades vêm na caixa.", variant: "destructive", duration: 7e3 });
+      return false;
+    }
+
+    if (isNaN(totalPackagingPrice) || totalPackagingPrice <= 0) {
+      toast({ title: "Dados Inválidos", description: "Preencha o preço da caixa.", variant: "destructive", duration: 7e3 });
+      return false;
+    }
+
+    // For weight/volume products, unitWeight is required
+    if (!isUnitProduct && (isNaN(unitWeight) || unitWeight <= 0)) {
+      toast({ title: "Dados Inválidos", description: "Preencha o peso/volume da embalagem.", variant: "destructive", duration: 7e3 });
       return false;
     }
 

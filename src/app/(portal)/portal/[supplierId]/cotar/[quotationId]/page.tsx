@@ -1808,11 +1808,28 @@ export default function SellerQuotationPage() {
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
 
+    // For unit-based products (Unidade(s)), packageWeight is not required - default to 1
+    const isUnitProduct = product.unit === 'Unidade(s)';
+    let finalPackageWeight = flow.packageWeight;
+    if (isUnitProduct && (!finalPackageWeight || finalPackageWeight <= 0)) {
+      finalPackageWeight = 1; // Default to 1 for unit products
+    }
+
     // Verificar dados básicos
-    if (!flow.selectedBrand.trim() || flow.requiredPackages <= 0 || flow.packageWeight <= 0 || flow.packagePrice <= 0) {
+    if (!flow.selectedBrand.trim() || flow.requiredPackages <= 0 || flow.packagePrice <= 0) {
       toast({
-        title: "Dados Inválidos", 
-        description: "Todos os campos devem estar preenchidos corretamente.", 
+        title: "Dados Inválidos",
+        description: "Preencha marca, quantidade de caixas e preço.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For weight/volume products, packageWeight is required
+    if (!isUnitProduct && (!finalPackageWeight || finalPackageWeight <= 0)) {
+      toast({
+        title: "Dados Inválidos",
+        description: "Preencha o peso/volume da embalagem.",
         variant: "destructive"
       });
       return;
@@ -1820,13 +1837,13 @@ export default function SellerQuotationPage() {
 
     // Determinar se é granel ou caixa/fardo
     const isGranelComplete = flow.packagingType === 'granel';
-    
+
     // CÁLCULO DO PREÇO POR UNIDADE
     // Para GRANEL: preço_embalagem / peso_por_embalagem
     // Para CAIXA/FARDO: preço_caixa / (unidades_por_caixa × peso_por_unidade)
-    const pricePerUnit = isGranelComplete 
-      ? flow.packagePrice / (flow.packageWeight || 1)  // Para granel: preço por embalagem / peso por embalagem
-      : flow.packagePrice / ((flow.unitsPerPackage || 1) * (flow.packageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
+    const pricePerUnit = isGranelComplete
+      ? flow.packagePrice / (finalPackageWeight || 1)  // Para granel: preço por embalagem / peso por embalagem
+      : flow.packagePrice / ((flow.unitsPerPackage || 1) * (finalPackageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
 
     // Criar nova oferta com dados do fluxo guiado
     const newOfferUiId = Date.now().toString() + Math.random().toString(36).substring(2,7);
@@ -1841,7 +1858,7 @@ export default function SellerQuotationPage() {
       packagingDescription: `${flow.requiredPackages} ${isGranelComplete ? 'embalagem(ns)' : `${flow.packagingType}(s)`}`,
       unitsInPackaging: flow.requiredPackages,
       unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage, // Para granel, sempre 1
-      unitWeight: flow.packageWeight,
+      unitWeight: finalPackageWeight,
       totalPackagingPrice: flow.packagePrice,
       pricePerUnit: pricePerUnit,
       updatedAt: serverTimestamp() as Timestamp,
@@ -1861,7 +1878,7 @@ export default function SellerQuotationPage() {
         packagingDescription: `${flow.requiredPackages} ${isGranelComplete ? 'embalagem(ns)' : `${flow.packagingType}(s)`}`,
         unitsInPackaging: flow.requiredPackages,
         unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage, // Para granel, sempre 1
-        unitWeight: flow.packageWeight,
+        unitWeight: finalPackageWeight,
         totalPackagingPrice: flow.packagePrice,
         pricePerUnit: pricePerUnit,
         updatedAt: serverTimestamp() as Timestamp,
@@ -1894,7 +1911,7 @@ export default function SellerQuotationPage() {
       const offeredQuantity = calculateTotalOfferedQuantity({
         unitsInPackaging: flow.requiredPackages || 0,
         unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage,
-        unitWeight: flow.packageWeight,
+        unitWeight: finalPackageWeight,
         packagingType: isGranelComplete ? 'bulk' : 'closed_package',
       }, product);
       const requestedQuantity = product.quantity;
@@ -1930,7 +1947,7 @@ export default function SellerQuotationPage() {
             unit: product.unit,
             offerId: newOfferDocRef.id,
             unitsPerPackage: isGranelComplete ? 1 : flow.unitsPerPackage,
-            unitWeight: flow.packageWeight,
+            unitWeight: finalPackageWeight,
             totalPackagingPrice: flow.packagePrice,
           });
 
@@ -2009,18 +2026,35 @@ export default function SellerQuotationPage() {
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
 
+    // For unit-based products (Unidade(s)), packageWeight is not required - default to 1
+    const isUnitProduct = product.unit === 'Unidade(s)';
+    let finalPackageWeight = flow.packageWeight;
+    if (isUnitProduct && (!finalPackageWeight || finalPackageWeight <= 0)) {
+      finalPackageWeight = 1; // Default to 1 for unit products
+    }
+
     // Verificar se os dados atendem à quantidade solicitada
     const tempBrandOffer = {
       unitsInPackaging: flow.requiredPackages || 1, // Usar a quantidade informada pelo vendedor
       unitsPerPackage: flow.packagingType === 'granel' ? 1 : flow.unitsPerPackage,
-      unitWeight: flow.packageWeight
+      unitWeight: finalPackageWeight
     };
 
     // Verificar dados básicos
-    if (!flow.brandName.trim() || flow.unitsPerPackage <= 0 || flow.packageWeight <= 0 || flow.packagePrice <= 0 || flow.requiredPackages <= 0) {
+    if (!flow.brandName.trim() || flow.unitsPerPackage <= 0 || flow.packagePrice <= 0 || flow.requiredPackages <= 0) {
       toast({
-        title: "Dados Inválidos", 
-        description: "Todos os campos devem estar preenchidos corretamente.", 
+        title: "Dados Inválidos",
+        description: "Preencha nome da marca, unidades, preço e quantidade.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For weight/volume products, packageWeight is required
+    if (!isUnitProduct && (!finalPackageWeight || finalPackageWeight <= 0)) {
+      toast({
+        title: "Dados Inválidos",
+        description: "Preencha o peso/volume da embalagem.",
         variant: "destructive"
       });
       return;
@@ -2036,7 +2070,7 @@ export default function SellerQuotationPage() {
       }
 
       // Calcular preço por unidade
-      const pricePerUnit = flow.packagePrice / (flow.unitsPerPackage * flow.packageWeight);
+      const pricePerUnit = flow.packagePrice / (flow.unitsPerPackage * finalPackageWeight);
 
       // Criar request de nova marca usando a API
       const brandRequestData = {
@@ -2050,7 +2084,7 @@ export default function SellerQuotationPage() {
         packagingDescription: `${flow.unitsPerPackage} unidades por embalagem`,
         unitsInPackaging: flow.requiredPackages || 1,
         unitsPerPackage: flow.unitsPerPackage,
-        unitWeight: flow.packageWeight,
+        unitWeight: finalPackageWeight,
         totalPackagingPrice: flow.packagePrice,
         pricePerUnit: pricePerUnit,
         imageUrl: imageUrl,

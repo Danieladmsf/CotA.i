@@ -393,9 +393,20 @@ export const buildDynamicTitle = (
     title += ` - ${offer.brandOffered}`;
   }
 
-  // Adiciona embalagem se ambos campos preenchidos
-  if (offer.unitsInPackaging > 0 && offer.unitWeight && offer.unitWeight > 0) {
-    title += ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, productUnit)}`;
+  // Detectar se é produto de unidade
+  const isUnitProduct = productUnit === 'Unidade(s)';
+
+  // Adiciona embalagem - lógica diferente para unidades vs peso/volume
+  if (isUnitProduct) {
+    // Para produtos de UNIDADE: mostrar apenas unitsPerPackage
+    if (offer.unitsPerPackage > 0) {
+      title += ` ${offer.unitsPerPackage}${abbreviateUnit(productUnit)}`;
+    }
+  } else {
+    // Para produtos de PESO/VOLUME: mostrar unitsInPackaging × unitWeight
+    if (offer.unitsInPackaging > 0 && offer.unitWeight && offer.unitWeight > 0) {
+      title += ` ${formatPackaging(offer.unitsInPackaging, offer.unitWeight, productUnit)}`;
+    }
   }
 
   // Adiciona preço se preenchido

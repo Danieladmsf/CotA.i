@@ -56,9 +56,12 @@ export function OfferFormCard({
   abbreviateUnit,
   getWeightDisplayValue
 }: OfferFormCardProps) {
+  // Detectar se é produto de unidade
+  const isUnitProduct = product.unit === 'Unidade(s)';
+
   return (
     <div key={`${product.id}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isUnitProduct ? 'lg:grid-cols-5' : 'lg:grid-cols-6'}`}>
         {/* Campo 1: Quantas Cx ou fardos */}
         <div className="space-y-1">
           <label
@@ -95,29 +98,31 @@ export function OfferFormCard({
           />
         </div>
 
-        {/* Campo 3: Peso */}
-        <div className="space-y-1">
-          <label
-            htmlFor={`weight-${product.id}-${offer.uiId}`}
-            className="block text-xs font-medium text-muted-foreground"
-          >
-            Peso (Kg) *
-          </label>
-          <div className="relative">
-            <Input
-              id={`weight-${product.id}-${offer.uiId}`}
-              type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
-              value={getWeightDisplayValue(product, offer)}
-              onChange={(e) => handleWeightChange(e, product, offer)}
-              placeholder="0,000"
-              disabled={isOfferDisabled}
-              className="pr-8"
-            />
-            <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
-              Kg
-            </span>
+        {/* Campo 3: Peso (oculto para produtos de unidade) */}
+        {!isUnitProduct && (
+          <div className="space-y-1">
+            <label
+              htmlFor={`weight-${product.id}-${offer.uiId}`}
+              className="block text-xs font-medium text-muted-foreground"
+            >
+              Peso (Kg) *
+            </label>
+            <div className="relative">
+              <Input
+                id={`weight-${product.id}-${offer.uiId}`}
+                type={product.unit === 'Kilograma(s)' || product.unit === 'Litro(s)' ? "text" : "number"}
+                value={getWeightDisplayValue(product, offer)}
+                onChange={(e) => handleWeightChange(e, product, offer)}
+                placeholder="0,000"
+                disabled={isOfferDisabled}
+                className="pr-8"
+              />
+              <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
+                Kg
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Campo 4: Preço Total da Emb */}
         <div className="space-y-1">

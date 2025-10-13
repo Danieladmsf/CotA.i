@@ -39,12 +39,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (unitsInPackaging <= 0 || unitWeight <= 0 || totalPackagingPrice <= 0) {
+    // Validate units and price
+    if (unitsInPackaging <= 0 || totalPackagingPrice <= 0) {
       return NextResponse.json(
-        { error: 'Units, weight and price must be greater than 0' },
+        { error: 'Units and price must be greater than 0' },
         { status: 400 }
       );
     }
+
+    // For unit products, unitWeight can be 0 or missing - default to 1
+    const finalUnitWeight = unitWeight && unitWeight > 0 ? Number(unitWeight) : 1;
 
     // Validate pricePerUnit
     const pricePerUnitNumber = Number(pricePerUnit);
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
       packagingDescription: packagingDescription.trim(),
       unitsInPackaging: Number(unitsInPackaging),
       unitsPerPackage: unitsPerPackage ? Number(unitsPerPackage) : Number(unitsInPackaging), // Use unitsPerPackage if provided, otherwise use unitsInPackaging for backward compatibility
-      unitWeight: Number(unitWeight),
+      unitWeight: finalUnitWeight,
       totalPackagingPrice: Number(totalPackagingPrice),
       pricePerUnit: pricePerUnitNumber,
       imageUrl: imageUrl || '',

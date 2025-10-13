@@ -53,13 +53,38 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
 
     const unsubscribe = onSnapshot(
       notificationsQuery,
-      (snapshot) => {
+      async (snapshot) => {
         const notifications = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as SystemNotification[];
 
+        // Auto-fix: If adjustment is applied but notification is not marked as read, fix it
+        const notificationsToFix = notifications.filter(notif => {
+          const adjustmentApplied = notif.metadata?.adjustmentApplied;
+          const isRead = notif.isRead;
+          return adjustmentApplied && !isRead;
+        });
 
+        if (notificationsToFix.length > 0) {
+          console.log(`[QuantityApprovalsTab] Auto-fixing ${notificationsToFix.length} inconsistent notifications`);
+
+          // Fix all inconsistent notifications in parallel
+          await Promise.all(
+            notificationsToFix.map(async (notif) => {
+              try {
+                const notificationRef = doc(db, 'notifications', notif.id);
+                await updateDoc(notificationRef, {
+                  isRead: true,
+                  readAt: Timestamp.now()
+                });
+                console.log(`[QuantityApprovalsTab] Fixed notification ${notif.id} (${notif.productName})`);
+              } catch (error) {
+                console.error(`[QuantityApprovalsTab] Failed to fix notification ${notif.id}:`, error);
+              }
+            })
+          );
+        }
 
         notifications.sort((a, b) => {
           const aTime = (a.createdAt as any)?.toDate?.() || new Date(0);
@@ -143,7 +168,31 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
           description: `A oferta de ${notification.supplierName} foi ajustada para ${suggestion.packages} caixas (${suggestion.totalQuantity.toFixed(1)} ${getUnitAbbr(unit)}).`,
           variant: "default"
         });
-        setAllNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, metadata: { ...n.metadata, adjustmentApplied: true, adjustmentStatus: 'applied', adjustedBoxes: suggestion.packages } } : n));
+
+        // Mark notification as read in Firestore after successful adjustment
+        try {
+          const notificationRef = doc(db, 'notifications', notification.id);
+          await updateDoc(notificationRef, {
+            isRead: true,
+            readAt: Timestamp.now()
+          });
+        } catch (updateError) {
+          console.error('[QuantityApprovals] Error marking notification as read:', updateError);
+          // Don't block the flow if marking as read fails
+        }
+
+        // Update local state
+        setAllNotifications(prev => prev.map(n => n.id === notification.id ? {
+          ...n,
+          isRead: true,
+          readAt: Timestamp.now(),
+          metadata: {
+            ...n.metadata,
+            adjustmentApplied: true,
+            adjustmentStatus: 'applied',
+            adjustedBoxes: suggestion.packages
+          }
+        } : n));
       } else {
         toast({ title: "Erro ao Aplicar Ajuste", description: result.error || "Ocorreu um erro desconhecido.", variant: "destructive" });
       }
@@ -402,7 +451,7 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
                       <Avatar className="h-8 w-8"><AvatarFallback className="bg-orange-100 text-orange-800">{notification.supplierName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '??'}</AvatarFallback></Avatar>
                       <div><p className="text-sm font-medium">{notification.supplierName}</p><p className="text-xs text-muted-foreground">Fornecedor</p></div>
                     </div>
-                    {isUnread && !adjustmentApplied && <div className="flex items-center gap-3"><Button size="sm" onClick={(e) => { e.stopPropagation(); handleMarkAsReviewed(notification); }} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}Marcar como Revisada</Button></div>}
+                    {isUnread && <div className="flex items-center gap-3"><Button size="sm" onClick={(e) => { e.stopPropagation(); handleMarkAsReviewed(notification); }} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}Marcar como Revisada</Button></div>}
                     {!isUnread && <div className="text-sm text-muted-foreground">Revisada em {format((notification.readAt as any)?.toDate?.() || new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</div>}
                   </div>
                 </CardContent>

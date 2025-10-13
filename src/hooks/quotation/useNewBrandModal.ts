@@ -147,8 +147,28 @@ export function useNewBrandModal({
       return;
     }
 
-    if (newBrandForm.unitsInPackaging <= 0 || newBrandForm.unitWeight <= 0 || newBrandForm.totalPackagingPrice <= 0) {
-      toast({ title: "Erro", description: "Todos os campos são obrigatórios (Unidades > 0, Peso > 0, Preço > 0).", variant: "destructive" });
+    // For unit-based products (Unidade(s)), unitWeight is not required - default to 1
+    const isUnitProduct = newBrandModal.productUnit === 'Unidade(s)';
+    let unitWeight = newBrandForm.unitWeight;
+
+    if (isUnitProduct && unitWeight <= 0) {
+      unitWeight = 1; // Default to 1 for unit products
+    }
+
+    // Validate required fields
+    if (newBrandForm.unitsInPackaging <= 0) {
+      toast({ title: "Erro", description: "Preencha a quantidade de unidades na caixa.", variant: "destructive" });
+      return;
+    }
+
+    if (newBrandForm.totalPackagingPrice <= 0) {
+      toast({ title: "Erro", description: "Preencha o preço da caixa.", variant: "destructive" });
+      return;
+    }
+
+    // For weight/volume products, unitWeight is required
+    if (!isUnitProduct && unitWeight <= 0) {
+      toast({ title: "Erro", description: "Preencha o peso/volume da embalagem.", variant: "destructive" });
       return;
     }
 
@@ -167,7 +187,7 @@ export function useNewBrandModal({
       // No modal de nova marca, unitsInPackaging representa "Total Un na Emb" (unidades por embalagem)
       // O preço é da embalagem completa, então calculamos: preço_embalagem / (unidades × peso_unitário)
       const unitsPerPackage = newBrandForm.unitsInPackaging; // "Total Un na Emb"
-      const pricePerUnit = newBrandForm.totalPackagingPrice / (unitsPerPackage * newBrandForm.unitWeight);
+      const pricePerUnit = newBrandForm.totalPackagingPrice / (unitsPerPackage * unitWeight);
 
       const brandRequestData = {
         quotationId: quotation.id,
@@ -177,10 +197,10 @@ export function useNewBrandModal({
         supplierName: currentSupplierDetails.empresa,
         supplierInitials: currentSupplierDetails.vendedor.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
         brandName: newBrandForm.brandName.trim(),
-        packagingDescription: newBrandForm.packagingDescription.trim() || formatPackaging(newBrandForm.unitsInPackaging, newBrandForm.unitWeight, newBrandModal.productUnit as UnitOfMeasure),
+        packagingDescription: newBrandForm.packagingDescription.trim() || formatPackaging(newBrandForm.unitsInPackaging, unitWeight, newBrandModal.productUnit as UnitOfMeasure),
         unitsInPackaging: newBrandForm.unitsInPackaging,
         unitsPerPackage: newBrandForm.unitsInPackaging, // No modal, unitsInPackaging = unitsPerPackage
-        unitWeight: newBrandForm.unitWeight,
+        unitWeight: unitWeight,
         totalPackagingPrice: newBrandForm.totalPackagingPrice,
         pricePerUnit: pricePerUnit,
         imageUrl: imageUrl,
