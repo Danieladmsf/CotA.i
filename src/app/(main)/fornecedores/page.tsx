@@ -44,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/config/firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { formatCNPJ, formatPhoneNumber } from '@/lib/utils';
 
 import type { Fornecedor } from '@/types';
 import AddFornecedorModal, { type FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
@@ -759,9 +760,9 @@ export default function FornecedoresPage() {
                           {fornecedor.empresa}
                           {isPending && <Badge variant="secondary" className="ml-2 font-normal pulse-glow">Pendente</Badge>}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">{fornecedor.cnpj || "N/A"}</TableCell>
+                        <TableCell className="hidden md:table-cell">{formatCNPJ(fornecedor.cnpj)}</TableCell>
                         <TableCell className="hidden lg:table-cell">{fornecedor.vendedor || "N/A"}</TableCell>
-                        <TableCell className="hidden sm:table-cell">{fornecedor.whatsapp || "N/A"}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{formatPhoneNumber(fornecedor.whatsapp)}</TableCell>
                         <TableCell className="text-center">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenLinkModal(fornecedor)} className="hover-lift">
                              <Link2 className="h-5 w-5 text-primary rotate-hover" />
