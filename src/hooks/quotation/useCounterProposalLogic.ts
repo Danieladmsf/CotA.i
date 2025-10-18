@@ -61,17 +61,16 @@ export function calculateCounterProposalStatus(
     outbidOffer.updatedAt.toDate().getTime() + counterProposalMins * 60000
   );
 
-  // Verifica se ainda estou dentro do prazo de contraproposta
-  const now = new Date();
+  // Sempre retorna as informações da contraproposta se ela existir
+  counterProposalInfo = {
+    deadline,
+    winningBrand: outbidOffer.brandOffered,
+    myBrand: myBestOffer.brandOffered,
+  };
 
-  if (now < deadline) {
-    counterProposalInfo = {
-      deadline,
-      winningBrand: outbidOffer.brandOffered,
-      myBrand: myBestOffer.brandOffered,
-    };
-  } else {
-    // Prazo expirado - verificar se deve bloquear
+  // Verifica se o prazo expirou para definir o lockout
+  const now = new Date();
+  if (now >= deadline) {
     const competingSuppliersCount = new Set(
       allOffers.filter(o => o.pricePerUnit > 0).map(o => o.supplierId)
     ).size;

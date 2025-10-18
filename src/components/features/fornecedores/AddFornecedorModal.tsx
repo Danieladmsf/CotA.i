@@ -46,19 +46,19 @@ interface AddOrEditFornecedorModalProps {
 
 export default function AddFornecedorModal({ isOpen, onClose, onSave, fornecedor }: AddOrEditFornecedorModalProps) {
   const { user } = useAuth();
+  const isEditing = !!fornecedor;
+
   const form = useForm<FornecedorFormValues>({
     resolver: zodResolver(fornecedorFormSchema),
     defaultValues: {
       empresa: '',
       cnpj: '',
       vendedor: '',
-      whatsapp: '',
+      whatsapp: isEditing && fornecedor ? fornecedor.whatsapp : '55',
       fotoFile: null,
       diasDeEntrega: [],
     },
   });
-  
-  const isEditing = !!fornecedor;
 
   useEffect(() => {
     if (isOpen) {

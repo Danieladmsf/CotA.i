@@ -120,5 +120,13 @@ service cloud.firestore {
     match /whatsapp_conversations/{conversationId} {
         allow read, write: if request.auth != null;
     }
+
+    // Price history - authenticated users own their price history records
+    match /price_history/{historyId} {
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow list: if request.auth != null && request.auth.uid != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
   }
 }

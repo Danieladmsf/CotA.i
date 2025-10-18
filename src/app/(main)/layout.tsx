@@ -1,6 +1,8 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { CategoriesProvider } from '@/contexts/CategoriesContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarTrigger, SidebarContent, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
@@ -74,51 +76,55 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <Sidebar collapsible="icon" variant="sidebar" side="left">
-        <SidebarHeader className="flex items-center justify-between p-4 group-data-[collapsible=icon]:justify-center">
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:hidden">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Zap className="h-6 w-6 text-white" />
+    <CategoriesProvider>
+      <HeaderActionsProvider>
+        <SidebarProvider defaultOpen={true}>
+          <Sidebar collapsible="icon" variant="sidebar" side="left">
+          <SidebarHeader className="flex items-center justify-between p-4 group-data-[collapsible=icon]:justify-center">
+            <div className="flex items-center gap-3 group-data-[collapsible=icon]:hidden">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
+                <Zap className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">CotA.I</h1>
+                <p className="text-xs text-muted-foreground">Gestão Inteligente</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">CotA.I</h1>
-              <p className="text-xs text-muted-foreground">Gestão Inteligente</p>
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <SidebarTrigger />
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <ClientSidebarNavigation />
-        </SidebarContent>
-        <SidebarFooter className="p-4 group-data-[collapsible=icon]:hidden">
-          <Separator className="my-2" />
-          <div className="flex items-center gap-3 py-2">
-            <Avatar className="h-9 w-9">
-              {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || 'Avatar'} />}
-              <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold truncate">{user?.displayName || 'Demo User'}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email || 'demo@teste.com'}</p>
+          </SidebarHeader>
+          <SidebarContent>
+            <ClientSidebarNavigation />
+          </SidebarContent>
+          <SidebarFooter className="p-4 group-data-[collapsible=icon]:hidden">
+            <Separator className="my-2" />
+            <div className="flex items-center gap-3 py-2">
+              <Avatar className="h-9 w-9">
+                {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || 'Avatar'} />}
+                <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-semibold truncate">{user?.displayName || 'Demo User'}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || 'demo@teste.com'}</p>
+              </div>
             </div>
-          </div>
-           <Button variant="outline" className="w-full justify-start mt-2" onClick={logout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
-          <p className="text-xs text-muted-foreground mt-4 text-center">&copy; <CurrentYear /> EasyTrade</p>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="p-4">
-        <Header title={currentInfo.title} description={currentInfo.description} />
-        <main className="mt-6">
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+            <Button variant="outline" className="w-full justify-start mt-2" onClick={logout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+            <p className="text-xs text-muted-foreground mt-4 text-center">&copy; <CurrentYear /> EasyTrade</p>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset className="p-4">
+          <Header title={currentInfo.title} description={currentInfo.description} />
+          <main className="mt-6">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+      </HeaderActionsProvider>
+    </CategoriesProvider>
   );
 }
 

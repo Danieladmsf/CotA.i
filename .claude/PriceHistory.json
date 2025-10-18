@@ -1,0 +1,75 @@
+{
+  "name": "PriceHistory",
+  "type": "object",
+  "properties": {
+    "ingredient_id": {
+      "type": "string",
+      "description": "ID do ingrediente"
+    },
+    "old_price": {
+      "type": "number",
+      "description": "Preço anterior"
+    },
+    "new_price": {
+      "type": "number",
+      "description": "Novo preço"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Fornecedor"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da atualização"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categoria do ingrediente"
+    },
+    "percentage_change": {
+      "type": "number",
+      "description": "Variação percentual"
+    },
+    "min_price": {
+      "type": "number",
+      "description": "Preço mínimo registrado"
+    },
+    "max_price": {
+      "type": "number",
+      "description": "Preço máximo registrado"
+    },
+    "total_variation": {
+      "type": "number",
+      "description": "Variação total em porcentagem"
+    },
+    "price_progression": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from_price": {
+            "type": "number"
+          },
+          "to_price": {
+            "type": "number"
+          },
+          "variation": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "description": "Histórico de progressão dos preços"
+    }
+  },
+  "required": [
+    "ingredient_id",
+    "new_price",
+    "date",
+    "category"
+  ]
+}

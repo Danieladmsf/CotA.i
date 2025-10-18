@@ -30,8 +30,6 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
-  ChevronLeft,
-  ChevronRight,
   Package,
   TrendingUp,
   TrendingDown,
@@ -48,6 +46,7 @@ import type { Supply, Offer, Quotation, Fornecedor, ShoppingListItem, UnitOfMeas
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { closeQuotationAndItems } from "@/actions/quotationActions";
+import QuotationNavigator from "@/components/shared/QuotationNavigator";
 
 const QUOTATIONS_COLLECTION = 'quotations';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
@@ -141,16 +140,13 @@ export default function PriceAnalysisClient() {
   
   // Fetch quotations list
   useEffect(() => {
-    console.log('📊 [ANALYSIS] Fetch quotations useEffect triggered', { user: !!user, dateRange });
 
     if (!user) {
-      console.log('⚠️ [ANALYSIS] No user, skipping quotations fetch');
       setQuotations([]);
       setLoadingQuotations(false);
       return;
     }
 
-    console.log('🔄 [ANALYSIS] Starting quotations fetch...');
     setLoadingQuotations(true);
 
     const q = query(
@@ -162,30 +158,21 @@ export default function PriceAnalysisClient() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log('✅ [ANALYSIS] Quotations snapshot received', { count: snapshot.docs.length });
       const fetchedQuotations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
       setQuotations(fetchedQuotations);
 
       const currentSelectionExists = fetchedQuotations.some(q => q.id === selectedQuotationId);
-      console.log('🔍 [ANALYSIS] Current selection check', {
-        selectedQuotationId,
-        currentSelectionExists,
-        quotationsCount: fetchedQuotations.length
-      });
 
       if (!currentSelectionExists && fetchedQuotations.length > 0) {
         const newId = fetchedQuotations[0].id;
-        console.log('🎯 [ANALYSIS] Auto-selecting first quotation:', newId);
         setSelectedQuotationId(newId);
         router.replace(`/analise-de-precos?quotationId=${newId}`, { scroll: false });
       } else if (fetchedQuotations.length === 0) {
-        console.log('⚠️ [ANALYSIS] No quotations found');
         setSelectedQuotationId('');
         router.replace('/analise-de-precos', { scroll: false });
       }
 
       setLoadingQuotations(false);
-      console.log('✅ [ANALYSIS] Quotations loading complete');
     }, (error) => {
       console.error("❌ [ANALYSIS] Error fetching quotations list:", error);
       toast({ title: "Erro ao buscar cotações", description: error.message, variant: "destructive" });
@@ -198,41 +185,32 @@ export default function PriceAnalysisClient() {
   // Set selected quotation from URL or first in list
   useEffect(() => {
     const urlQuotationId = searchParams.get('quotationId');
-    console.log('🔗 [ANALYSIS] URL quotation ID check', { urlQuotationId, quotationsCount: quotations.length });
 
     if (urlQuotationId) {
-        console.log('✅ [ANALYSIS] Setting quotation from URL:', urlQuotationId);
         setSelectedQuotationId(urlQuotationId);
     } else if (quotations.length > 0) {
-        console.log('✅ [ANALYSIS] Auto-selecting first quotation:', quotations[0].id);
         setSelectedQuotationId(quotations[0].id);
     }
   }, [searchParams, quotations]);
 
   // Fetch and analyze data for the selected quotation
   useEffect(() => {
-    console.log('📈 [ANALYSIS] Analyze quotation useEffect triggered', { selectedQuotationId });
 
     if (!selectedQuotationId) {
-      console.log('⚠️ [ANALYSIS] No quotation selected, clearing data');
       setSelectedQuotation(null);
       setAnalysisData([]);
       return;
     }
 
-    console.log('🔄 [ANALYSIS] Starting analysis for quotation:', selectedQuotationId);
     setLoadingAnalysis(true);
 
     const unsubQuotation = onSnapshot(doc(db, QUOTATIONS_COLLECTION, selectedQuotationId), (docSnap) => {
-      console.log('📄 [ANALYSIS] Quotation document snapshot', { exists: docSnap.exists() });
 
       if (docSnap.exists()) {
         const quotationData = { id: docSnap.id, ...docSnap.data() } as Quotation;
-        console.log('✅ [ANALYSIS] Quotation data loaded', { id: quotationData.id, status: quotationData.status });
         setSelectedQuotation(quotationData);
 
         if (quotationData.status === 'Aberta' && quotationData.deadline.toDate() < new Date()) {
-          console.log('⏰ [ANALYSIS] Deadline passed, auto-closing quotation');
           handleAutoCloseQuotation(quotationData.id);
         }
 
@@ -245,11 +223,9 @@ export default function PriceAnalysisClient() {
 
     const performAnalysis = async () => {
         try {
-            console.log('🔍 [ANALYSIS] Fetching shopping list items...');
             const itemsQuery = query(collection(db, SHOPPING_LIST_ITEMS_COLLECTION), where("quotationId", "==", selectedQuotationId));
             const itemsSnapshot = await getDocs(itemsQuery);
             const items = itemsSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingListItem));
-            console.log('✅ [ANALYSIS] Shopping list items fetched', { count: items.length });
 
             const newAnalysisData: PriceAnalysisItem[] = [];
             const newSupplierCache = new Map(supplierDataCache);
@@ -302,23 +278,19 @@ export default function PriceAnalysisClient() {
                 };
                 newAnalysisData.push(analysisItem);
             }
-            console.log('✅ [ANALYSIS] Analysis complete', { productsAnalyzed: newAnalysisData.length });
             setAnalysisData(newAnalysisData.sort((a, b) => a.name.localeCompare(b.name)));
             setSupplierDataCache(newSupplierCache);
         } catch (error) {
             console.error("❌ [ANALYSIS] Error performing analysis:", error);
             toast({ title: "Erro na Análise", description: "Não foi possível carregar os detalhes da cotação.", variant: "destructive" });
         } finally {
-            console.log('🏁 [ANALYSIS] Loading analysis complete');
             setLoadingAnalysis(false);
         }
     };
 
-    console.log('🚀 [ANALYSIS] Calling performAnalysis...');
     performAnalysis();
 
     return () => {
-      console.log('🧹 [ANALYSIS] Cleaning up quotation subscription');
       unsubQuotation();
     };
   }, [selectedQuotationId, toast, handleAutoCloseQuotation]); // Removed supplierDataCache to prevent infinite loop
@@ -396,41 +368,21 @@ export default function PriceAnalysisClient() {
     router.replace(`/analise-de-precos?quotationId=${id}`, { scroll: false });
   };
   
-  const navigateQuotation = (direction: 'prev' | 'next') => {
-    if (quotations.length < 2) return;
-    const currentIndex = quotations.findIndex(q => q.id === selectedQuotationId);
-    let nextIndex;
-    if (direction === 'prev') {
-        nextIndex = currentIndex > 0 ? currentIndex - 1 : quotations.length - 1;
-    } else {
-        nextIndex = currentIndex < quotations.length - 1 ? currentIndex + 1 : 0;
-    }
-    handleSelectQuotationFromDropdown(quotations[nextIndex].id);
-  };
-  
   const isLoading = loadingQuotations || loadingAnalysis;
-
-  console.log('🎨 [ANALYSIS] Rendering component', {
-    isLoading,
-    loadingQuotations,
-    loadingAnalysis,
-    quotationsCount: quotations.length,
-    selectedQuotationId,
-    hasSelectedQuotation: !!selectedQuotation,
-    analysisDataCount: analysisData.length
-  });
 
   return (
     <div className="space-y-6">
+      {/* Navegação Unificada - Período e Cotações */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+            {/* Filtro de Período */}
             <div className="flex items-center gap-2">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-[280px] justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from && dateRange?.to ? 
+                    {dateRange?.from && dateRange?.to ?
                       `${format(dateRange.from, "dd/MM/yy")} - ${format(dateRange.to, "dd/MM/yy")}` :
                       "Selecionar período"
                     }
@@ -440,20 +392,29 @@ export default function PriceAnalysisClient() {
                   <Calendar mode="range" selected={dateRange} onSelect={setDateRange} initialFocus />
                 </PopoverContent>
               </Popover>
-              {timeLeft && <Badge variant={isDeadlinePassed ? "destructive" : "secondary"}>{timeLeft}</Badge>}
             </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-            <Button variant="outline" size="icon" onClick={() => navigateQuotation('prev')} disabled={quotations.length < 2 || isLoading}><ChevronLeft className="h-4 w-4" /></Button>
-            <Select value={selectedQuotationId} onValueChange={handleSelectQuotationFromDropdown} disabled={loadingQuotations || quotations.length === 0}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder={loadingQuotations ? "Carregando..." : "Nenhuma cotação encontrada"} />
-              </SelectTrigger>
-              <SelectContent>
-                {quotations.map(q => <SelectItem key={q.id} value={q.id}>{`Cotação de ${format(q.shoppingListDate.toDate(), "dd/MM/yy HH:mm")} (Status: ${q.status})`}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => navigateQuotation('next')} disabled={quotations.length < 2 || isLoading}><ChevronRight className="h-4 w-4" /></Button>
+
+            {/* Separador vertical */}
+            <div className="hidden lg:block h-8 w-px bg-border"></div>
+
+            {/* Navegação de Cotações */}
+            <div className="flex-1 w-full lg:w-auto">
+              <QuotationNavigator
+                allQuotations={quotations}
+                filteredQuotations={quotations}
+                selectedQuotationId={selectedQuotationId}
+                isLoading={isLoading}
+                onDateChange={() => {}}
+                onQuotationSelect={handleSelectQuotationFromDropdown}
+                showBadgeInfo={false}
+                showDateFilter={false}
+                timeLeft={timeLeft}
+                isDeadlinePassed={isDeadlinePassed}
+                enableNavigationLoop={true}
+                updateDateOnNavigate={false}
+                inline={true}
+              />
+            </div>
           </div>
         </CardHeader>
       </Card>

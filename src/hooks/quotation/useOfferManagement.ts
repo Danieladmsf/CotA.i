@@ -444,7 +444,7 @@ export function useOfferManagement({
     const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
 
     // If modal is required and no decision has been made yet, show modal
-    if (boxValidation.requiresModal && !quantityDecision) {
+    if (boxValidation.requiresModal && !quantityDecision && !offerData.id) {
       setQuantityShortageContext({
         product,
         offerData,

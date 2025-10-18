@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import PriceAnalysisClient from '@/components/features/analise/PriceAnalysisClient';
+import AnalysisManager from '@/components/features/analise/AnalysisManager';
 
 export default function AnaliseDePrecosPage() {
-  return <PriceAnalysisClient />;
+  return <AnalysisManager />;
 }

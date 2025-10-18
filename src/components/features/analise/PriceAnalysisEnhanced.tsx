@@ -68,6 +68,8 @@ import { db } from '@/lib/config/firebase';
 import { collection, query, getDocs, orderBy, where, Timestamp } from 'firebase/firestore';
 import type { Supply, Offer, Quotation, Fornecedor } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -143,6 +145,10 @@ interface SupplierAnalysis {
 }
 
 export default function PriceAnalysisEnhanced() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { setActions } = useHeaderActions();
+
   const [analysisData, setAnalysisData] = useState<PriceAnalysisItem[]>([]);
   const [filteredData, setFilteredData] = useState<PriceAnalysisItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -155,7 +161,6 @@ export default function PriceAnalysisEnhanced() {
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const { toast } = useToast();
 
   const [filters, setFilters] = useState<FilterState>({
     dateRange: {
@@ -177,72 +182,80 @@ export default function PriceAnalysisEnhanced() {
   });
 
   const loadAnalysisData = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Buscar insumos
-      const suppliesQuery = query(collection(db, 'supplies'), orderBy('name'));
-      const suppliesSnapshot = await getDocs(suppliesQuery);
+
+      // Carregar dados em paralelo para melhor performance
+      const [suppliesSnapshot, quotationsSnapshot, suppliersSnapshot] = await Promise.all([
+        getDocs(query(
+          collection(db, 'supplies'),
+          where('userId', '==', user.uid),
+          orderBy('name')
+        )),
+        getDocs(query(
+          collection(db, 'quotations'),
+          where('userId', '==', user.uid),
+          where('createdAt', '>=', Timestamp.fromDate(filters.dateRange.start)),
+          where('createdAt', '<=', Timestamp.fromDate(filters.dateRange.end)),
+          orderBy('createdAt', 'desc')
+        )),
+        getDocs(query(
+          collection(db, 'fornecedores'),
+          where('userId', '==', user.uid),
+          where('status', '==', 'ativo'),
+          orderBy('empresa')
+        ))
+      ]);
+
       const supplies = suppliesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Supply[];
 
-      // Buscar cotações
-      const quotationsQuery = query(
-        collection(db, 'quotations'),
-        where('createdAt', '>=', Timestamp.fromDate(filters.dateRange.start)),
-        where('createdAt', '<=', Timestamp.fromDate(filters.dateRange.end)),
-        orderBy('createdAt', 'desc')
-      );
-      const quotationsSnapshot = await getDocs(quotationsQuery);
       const quotations = quotationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Quotation[];
 
-      // Buscar fornecedores
-      const suppliersQuery = query(
-        collection(db, 'fornecedores'),
-        where('status', '==', 'ativo'),
-        orderBy('empresa')
-      );
-      const suppliersSnapshot = await getDocs(suppliersQuery);
       const suppliersData = suppliersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Fornecedor[];
 
-      // Extrair categorias únicas dos insumos
+      // Extrair categorias e fornecedores únicos
       const uniqueCategories = [...new Set(supplies.map(s => s.categoryName).filter(Boolean))];
       setCategories(uniqueCategories);
 
-      // Extrair fornecedores únicos
       const uniqueSuppliers = [...new Set(suppliersData.map(s => s.empresa).filter(Boolean))];
       setSuppliers(uniqueSuppliers);
 
-      // Processar dados de análise para cada insumo
-      const analysisItems: PriceAnalysisItem[] = [];
+      // OTIMIZAÇÃO: Buscar todas as ofertas de uma vez usando Promise.all
+      const offersBySupply = new Map<string, Array<{
+        date: string;
+        price: number;
+        supplier: string;
+        quotationId: string;
+      }>>();
 
-      for (const supply of supplies) {
-        const priceHistory: Array<{
-          date: string;
-          price: number;
-          supplier: string;
-          quotationId: string;
-        }> = [];
-
-        // Buscar ofertas para este insumo em todas as cotações
-        for (const quotation of quotations) {
+      // Buscar ofertas de forma paralela para cada cotação
+      const offersPromises = quotations.map(async (quotation) => {
+        const supplyOffersPromises = supplies.map(async (supply) => {
           try {
             const offersPath = `quotations/${quotation.id}/products/${supply.id}/offers`;
-            const offersQuery = query(collection(db, offersPath));
-            const offersSnapshot = await getDocs(offersQuery);
-            
+            const offersSnapshot = await getDocs(query(collection(db, offersPath)));
+
             offersSnapshot.docs.forEach(offerDoc => {
               const offer = { id: offerDoc.id, ...offerDoc.data() } as Offer;
               if (offer.pricePerUnit && offer.supplierName) {
-                priceHistory.push({
+                if (!offersBySupply.has(supply.id)) {
+                  offersBySupply.set(supply.id, []);
+                }
+                offersBySupply.get(supply.id)!.push({
                   date: offer.updatedAt ? (offer.updatedAt as any).toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                   price: offer.pricePerUnit,
                   supplier: offer.supplierName,
@@ -251,9 +264,19 @@ export default function PriceAnalysisEnhanced() {
               }
             });
           } catch (error) {
-            // Ignorar erros para insumos sem ofertas nesta cotação
+            // Ignorar erros para insumos sem ofertas
           }
-        }
+        });
+        await Promise.all(supplyOffersPromises);
+      });
+
+      await Promise.all(offersPromises);
+
+      // Processar dados de análise para cada insumo
+      const analysisItems: PriceAnalysisItem[] = [];
+
+      for (const supply of supplies) {
+        const priceHistory = offersBySupply.get(supply.id) || [];
 
         if (priceHistory.length > 0) {
           // Ordenar histórico por data
@@ -331,7 +354,6 @@ export default function PriceAnalysisEnhanced() {
 
       setAnalysisData(analysisItems);
     } catch (error: any) {
-      console.error('Error loading analysis data:', error);
       toast({
         title: "Erro ao carregar análise",
         description: "Não foi possível carregar os dados de análise de preços.",
@@ -340,7 +362,7 @@ export default function PriceAnalysisEnhanced() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, filters.dateRange, toast]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -651,16 +673,6 @@ export default function PriceAnalysisEnhanced() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <BarChart3 className="h-8 w-8 text-primary" />
-            Análise Avançada de Preços
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Análise inteligente com tendências, competitividade e volatilidade
-          </p>
-        </div>
-        
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadAnalysisData}>
             <RefreshCw className="h-4 w-4 mr-2" />

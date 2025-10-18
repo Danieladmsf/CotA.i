@@ -2756,30 +2756,30 @@ export default function SellerQuotationPage() {
                                      })()}
 
                                      {product.supplierOffers.map((offer, offerIndex) => {
-                                       const savingKey = `${product.id}_${offer.uiId}`;
-                                       const pricePerUnit = calculatePricePerUnit(offer);
-                                       let pricePerUnitClasses = "bg-muted";
-                                       const bestCompetitorOfferOverall = product.bestOffersByBrand.find(b => !b.isSelf);
-                                       const isMyOfferOutbid = offer.id && bestCompetitorOfferOverall && pricePerUnit && pricePerUnit > bestCompetitorOfferOverall.pricePerUnit;
-      
-                                       // Ativar showBeatOfferOptions automaticamente quando estiver perdendo
-                                       if (isMyOfferOutbid && !offer.showBeatOfferOptions) {
-                                         setTimeout(() => {
-                                           handleOfferChange(product.id, offer.uiId, 'showBeatOfferOptions', true);
-                                         }, 0);
-                                       }
-      
-                                       // Calcular condições de bloqueio usando hook
-                                       const { isOfferDisabled, isBrandFieldDisabled, isButtonDisabled } = calculateBlockingRules({
-                                         isQuotationEnded,
-                                         isLockedOut,
-                                         isStoppedQuoting: stoppedQuotingProducts.has(product.id),
-                                         counterProposalInfo: product.counterProposalInfo,
-                                         isOfferSaved: !!offer.id,
-                                         isInEditMode: isInEditMode(product.id, offer.uiId),
-                                         isSaving: isSaving[savingKey] || false
-                                       }, offer.isSuggestedBrand);
+                                                                              const savingKey = `${product.id}_${offer.uiId}`;
+                                                                              const pricePerUnit = calculatePricePerUnit(offer);
+                                                                              let pricePerUnitClasses = "bg-muted";
+                                                                              const bestCompetitorOfferOverall = product.bestOffersByBrand.find(b => !b.isSelf);
+                                                                              const isMyOfferOutbid = offer.id && bestCompetitorOfferOverall && pricePerUnit && pricePerUnit > bestCompetitorOfferOverall.pricePerUnit;
+                                             
+                                                                              // Calcular condições de bloqueio usando hook
+                                                                              const { isOfferDisabled, isBrandFieldDisabled, isButtonDisabled } = calculateBlockingRules({
+                                                                                isQuotationEnded,
+                                                                                isLockedOut,
+                                                                                isStoppedQuoting: stoppedQuotingProducts.has(product.id),
+                                                                                counterProposalInfo: product.counterProposalInfo,
+                                                                                isOfferSaved: !!offer.id,
+                                                                                isInEditMode: isInEditMode(product.id, offer.uiId),
+                                                                                isSaving: isSaving[savingKey] || false
+                                                                              }, offer.isSuggestedBrand);
                                        
+                                                                              // Ativar showBeatOfferOptions automaticamente quando estiver perdendo
+                                                                              if (isMyOfferOutbid && !offer.showBeatOfferOptions) {
+                                                                                setTimeout(() => {
+                                                                                  handleOfferChange(product.id, offer.uiId, 'showBeatOfferOptions', true);
+                                                                                }, 0);
+                                                                              }
+                                             
                                        if (hasMyOffers && pricePerUnit !== null && bestCompetitorOfferOverall) {
                                           if(pricePerUnit <= bestCompetitorOfferOverall.pricePerUnit) {
                                             pricePerUnitClasses = "bg-green-500/10 border-green-500/40 text-green-700 font-semibold";
@@ -2794,26 +2794,47 @@ export default function SellerQuotationPage() {
                                        const totalOrderValue = (Number(offer.unitsInPackaging) || 0) * (Number(offer.totalPackagingPrice) || 0);
 
                                        return (
-                                         <OfferFormCard
-                                           key={`${product.id}-${offerIndex}-${offer.uiId}`}
-                                           offer={offer}
-                                           product={product}
-                                           pricePerUnit={pricePerUnit}
-                                           pricePerUnitClasses={pricePerUnitClasses}
-                                           totalOrderValue={totalOrderValue}
-                                           isOfferDisabled={isOfferDisabled}
-                                           isButtonDisabled={isButtonDisabled}
-                                           isQuotationEnded={isQuotationEnded}
-                                           handleOfferChange={handleOfferChange}
-                                           handleWeightChange={handleWeightChange}
-                                           handlePriceChange={handlePriceChange}
-                                           handleSaveProductOffer={handleSaveProductOffer}
-                                           onRequestStopQuoting={(productId) => handleStopQuotingClick(productId, offer.uiId, product.name)}
-                                           formatCurrency={formatCurrency}
-                                           formatCurrencyInput={formatCurrencyInput}
-                                           abbreviateUnit={abbreviateUnit}
-                                           getWeightDisplayValue={getWeightDisplayValue}
-                                         />
+                                        <div key={`${product.id}-${offerIndex}-${offer.uiId}`}>
+                                        {/* Render discount buttons if product.counterProposalInfo exists */}
+                                        {product.counterProposalInfo && (
+                                          <div className="flex flex-wrap gap-2 mt-2 mb-2">
+                                            <span className="text-sm font-medium text-muted-foreground">Aplicar Desconto:</span>
+                                            {[1, 2, 3, 4, 5].map(discount => (
+                                              <Button
+                                                key={discount}
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleBeatOfferClick(product.id, offer.uiId, discount)}
+                                                disabled={isOfferDisabled || isButtonDisabled}
+                                                className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                                              >
+                                                {discount}%
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        )}
+                                          <OfferFormCard
+                                            offer={offer}
+                                            product={product}
+                                            pricePerUnit={pricePerUnit}
+                                            pricePerUnitClasses={pricePerUnitClasses}
+                                            totalOrderValue={totalOrderValue}
+                                            isOfferDisabled={isOfferDisabled}
+                                            isButtonDisabled={isButtonDisabled}
+                                            isQuotationEnded={isQuotationEnded}
+                                            handleOfferChange={handleOfferChange}
+                                            handleWeightChange={handleWeightChange}
+                                            handlePriceChange={handlePriceChange}
+                                            handleSaveProductOffer={handleSaveProductOffer}
+                                            onRequestStopQuoting={(productId) => handleStopQuotingClick(productId, offer.uiId, product.name)}
+                                            formatCurrency={formatCurrency}
+                                            formatCurrencyInput={formatCurrencyInput}
+                                            abbreviateUnit={abbreviateUnit}
+                                            getWeightDisplayValue={getWeightDisplayValue}
+                                            toggleEditMode={toggleEditMode}
+                                            isInEditMode={isInEditMode}
+                                          />
+                                        </div>
                                        );
                                      })}
                                      </>

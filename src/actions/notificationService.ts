@@ -30,13 +30,22 @@ export async function createNotification(params: CreateNotificationParams) {
     if (!params.userId && !params.targetSupplierId) {
       throw new Error('Either userId or targetSupplierId must be provided');
     }
+    const now = Timestamp.now();
+    const formattedTimestamp = now.toDate().toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
     const notification: any = {
       type: params.type,
       title: params.title,
-      message: params.message,
+      message: `[${formattedTimestamp}] ${params.message}`,
       isRead: false,
       priority: params.priority || 'medium',
-      createdAt: Timestamp.now()
+      createdAt: now
     };
     if (params.userId !== undefined) notification.userId = params.userId;
     if (params.targetSupplierId !== undefined) notification.targetSupplierId = params.targetSupplierId;

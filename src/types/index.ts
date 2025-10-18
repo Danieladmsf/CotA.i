@@ -200,3 +200,29 @@ export interface SystemNotification {
   metadata?: Record<string, any>; // Para dados extras específicos do tipo
   entityId?: string; // ID da entidade relacionada (ex: brand request ID)
 }
+
+export interface PriceProgression {
+  from_price: number | null;
+  to_price: number;
+  variation: number;
+  date: string; // ISO date string
+}
+
+export interface PriceHistory {
+  id: string;
+  supplyId: string; // Reference to Supply
+  supplyName?: string; // Denormalized for display
+  old_price: number | null;
+  new_price: number;
+  supplier: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  category: string;
+  percentage_change: number;
+  min_price: number;
+  max_price: number;
+  total_variation: number;
+  price_progression: PriceProgression[];
+  userId: string; // To scope history to a user
+  createdAt?: Timestamp | FieldValue;
+  updatedAt?: Timestamp | FieldValue;
+}

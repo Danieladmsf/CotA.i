@@ -27,8 +27,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KeepAliveTabsContent } from "@/components/ui/keep-alive-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -40,9 +38,6 @@ import {
   FileBarChart,
   Loader2,
   Clock,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   Info,
   PauseCircle,
   TrendingUp,
@@ -74,6 +69,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
+import QuotationNavigator from "@/components/shared/QuotationNavigator";
 
 // Utility function to handle preferredBrands as both string and array
 const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
@@ -166,9 +162,6 @@ export default function CotacaoClient() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
   const [filterByBrand, setFilterByBrand] = useState<string>("all");
-  const [isExtendDeadlineModalOpen, setIsExtendDeadlineModalOpen] = useState(false);
-  const [newDeadlineDate, setNewDeadlineDate] = useState<Date | undefined>(undefined);
-  const [newDeadlineTime, setNewDeadlineTime] = useState<string>("");
 
   // Update activeTab when URL params change
   useEffect(() => {
@@ -491,20 +484,6 @@ export default function CotacaoClient() {
     }
   };
 
-  const navigateQuotation = (direction: 'prev' | 'next') => {
-    if (filteredQuotationsForSelect.length < 2) return;
-    const currentIndex = filteredQuotationsForSelect.findIndex(q => q.id === selectedQuotationId);
-    let nextIndex = -1;
-    if (direction === 'prev') {
-      nextIndex = currentIndex > 0 ? currentIndex - 1 : filteredQuotationsForSelect.length - 1;
-    } else {
-      nextIndex = currentIndex < filteredQuotationsForSelect.length - 1 ? currentIndex + 1 : 0;
-    }
-    if (nextIndex !== -1 && filteredQuotationsForSelect[nextIndex]) {
-      handleSelectQuotationFromDropdown(filteredQuotationsForSelect[nextIndex].id);
-    }
-  };
-
   // Computed values com informações melhoradas
   const tableProducts = useMemo((): EnhancedProductRow[] => {
     if (!activeQuotationDetails || !activeQuotationDetails.shoppingListItems || activeQuotationDetails.shoppingListItems.length === 0) {
@@ -719,103 +698,22 @@ export default function CotacaoClient() {
 
   return (
     <main className="w-full space-y-8" role="main">
-      {/* Cotações */}
-      <section className="card-professional modern-shadow-xl" aria-labelledby="quotation-selector">
-        <header className="p-6 border-b header-modern">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="hover-lift text-sm">
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yyyy") : "Filtrar por Data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar mode="single" selected={selectedDateForFilter} onSelect={handleDateChangeForFilter} initialFocus />
-                </PopoverContent>
-              </Popover>
-              
-              {selectedDateForFilter && (
-                <Button variant="ghost" size="sm" onClick={() => handleDateChangeForFilter(undefined)}>
-                  Limpar Filtro
-                </Button>
-              )}
-              
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => navigateQuotation('prev')} 
-                  disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-                  className="hover-lift"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                
-                <Select 
-                  value={selectedQuotationId} 
-                  onValueChange={handleSelectQuotationFromDropdown} 
-                  disabled={isLoading || filteredQuotationsForSelect.length === 0}
-                >
-                  <SelectTrigger className="flex-1 input-modern text-sm">
-                    <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
-                  </SelectTrigger>
-                  <SelectContent className="card-professional">
-                    {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && 
-                      <SelectItem value="no-quote" disabled>
-                        Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}
-                      </SelectItem>
-                    }
-                    {filteredQuotationsForSelect.map((quotation) => {
-                      const quotationsOnSameDay = allFetchedQuotations.filter(q => 
-                         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                      );
-                      
-                      const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
-                        const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
-                        const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
-                        return aTime - bTime;
-                      });
-                      
-                      const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === quotation.id) + 1;
-                          
-                      const quotationName = quotation.createdAt && quotation.shoppingListDate
-                          ? `Cotação #${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`
-                          : `Cotação de ${quotation.shoppingListDate ? format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
-
-                      return (
-                        <SelectItem key={quotation.id} value={quotation.id}>
-                          {quotationName}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-                
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => navigateQuotation('next')} 
-                  disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-                  className="hover-lift"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {timeLeft && selectedQuotationId && activeQuotationDetails && (
-                <Badge 
-                  variant={isDeadlinePassed ? "destructive" : isQuotationPaused ? "outline" : "secondary"} 
-                  className="text-base px-4 py-2 modern-shadow pulse-glow"
-                >
-                  <Clock className="mr-2 h-5 w-5" /> {timeLeft}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </header>
-      </section>
+      {/* Cotações - Componente Centralizado */}
+      <QuotationNavigator
+        allQuotations={allFetchedQuotations}
+        filteredQuotations={filteredQuotationsForSelect}
+        selectedDate={selectedDateForFilter}
+        selectedQuotationId={selectedQuotationId}
+        isLoading={isLoading}
+        onDateChange={handleDateChangeForFilter}
+        onQuotationSelect={handleSelectQuotationFromDropdown}
+        showBadgeInfo={false}
+        timeLeft={timeLeft}
+        isDeadlinePassed={isDeadlinePassed}
+        isQuotationPaused={isQuotationPaused}
+        enableNavigationLoop={true}
+        updateDateOnNavigate={true}
+      />
 
       {/* Conteúdo Principal */}
       {(isLoadingSelectedQuotationData && selectedQuotationId) ? (
@@ -871,17 +769,7 @@ export default function CotacaoClient() {
                 <TrendingUp className="h-5 w-5 rotate-hover text-blue-600" />
                 Variações de Qtd
               </TabsTrigger>
-              <TabsTrigger
-                value="resultado-envio"
-                className="flex items-center gap-2 py-3 nav-item-modern font-heading"
-                disabled={activeQuotationDetails?.status !== 'Fechada'}
-              >
-                <Send className="h-5 w-5 rotate-hover text-green-600" />
-                Resultado & Envio
-                {activeQuotationDetails?.status === 'Fechada' && (
-                  <Badge variant="default" className="ml-2">Pronto</Badge>
-                )}
-              </TabsTrigger>
+
             </TabsList>
 
             {/* Tab: Visão Geral */}
@@ -1049,145 +937,6 @@ export default function CotacaoClient() {
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <span className="text-body">{timeLeft || "Sem prazo ativo"}</span>
                       </div>
-                      {activeQuotationDetails.deadline && (
-                        <div className="text-caption">
-                          Prazo: {format(activeQuotationDetails.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm")}
-                        </div>
-                      )}
-                      {activeQuotationDetails.deadline && (
-                        <Dialog open={isExtendDeadlineModalOpen} onOpenChange={setIsExtendDeadlineModalOpen}>
-                          <DialogTrigger asChild>
-                            <Button
-                              onClick={() => {
-                                const currentDeadline = activeQuotationDetails.deadline.toDate();
-                                setNewDeadlineDate(currentDeadline);
-                                setNewDeadlineTime(format(currentDeadline, "HH:mm"));
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              Estender Prazo
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                              <DialogTitle>Estender Prazo da Cotação</DialogTitle>
-                              <DialogDescription>
-                                Defina a nova data e hora de encerramento para esta cotação.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-6 py-4">
-                              <div className="grid gap-2">
-                                <Label htmlFor="deadline-date">Data</Label>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      className="w-full justify-start text-left font-normal"
-                                    >
-                                      <CalendarDays className="mr-2 h-4 w-4" />
-                                      {newDeadlineDate ? format(newDeadlineDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione uma data"}
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      selected={newDeadlineDate}
-                                      onSelect={setNewDeadlineDate}
-                                      locale={ptBR}
-                                      disabled={(date) => {
-                                        const today = new Date();
-                                        today.setHours(0, 0, 0, 0);
-                                        const compareDate = new Date(date);
-                                        compareDate.setHours(0, 0, 0, 0);
-                                        return compareDate < today;
-                                      }}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="deadline-time">Hora</Label>
-                                <Input
-                                  id="deadline-time"
-                                  type="time"
-                                  value={newDeadlineTime}
-                                  onChange={(e) => setNewDeadlineTime(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsExtendDeadlineModalOpen(false)}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  if (!activeQuotationDetails.id || !newDeadlineDate || !newDeadlineTime) {
-                                    toast({
-                                      title: "Erro",
-                                      description: "Por favor, selecione data e hora.",
-                                      variant: "destructive"
-                                    });
-                                    return;
-                                  }
-
-                                  try {
-                                    const [hours, minutes] = newDeadlineTime.split(':');
-                                    const newDeadline = new Date(newDeadlineDate);
-                                    newDeadline.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-                                    // Update deadline and reopen quotation if closed
-                                    const updateData: any = {
-                                      deadline: Timestamp.fromDate(newDeadline)
-                                    };
-
-                                    // If quotation is closed, reopen it
-                                    if (activeQuotationDetails.status === 'Fechada') {
-                                      updateData.status = 'Aberta';
-                                    }
-
-                                    await updateDoc(doc(db, FIREBASE_COLLECTIONS.QUOTATIONS, activeQuotationDetails.id), updateData);
-
-                                    // Reopen all shopping list items for this quotation
-                                    const itemsQuery = query(
-                                      collection(db, FIREBASE_COLLECTIONS.SHOPPING_LIST_ITEMS),
-                                      where('quotationId', '==', activeQuotationDetails.id),
-                                      where('status', '==', 'Encerrado')
-                                    );
-                                    const itemsSnapshot = await getDocs(itemsQuery);
-
-                                    const reopenPromises = itemsSnapshot.docs.map(itemDoc =>
-                                      updateDoc(itemDoc.ref, { status: 'Aberto' })
-                                    );
-                                    await Promise.all(reopenPromises);
-
-                                    toast({
-                                      title: activeQuotationDetails.status === 'Fechada' ? "Cotação Reaberta" : "Prazo Estendido",
-                                      description: `Novo prazo: ${format(newDeadline, "dd/MM/yyyy 'às' HH:mm")}${itemsSnapshot.docs.length > 0 ? ` • ${itemsSnapshot.docs.length} itens reabertos` : ''}`,
-                                    });
-
-                                    setIsExtendDeadlineModalOpen(false);
-                                  } catch (error) {
-                                    console.error("Error extending deadline:", error);
-                                    toast({
-                                      title: "Erro",
-                                      description: "Não foi possível estender o prazo.",
-                                      variant: "destructive"
-                                    });
-                                  }
-                                }}
-                              >
-                                Confirmar
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1494,15 +1243,7 @@ export default function CotacaoClient() {
               <QuantityApprovalsTab quotationId={selectedQuotationId} />
             </KeepAliveTabsContent>
 
-            {/* Tab: Resultado & Envio */}
-            <KeepAliveTabsContent value="resultado-envio" activeTab={activeTab} className="mt-6 fade-in">
-              <ResultadoEnvioTab
-                quotation={activeQuotationDetails}
-                products={activeQuotationDetails.shoppingListItems}
-                offers={offersForResultTab}
-                suppliers={supplierDataCacheRef.current}
-              />
-            </KeepAliveTabsContent>
+
           </Tabs>
         </section>
       ) : selectedQuotationId ? (

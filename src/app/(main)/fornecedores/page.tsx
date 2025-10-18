@@ -309,11 +309,17 @@ export default function FornecedoresPage() {
       }
     }
 
+    let whatsappToSave = dataForFirestore.whatsapp.trim().replace(/[^\d]/g, "");
+    // Ensure '55' prefix is present
+    if (!whatsappToSave.startsWith('55') && whatsappToSave.length >= 10) { // Assuming 10 digits is a valid number without country code
+      whatsappToSave = '55' + whatsappToSave;
+    }
+
     const fornecedorData = {
       empresa: dataForFirestore.empresa.trim(),
       cnpj: cleanedCnpj,
       vendedor: dataForFirestore.vendedor.trim(),
-      whatsapp: dataForFirestore.whatsapp.trim().replace(/[^\d]/g, ""),
+      whatsapp: whatsappToSave,
       diasDeEntrega: dataForFirestore.diasDeEntrega,
       fotoUrl,
       fotoHint,
@@ -629,7 +635,8 @@ export default function FornecedoresPage() {
     <main className="w-full space-y-8" role="main">
       <section className="card-professional modern-shadow-xl hover-lift" aria-labelledby="fornecedores-section">
         <header className="p-6 md:p-8 border-b header-modern">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            {/* Campo de Busca */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -642,63 +649,67 @@ export default function FornecedoresPage() {
                 aria-label="Buscar fornecedores"
               />
             </div>
+
+            {/* Separador vertical (apenas em telas grandes) */}
+            <div className="hidden lg:block h-8 w-px bg-border"></div>
+
+            {/* Botões de Ação */}
+            <nav aria-label="Ações de fornecedores" className="flex-shrink-0">
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleImportButtonClick}
+                  className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200"
+                  disabled={isLoadingFornecedores}
+                  aria-label="Importar fornecedores via CSV ou TXT"
+                >
+                  {isLoadingFornecedores && fileInputRef.current?.files && fileInputRef.current.files.length > 0 ?
+                    <Loader2 className="h-5 w-5 animate-spin" /> :
+                    <Upload className="h-5 w-5 rotate-hover" />
+                  }
+                  <span className="font-medium">Importar</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={handleExportFornecedores}
+                  className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200"
+                  disabled={fornecedores.length === 0}
+                  aria-label="Exportar lista de fornecedores"
+                >
+                  <Download className="h-5 w-5 rotate-hover" />
+                  <span className="font-medium">Exportar</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setIsInviteModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200"
+                  aria-label="Convidar novo fornecedor"
+                >
+                  <UserPlus className="h-5 w-5 rotate-hover" />
+                  <span className="font-medium">Convidar</span>
+                </Button>
+
+                <Button
+                  onClick={handleNovoFornecedorClick}
+                  className="flex items-center gap-2 px-6 py-2 button-modern font-semibold"
+                  disabled={isLoadingFornecedores}
+                  aria-label="Adicionar novo fornecedor"
+                >
+                  <PlusCircle className="h-5 w-5 rotate-hover" />
+                  <span>Novo Fornecedor</span>
+                </Button>
+              </div>
+            </nav>
           </div>
-          
-          <nav className="mt-6" aria-label="Ações de fornecedores">
-            <div className="flex flex-wrap gap-3">
-              <input
-                type="file"
-                accept=".csv,.txt"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Button 
-                variant="outline" 
-                onClick={handleImportButtonClick} 
-                className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200" 
-                disabled={isLoadingFornecedores}
-                aria-label="Importar fornecedores via CSV ou TXT"
-              >
-                {isLoadingFornecedores && fileInputRef.current?.files && fileInputRef.current.files.length > 0 ? 
-                  <Loader2 className="h-5 w-5 animate-spin" /> : 
-                  <Upload className="h-5 w-5 rotate-hover" />
-                }
-                <span className="font-medium">Importar</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={handleExportFornecedores} 
-                className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200" 
-                disabled={fornecedores.length === 0}
-                aria-label="Exportar lista de fornecedores"
-              >
-                <Download className="h-5 w-5 rotate-hover" />
-                <span className="font-medium">Exportar</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => setIsInviteModalOpen(true)} 
-                className="flex items-center gap-2 px-4 py-2 hover-lift transition-all duration-200"
-                aria-label="Convidar novo fornecedor"
-              >
-                <UserPlus className="h-5 w-5 rotate-hover" />
-                <span className="font-medium">Convidar</span>
-              </Button>
-              
-              <Button 
-                onClick={handleNovoFornecedorClick} 
-                className="flex items-center gap-2 px-6 py-2 button-modern font-semibold" 
-                disabled={isLoadingFornecedores}
-                aria-label="Adicionar novo fornecedor"
-              >
-                <PlusCircle className="h-5 w-5 rotate-hover" />
-                <span>Novo Fornecedor</span>
-              </Button>
-            </div>
-          </nav>
         </header>
         
         <div className="p-0" role="region" aria-label="Lista de fornecedores">

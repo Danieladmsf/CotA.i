@@ -29,6 +29,8 @@ interface OfferFormCardProps {
   handlePriceChange: (productId: string, offerUiId: string, value: string) => void;
   handleSaveProductOffer: (productId: string, offerUiId: string) => Promise<boolean>;
   onRequestStopQuoting?: (productId: string) => void;
+  toggleEditMode: (productId: string, offerUiId: string) => void;
+  isInEditMode: (productId: string, offerUiId: string) => boolean;
 
   // Format functions
   formatCurrency: (value: number | null) => string;
@@ -54,10 +56,14 @@ export function OfferFormCard({
   formatCurrency,
   formatCurrencyInput,
   abbreviateUnit,
-  getWeightDisplayValue
+  getWeightDisplayValue,
+  toggleEditMode,
+  isInEditMode,
 }: OfferFormCardProps) {
   // Detectar se é produto de unidade
   const isUnitProduct = product.unit === 'Unidade(s)';
+
+  const currentIsInEditMode = isInEditMode(product.id, offer.uiId);
 
   return (
     <div key={`${product.id}-${offer.uiId}`} className="p-3 border rounded-md bg-background shadow-sm space-y-3">
@@ -76,7 +82,7 @@ export function OfferFormCard({
             value={offer.unitsInPackaging > 0 ? offer.unitsInPackaging : ''}
             onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsInPackaging', e.target.value)}
             placeholder="Ex: 5"
-            disabled={isOfferDisabled}
+            disabled={isOfferDisabled || !currentIsInEditMode}
           />
         </div>
 
@@ -94,7 +100,7 @@ export function OfferFormCard({
             value={offer.unitsPerPackage || ''}
             onChange={(e) => handleOfferChange(product.id, offer.uiId, 'unitsPerPackage', parseInt(e.target.value) || 0)}
             placeholder="Ex: 12"
-            disabled={isOfferDisabled}
+            disabled={isOfferDisabled || !currentIsInEditMode}
           />
         </div>
 
@@ -114,7 +120,7 @@ export function OfferFormCard({
                 value={getWeightDisplayValue(product, offer)}
                 onChange={(e) => handleWeightChange(e, product, offer)}
                 placeholder="0,000"
-                disabled={isOfferDisabled}
+                disabled={isOfferDisabled || !currentIsInEditMode}
                 className="pr-8"
               />
               <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
@@ -138,7 +144,7 @@ export function OfferFormCard({
             value={offer.totalPackagingPrice > 0 ? formatCurrencyInput(offer.totalPackagingPrice * 100) : ''}
             onChange={(e) => handlePriceChange(product.id, offer.uiId, e.target.value)}
             placeholder="R$ 0,00"
-            disabled={isOfferDisabled}
+            disabled={isOfferDisabled || !currentIsInEditMode}
           />
         </div>
 
@@ -187,12 +193,16 @@ export function OfferFormCard({
         <Button
           size="sm"
           onClick={async () => {
-            await handleSaveProductOffer(product.id, offer.uiId);
+            if (currentIsInEditMode) {
+              await handleSaveProductOffer(product.id, offer.uiId);
+            } else {
+              toggleEditMode(product.id, offer.uiId);
+            }
           }}
           disabled={isButtonDisabled}
           className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {offer.id ? 'Editar Oferta' : 'Salvar Nova Oferta'}
+          {currentIsInEditMode ? 'Salvar Edição' : (offer.id ? 'Editar Oferta' : 'Salvar Nova Oferta')}
         </Button>
       </div>
     </div>

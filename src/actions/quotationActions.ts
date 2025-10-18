@@ -3,7 +3,7 @@
 
 import { admin, adminDb } from '@/lib/config/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { Fornecedor, ShoppingListItem, Offer } from '@/types';
+import type { Fornecedor, ShoppingListItem, Offer, Quotation } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 // Import the new centralized notification actions
@@ -99,7 +99,7 @@ export async function startQuotation(
     
     // 6. Create notification for quotation start
     try {
-      const quotationName = `Cotação #${newQuotationRef.id.slice(-6)} de ${format(shoppingListDate, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+      const quotationName = `Cotação #${newQuotationRef.id.slice(-6)} de ${format(deadline, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
       await notifyQuotationStarted({
         userId: userId,
         quotationId: newQuotationRef.id,
@@ -117,6 +117,106 @@ export async function startQuotation(
   } catch (error: any) {
     // This is where the error is caught and sent back to the client.
     const errorMessage = error.message || 'Ocorreu um erro desconhecido ao iniciar a cotação.';
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Updates an existing quotation with new items and potentially new suppliers/deadline.
+ * @returns An object indicating success or failure.
+ */
+export async function updateQuotation(
+  quotationId: string,
+  listId: string,
+  shoppingListDateISO: string,
+  newSupplierIds: string[], // All selected suppliers, including existing ones
+  deadlineISO: string,
+  counterProposalTimeInMinutes: number,
+  counterProposalReminderPercentage: number,
+  formattedDeadline: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const shoppingListDate = new Date(shoppingListDateISO);
+  const deadline = new Date(deadlineISO);
+
+  if (!quotationId || !listId || !shoppingListDate || newSupplierIds.length === 0 || !deadline || !formattedDeadline || !userId) {
+    return { success: false, error: 'Dados insuficientes para atualizar a cotação.' };
+  }
+
+  try {
+    const db = adminDb();
+    const mainBatch = db.batch();
+
+    const quotationRef = db.collection(QUOTATIONS_COLLECTION).doc(quotationId);
+    const quotationSnap = await quotationRef.get();
+
+    if (!quotationSnap.exists) {
+      throw new Error('Cotação existente não encontrada.');
+    }
+
+    const existingQuotationData = quotationSnap.data() as Quotation;
+    const existingSupplierIds = new Set(existingQuotationData.supplierIds || []);
+    const suppliersToAdd = newSupplierIds.filter(id => !existingSupplierIds.has(id));
+
+    // 1. Find new items to be included in the quotation (items with this listId but no quotationId)
+    const newItemsQuery = db
+      .collection(SHOPPING_LIST_ITEMS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('listId', '==', listId)
+      .where('status', '==', 'Pendente'); // Only pending items can be added to an existing quotation
+    const newItemsSnapshot = await newItemsQuery.get();
+    const newItemsToInclude = newItemsSnapshot.docs.filter(doc => !doc.data().quotationId);
+
+    // 2. Update the existing quotation document
+    mainBatch.update(quotationRef, {
+      supplierIds: admin.firestore.FieldValue.arrayUnion(...newSupplierIds), // Add new suppliers
+      deadline: Timestamp.fromDate(deadline),
+      counterProposalTimeInMinutes: counterProposalTimeInMinutes,
+      counterProposalReminderPercentage: counterProposalReminderPercentage,
+      status: 'Aberta', // Ensure status is 'Aberta' if it was 'Pausada'
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 3. Update new shopping list items to link them to this quotation
+    newItemsToInclude.forEach(doc => {
+      mainBatch.update(doc.ref, { quotationId: quotationId, status: 'Cotado' });
+    });
+
+    // 4. Commit main database writes
+    await mainBatch.commit();
+
+    // 5. Fetch new suppliers and send invitations
+    if (suppliersToAdd.length > 0) {
+      const suppliersQuery = db.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', suppliersToAdd);
+      const suppliersSnapshot = await suppliersQuery.get();
+
+      for (const doc of suppliersSnapshot.docs) {
+        const supplier = { id: doc.id, ...doc.data() } as Fornecedor;
+        try {
+          await sendQuotationInvitation(supplier, formattedDeadline, userId);
+        } catch (invitationError: any) {
+          console.error(`Error sending invitation to new supplier ${supplier.id}:`, invitationError);
+        }
+      }
+    }
+
+    // 6. Create notification for quotation update (if new items or suppliers were added)
+    if (newItemsToInclude.length > 0 || suppliersToAdd.length > 0) {
+      const quotationName = `Cotação #${quotationId.slice(-6)} de ${format(deadline, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+      await notifyQuotationStarted({ // Reusing notifyQuotationStarted for now, might need a new type
+        userId: userId,
+        quotationId: quotationId,
+        quotationName: quotationName,
+        itemsCount: newItemsToInclude.length,
+        suppliersCount: suppliersToAdd.length,
+        deadline: deadline
+      });
+    }
+
+    return { success: true };
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Ocorreu um erro desconhecido ao atualizar a cotação.';
     return { success: false, error: errorMessage };
   }
 }
