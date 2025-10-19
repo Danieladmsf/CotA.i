@@ -615,49 +615,82 @@ export default function ComprasPageClient() {
 
   // Auto-selecionar cotação quando não houver seleção
   useEffect(() => {
+    console.log('🔍 [AUTO-SELECT] useEffect triggered:', {
+      selectedQuotationId,
+      selectedDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd HH:mm') : null,
+      activeTab,
+      allQuotationsCount: allQuotations.length,
+      filteredQuotationsCount: filteredQuotations.length,
+      navigableQuotationsCount: navigableQuotations.length,
+      flags: {
+        justSaved: justSavedListRef.current,
+        autoClearing: isAutoClearingRef.current,
+        justStarted: justStartedQuotationRef.current
+      }
+    });
 
     // SPECIAL CASE: If we just started a quotation and we're on gestao tab, try to auto-select the new quotation
     if (justStartedQuotationRef.current && activeTab === 'gestao' && !selectedQuotationId && listIdForQuotation) {
+      console.log('🎯 [AUTO-SELECT] SPECIAL CASE: Just started quotation');
       const newQuotation = allQuotations.find(q => q.listId === listIdForQuotation);
       if (newQuotation) {
+        console.log('✅ [AUTO-SELECT] Found new quotation, selecting:', newQuotation.id);
         previousStatusRef.current = null; // Reset to track this new quotation's status
         setSelectedQuotationId(newQuotation.id);
         setSelectedDate(newQuotation.shoppingListDate.toDate());
         return;
       } else {
+        console.log('⏳ [AUTO-SELECT] New quotation not found yet (waiting for Firestore)');
       }
     }
 
     // Não auto-selecionar se acabamos de salvar a lista, estamos auto-clearing, ou acabamos de iniciar cotação
     if (justSavedListRef.current || isAutoClearingRef.current || justStartedQuotationRef.current) {
+      console.log('🚫 [AUTO-SELECT] Blocked by flags');
       return;
     }
 
     // CASO 1: Se não há cotação selecionada
     if (!selectedQuotationId) {
+      console.log('📌 [AUTO-SELECT] CASO 1: No quotation selected');
+
       // Não auto-selecionar cotação ativa se estamos na etapa "iniciar-cotacao"
       // porque significa que o usuário acabou de criar a lista e vai iniciar a cotação
       if (activeTab === 'iniciar-cotacao') {
+        console.log('⏭️ [AUTO-SELECT] Skip: on iniciar-cotacao tab');
         return;
       }
 
       // Prioridade 1: Se há cotação ativa, selecionar a primeira
       // IMPORTANTE: Buscar em allQuotations quando não há filtro de data (página recém-carregada)
       const quotationsToSearch = selectedDate ? filteredQuotations : allQuotations;
+      console.log('🔎 [AUTO-SELECT] Searching for active quotation in:', selectedDate ? 'filteredQuotations' : 'allQuotations', `(${quotationsToSearch.length} items)`);
+
       const firstActive = quotationsToSearch.find(q => q.status === 'Aberta' || q.status === 'Pausada');
 
       if (firstActive) {
+        console.log('✅ [AUTO-SELECT] Found active quotation:', {
+          id: firstActive.id,
+          status: firstActive.status,
+          date: firstActive.shoppingListDate ? format(firstActive.shoppingListDate.toDate(), 'yyyy-MM-dd HH:mm') : null
+        });
         setSelectedQuotationId(firstActive.id);
         // Se não há data selecionada, setar a data da cotação ativa
         if (!selectedDate && firstActive.shoppingListDate) {
+          console.log('📅 [AUTO-SELECT] Setting selectedDate to quotation date');
           setSelectedDate(firstActive.shoppingListDate.toDate());
         }
         return;
+      } else {
+        console.log('❌ [AUTO-SELECT] No active quotation found');
       }
 
       // Prioridade 2: Se há "nova-cotacao" disponível, selecionar
       const hasNovaCotacao = navigableQuotations.some(q => q.id === 'nova-cotacao');
+      console.log('🆕 [AUTO-SELECT] Check nova-cotacao:', { hasNovaCotacao, hasSelectedDate: !!selectedDate });
+
       if (hasNovaCotacao && !selectedDate) {
+        console.log('✅ [AUTO-SELECT] Selecting nova-cotacao');
         setSelectedQuotationId('nova-cotacao');
         return;
       }
