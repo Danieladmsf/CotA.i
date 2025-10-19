@@ -79,27 +79,50 @@ export default function SelecionarFornecedoresTab({
   const hasShownWarningRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!user || (!listId && !selectedQuotationId)) return;
+    console.log('🔵 [SelecionarFornecedoresTab] useEffect triggered:', {
+      user: !!user,
+      listId,
+      selectedQuotationId,
+      hasShownWarningCount: hasShownWarningRef.current.size,
+      hasShownWarningIds: Array.from(hasShownWarningRef.current)
+    });
+
+    if (!user || (!listId && !selectedQuotationId)) {
+      console.log('⏸️ [SelecionarFornecedoresTab] No user or listId/selectedQuotationId - skipping');
+      return;
+    }
 
     const collectionRef = collection(db, 'quotations');
     let q;
 
     if (selectedQuotationId) {
       // If a specific quotation is selected, fetch it directly
+      console.log('🔍 [SelecionarFornecedoresTab] Querying by selectedQuotationId:', selectedQuotationId);
       q = query(collectionRef, where('__name__', '==', selectedQuotationId), where('userId', '==', user.uid));
     } else if (listId) {
       // Otherwise, look for an active quotation for the given listId
+      console.log('🔍 [SelecionarFornecedoresTab] Querying by listId:', listId);
       q = query(collectionRef, where('listId', '==', listId), where('userId', '==', user.uid), where('status', 'in', ['Aberta', 'Pausada']));
     } else {
       return;
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('📸 [SelecionarFornecedoresTab] Firestore snapshot received:', {
+        empty: snapshot.empty,
+        docsCount: snapshot.docs.length
+      });
+
       if (!snapshot.empty) {
         const quotationData = snapshot.docs[0].data() as Quotation;
         const quotation = { ...quotationData, id: snapshot.docs[0].id };
 
-        // Log for debugging
+        console.log('📦 [SelecionarFornecedoresTab] Quotation data:', {
+          id: quotation.id,
+          status: quotation.status,
+          listId: quotation.listId,
+          selectedQuotationId
+        });
 
         setExistingActiveQuotation(quotation);
 
@@ -135,20 +158,44 @@ export default function SelecionarFornecedoresTab({
         // 4. User is adding items to an active quotation (coming back to step 2)
         const quotationId = quotation.id;
         const hasAlreadyShown = hasShownWarningRef.current.has(quotationId);
+
+        const isActive = quotation.status === 'Aberta' || quotation.status === 'Pausada';
+        const hasSelectedQuotation = selectedQuotationId !== null && selectedQuotationId !== 'nova-cotacao';
+        const isSameQuotation = selectedQuotationId === quotationId;
+
+        console.log('🎯 [SelecionarFornecedoresTab] Modal decision:', {
+          quotationId,
+          isActive,
+          isReadOnly,
+          hasAlreadyShown,
+          hasSelectedQuotation,
+          isSameQuotation,
+          selectedQuotationId,
+          hasShownWarningSet: Array.from(hasShownWarningRef.current)
+        });
+
         const shouldShowWarning =
-          (quotation.status === 'Aberta' || quotation.status === 'Pausada') &&
+          isActive &&
           !isReadOnly &&
           !hasAlreadyShown &&
-          selectedQuotationId !== null &&
-          selectedQuotationId !== 'nova-cotacao' &&
-          selectedQuotationId === quotationId; // Only show when actively working on THIS quotation
+          hasSelectedQuotation &&
+          isSameQuotation; // Only show when actively working on THIS quotation
 
         if (shouldShowWarning) {
-            console.log('ℹ️ [SelecionarFornecedoresTab] Showing warning modal for quotation:', quotationId);
+            console.log('✅ [SelecionarFornecedoresTab] SHOWING WARNING MODAL for quotation:', quotationId);
             setIsWarningModalOpen(true);
             hasShownWarningRef.current.add(quotationId); // Add to Set so it won't show again
-        } else if ((quotation.status === 'Aberta' || quotation.status === 'Pausada') && hasAlreadyShown) {
-            console.log('⏭️ [SelecionarFornecedoresTab] Skipping warning modal (already shown for quotation):', quotationId);
+            console.log('📝 [SelecionarFornecedoresTab] Updated hasShownWarning Set:', Array.from(hasShownWarningRef.current));
+        } else if (isActive && hasAlreadyShown) {
+            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (already shown for quotation):', quotationId);
+        } else if (isActive && !hasSelectedQuotation) {
+            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (no quotation selected or nova-cotacao)');
+        } else if (isActive && !isSameQuotation) {
+            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (different quotation selected)');
+        } else if (!isActive) {
+            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (quotation not active)');
+        } else if (isReadOnly) {
+            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (read-only mode)');
         }
 
       } else {
@@ -306,9 +353,29 @@ export default function SelecionarFornecedoresTab({
     );
   }
 
+  console.log('🎨 [SelecionarFornecedoresTab] Rendering component:', {
+    selectedQuotationId,
+    listId,
+    shoppingListDate,
+    isWarningModalOpen,
+    hasActiveQuotation,
+    quotationStatus,
+    isReadOnly
+  });
+
   return (
     <>
-      <Dialog open={isWarningModalOpen} onOpenChange={setIsWarningModalOpen}>
+      <Dialog
+        open={isWarningModalOpen}
+        onOpenChange={(open) => {
+          console.log('🔔 [SelecionarFornecedoresTab] Modal state changing:', {
+            from: isWarningModalOpen,
+            to: open,
+            selectedQuotationId
+          });
+          setIsWarningModalOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cotação em Andamento Detectada</DialogTitle>
@@ -317,7 +384,10 @@ export default function SelecionarFornecedoresTab({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setIsWarningModalOpen(false)}>Entendi</Button>
+            <Button onClick={() => {
+              console.log('👆 [SelecionarFornecedoresTab] User clicked "Entendi" button');
+              setIsWarningModalOpen(false);
+            }}>Entendi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
