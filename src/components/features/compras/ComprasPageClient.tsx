@@ -316,16 +316,25 @@ export default function ComprasPageClient() {
   // Auto-select first quotation when filtered list changes
   // Only auto-select if user is actively navigating quotations (has selected a date)
   useEffect(() => {
+    console.log('🔍 [OLD-AUTO-SELECT] useEffect triggered:', {
+      selectedQuotationId,
+      selectedDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd HH:mm') : null,
+      filteredQuotationsCount: filteredQuotations.length,
+      listDateForQuotation: listDateForQuotation ? format(listDateForQuotation, 'yyyy-MM-dd HH:mm') : null
+    });
+
     // Don't auto-select if we're in "new quotation" mode (listDateForQuotation exists but no selectedQuotationId)
     const isNewQuotationMode = listDateForQuotation && !selectedQuotationId;
 
     // Don't auto-select if we're in the middle of an auto-clear operation
     if (isAutoClearingRef.current) {
+      console.log('🚫 [OLD-AUTO-SELECT] Blocked: auto-clearing');
       return;
     }
 
     // Don't auto-select if user is manually selecting
     if (isManuallySelectingRef.current) {
+      console.log('🚫 [OLD-AUTO-SELECT] Blocked: manual selection');
       // Reset flag after a brief delay
       setTimeout(() => {
         isManuallySelectingRef.current = false;
@@ -333,16 +342,26 @@ export default function ComprasPageClient() {
       return;
     }
 
+    // IMPORTANTE: Não interferir quando não há selectedDate
+    // Deixar o outro auto-select (baseado em allQuotations) lidar com isso
+    if (!selectedDate) {
+      console.log('⏭️ [OLD-AUTO-SELECT] Skip: no selectedDate (defer to allQuotations auto-select)');
+      return;
+    }
+
     if (filteredQuotations.length > 0 && !selectedQuotationId && selectedDate && !isNewQuotationMode) {
       // Check if first quotation is closed - don't auto-select closed quotations
       const firstQuotation = filteredQuotations[0];
       if (firstQuotation.status === 'Fechada' || firstQuotation.status === 'Concluída') {
+        console.log('⏭️ [OLD-AUTO-SELECT] Skip: first quotation is closed');
         return;
       }
 
+      console.log('✅ [OLD-AUTO-SELECT] Selecting first filtered quotation:', firstQuotation.id);
       // Only auto-select when date filter is active (user is browsing history)
       setSelectedQuotationId(filteredQuotations[0].id);
-    } else if (filteredQuotations.length === 0 && !isNewQuotationMode) {
+    } else if (filteredQuotations.length === 0 && !isNewQuotationMode && selectedDate) {
+      console.log('🧹 [OLD-AUTO-SELECT] Clearing selection (no filtered quotations)');
       setSelectedQuotationId(null);
     }
   }, [filteredQuotations, selectedQuotationId, selectedDate, listDateForQuotation]);
