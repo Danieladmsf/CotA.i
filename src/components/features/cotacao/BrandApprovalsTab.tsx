@@ -93,24 +93,19 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
   const handleApproval = async (request: PendingBrandRequest, approved: boolean) => {
     if (!request.id) return;
 
-    console.log('🟢 [handleApproval] Iniciando aprovação/rejeição', { requestId: request.id, approved });
     setProcessingIds(prev => new Set(prev).add(request.id!));
 
     try {
       if (approved) {
-        console.log('✅ [handleApproval] Aprovando marca...');
         // 1. Update the pending request status
         const requestRef = doc(db, 'pending_brand_requests', request.id);
-        console.log('📝 [handleApproval] Atualizando status para approved...');
         await updateDoc(requestRef, {
           status: 'approved',
           updatedAt: Timestamp.now()
         });
-        console.log('✅ [handleApproval] Status atualizado com sucesso');
 
         // 2. Add brand to supplies collection (handle both string and array formats)
         try {
-          console.log('📦 [handleApproval] Adicionando marca às coleções supplies...');
           // First, check shopping_list_items to get the correct supplyId
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
@@ -158,7 +153,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
         // 3. Add brand to shopping_list_items collection
         try {
-          console.log('📝 [handleApproval] Adicionando marca ao shopping_list_items...');
           const shoppingListRef = doc(db, 'shopping_list_items', request.productId);
           const shoppingListSnap = await getDoc(shoppingListRef);
           
@@ -193,7 +187,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
         // 4. Create the actual offer now that the brand is approved
         try {
-          console.log('💰 [handleApproval] Criando oferta automaticamente...');
           const offersCollectionRef = collection(db, 'quotations', request.quotationId, 'products', request.productId, 'offers');
           
           const offerPayload = {
@@ -212,10 +205,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             updatedAt: Timestamp.now(),
           };
 
-          console.log('💰 [handleApproval] Payload da oferta:', offerPayload);
           const newOfferRef = await addDoc(offersCollectionRef, offerPayload);
-          console.log('✅ [handleApproval] Oferta criada com sucesso! ID:', newOfferRef.id);
-          console.log('✅ [handleApproval] Path:', `quotations/${request.quotationId}/products/${request.productId}/offers`);
 
         } catch (error) {
           console.error('❌ [handleApproval] Erro ao criar oferta:', error);
@@ -233,7 +223,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           variant: "default"
         });
       } else {
-        console.log('❌ [handleApproval] Rejeitando marca...');
         // Just reject the request
         const requestRef = doc(db, 'pending_brand_requests', request.id);
         await updateDoc(requestRef, {
@@ -241,7 +230,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           rejectionReason: 'Rejeitada pelo comprador',
           updatedAt: Timestamp.now()
         });
-        console.log('✅ [handleApproval] Marca rejeitada com sucesso');
 
         toast({
           title: "Marca Rejeitada",
@@ -252,7 +240,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
 
       // 5. Create notification for the supplier using server-side function
       try {
-        console.log('🔔 [handleApproval] Criando notificação para o fornecedor...');
 
         // Fetch product name for a more descriptive message
         let productNameForNotif = request.productName || 'Produto desconhecido';
@@ -284,7 +271,6 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
             });
 
         if (notificationResult.success) {
-          console.log('✅ [handleApproval] Notificação criada com sucesso (server-side)');
         } else {
           console.error('❌ [handleApproval] Erro ao criar notificação (server-side):', notificationResult.error);
         }

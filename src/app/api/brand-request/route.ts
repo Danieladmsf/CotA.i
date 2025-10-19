@@ -4,12 +4,8 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { notifyBrandApprovalPending } from '@/actions/notificationService';
 
 export async function POST(request: NextRequest) {
-  console.log('\n==============================================');
-  console.log('🔵 API /api/brand-request CHAMADA!');
-  console.log('==============================================\n');
   try {
     const body = await request.json();
-    console.log('🔵 Body recebido:', JSON.stringify(body, null, 2));
     
     const {
       quotationId,
@@ -89,7 +85,6 @@ export async function POST(request: NextRequest) {
 
     // Create notification for the buyer using centralized server-side function
     try {
-      console.log('📧 Creating notification for buyer:', { buyerUserId, brandName, productName, productId, quotationId });
 
       // Fetch quotation name for a better notification message
       let quotationName = `Cotação #${quotationId.slice(-6)}`;
@@ -114,22 +109,13 @@ export async function POST(request: NextRequest) {
       });
 
       if (notificationResult.success) {
-        console.log('\n==============================================');
-        console.log('✅ NOTIFICAÇÃO CRIADA COM SUCESSO (server-side)!');
-        console.log('✅ ID da notificação:', notificationResult.id);
-        console.log('✅ Para o usuário:', buyerUserId);
-        console.log('✅ Marca:', brandName);
-        console.log('✅ Produto:', productName);
-        console.log('==============================================\n');
       } else {
         console.error('❌ Erro ao criar notificação (server-side):', notificationResult.error);
       }
     } catch (notificationError: any) {
-      console.log('\n==============================================');
       console.error('❌ ERRO AO CRIAR NOTIFICAÇÃO!');
       console.error('❌ Erro:', notificationError.message);
       console.error('❌ Stack:', notificationError.stack);
-      console.log('==============================================\n');
       // Non-critical error - don't fail the request
     }
 

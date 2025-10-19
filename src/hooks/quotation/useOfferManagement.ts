@@ -463,7 +463,6 @@ export function useOfferManagement({
     if (quantityDecision?.correctedData) {
       const data = quantityDecision.correctedData;
 
-      console.log('🔧 [Corrected Data] Applying corrected values:', data);
 
       // Support both new and legacy field names
       const packages = data.packages ?? data.quantity;
@@ -471,7 +470,6 @@ export function useOfferManagement({
       const unitsPerPkg = data.unitsPerPackage;
       const price = (data as any).price ?? data.totalPackagingPrice;
 
-      console.log('🔧 [Corrected Data] Extracted values:', { packages, weight, unitsPerPkg, price });
 
       if (packages !== undefined) {
         finalOfferPayload.unitsInPackaging = packages;
@@ -490,7 +488,6 @@ export function useOfferManagement({
         finalOfferPayload.pricePerUnit = price / (finalPackages * finalWeight);
       }
 
-      console.log('🔧 [Corrected Data] Final payload:', finalOfferPayload);
     }
 
 
@@ -521,16 +518,6 @@ export function useOfferManagement({
       const requestedAmount = product.quantity;
       const boxValidation = validateBoxQuantityVariation(offeredAmount, requestedAmount);
 
-      console.log('📊 [Quantity Validation]', {
-        productName: product.name,
-        offeredAmount,
-        requestedAmount,
-        isValid: boxValidation.isValid,
-        shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
-        variationType: boxValidation.variationType,
-        variationAmount: boxValidation.variationAmount,
-        variationPercentage: boxValidation.variationPercentage,
-      });
 
       // Mostrar toast informativo para o fornecedor
       if (!boxValidation.isValid) {
@@ -548,12 +535,6 @@ export function useOfferManagement({
       // Notificar o comprador internamente (sistema de notificações do sino)
       // Don't notify if variationType is 'exact' (no variation)
       if (boxValidation.shouldNotifyBuyer && quotation.userId && boxValidation.variationType !== 'exact') {
-        console.log('🔔 [Quantity Notification] Creating internal notification', {
-          quotationUserId: quotation.userId,
-          variationType: boxValidation.variationType,
-          offeredAmount,
-          requestedAmount,
-        });
 
         // Map decision types to shortageReason types
         const shortageReasonMap: Record<string, 'stock_shortage' | 'request_approval' | 'buyer_approval_excess' | undefined> = {
@@ -585,10 +566,6 @@ export function useOfferManagement({
           });
 
           if (result.success) {
-            console.log('✅ [Quantity Notification] Internal notification created successfully', {
-              productName: product.name,
-              notificationId: result.id,
-            });
           } else {
             console.warn('⚠️ [Quantity Notification] Failed to create notification:', result.error);
           }
@@ -601,10 +578,6 @@ export function useOfferManagement({
           // Don't block offer save if notification fails
         }
       } else {
-        console.log('ℹ️ [Quantity Notification] No notification needed', {
-          shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
-          hasUserId: !!quotation.userId,
-        });
       }
 
       setUnseenAlerts(prev => prev.filter(alertId => alertId !== productId));
@@ -666,8 +639,6 @@ export function useOfferManagement({
       weight?: number;
     }
   ) => {
-    console.log('🔧 [Decision Handler] Received decision:', decision);
-    console.log('🔧 [Decision Handler] Received correctedData:', correctedData);
 
     setQuantityDecision({
       decision,

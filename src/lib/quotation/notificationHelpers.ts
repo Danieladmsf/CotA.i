@@ -72,9 +72,6 @@ export async function handleOutbidNotification({
     return;
   }
 
-  console.log(
-    `[Action Trigger] Condition met to notify for product ${product.name}. My price ${newPricePerUnit} is less than ${previousBestOffer.pricePerUnit}.`
-  );
 
   let outbidSupplierDetails = supplierDetailsCache.get(
     previousBestOffer.supplierId

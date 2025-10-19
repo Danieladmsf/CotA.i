@@ -37,11 +37,6 @@ export function useEffectDebugger(
 
     if (Object.keys(changedDeps).length > 0) {
       effectCount.current += 1;
-      console.log(`[${debugLabel}] Effect triggered #${effectCount.current}`, {
-        renderCount: renderCount.current,
-        changedDeps,
-        allDeps: deps,
-      });
 
       // Detectar possível loop infinito
       if (effectCount.current > 10) {

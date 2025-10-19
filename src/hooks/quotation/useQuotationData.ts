@@ -156,8 +156,6 @@ export function useQuotationData({
       // Filter only pending and rejected (approved becomes offer automatically)
       const visibleRequests = brandRequests.filter(req => req.status === 'pending' || req.status === 'rejected');
 
-      console.log('🔵 [Brand Requests] Total received:', brandRequests.length);
-      console.log('🔵 [Brand Requests] Visible (pending/rejected):', visibleRequests.length);
 
       // Store in cache for initial product load
       setPendingRequestsCache(visibleRequests);

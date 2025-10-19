@@ -1,0 +1,319 @@
+react-dom.development.js:38560 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+capture.js:47 [CategoriesContext] No user, clearing categories
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
+capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
+capture.js:47 📊 [ComprasPageClient] Today quotations: Object
+capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 1
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
+capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
+capture.js:47 🎯 [ComprasPageClient] Active quotations count: 0
+capture.js:47 🔎 [ComprasPageClient] Has active today? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 1
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🧹 [ComprasPageClient] Clearing list data (no quotation selected)
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⚠️ [ComprasPageClient] No quotation to auto-select
+capture.js:47 [CategoriesContext] Setting up real-time listener for user: eSHP0qXE50OhyB84NYqdp1P7ofv1
+capture.js:47 [CategoriesContext] Setting up real-time listener for user: eSHP0qXE50OhyB84NYqdp1P7ofv1
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Sun Oct 19 2025 17:20:13 GMT-0300 (Hora padrão de Brasília)
+capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
+capture.js:47 ➕ [ComprasPageClient] Adding virtual to filtered (all closed or empty). Total: 1
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🧹 [ComprasPageClient] Clearing list data (no quotation selected)
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ✨ [ComprasPageClient] Auto-selecting first active quotation: nova-cotacao
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: nova-cotacao
+capture.js:47 🆕 [ComprasPageClient] Handling nova-cotacao selection
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔥 [ComprasPageClient] Firestore snapshot received: Object
+capture.js:47 [CategoriesContext] Received snapshot with 14 categories
+capture.js:47 [CategoriesContext] Received snapshot with 14 categories
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [useShoppingList] useEffect triggered: Object
+capture.js:47 [useShoppingList] specificListId is undefined - forcing empty new list
+capture.js:47 ⏰ [ComprasPageClient] Checking for expired quotations...
+capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
+capture.js:47 📊 [ComprasPageClient] Today quotations: Object
+capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 3
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Sun Oct 19 2025 17:20:13 GMT-0300 (Hora padrão de Brasília)
+capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
+capture.js:47 ➕ [ComprasPageClient] Adding virtual to filtered (all closed or empty). Total: 2
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: nova-cotacao
+capture.js:47 🆕 [ComprasPageClient] Handling nova-cotacao selection
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [useShoppingList] useEffect triggered: Object
+capture.js:47 [useShoppingList] specificListId is undefined - forcing empty new list
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 💾 [ComprasPageClient] handleListSaved called: Object
+capture.js:47 ➡️ [ComprasPageClient] Navigating to iniciar-cotacao tab
+capture.js:47 🔄 [ComprasPageClient] handleTabChange called: Object
+capture.js:47 🌐 [ComprasPageClient] Updating URL to: /compras?tab=iniciar-cotacao&date=2025-10-20&listId=1760905222583
+capture.js:47 📊 [ComprasPageClient] Tab transition state: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
+capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
+capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
+capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
+capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
+capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by listId: 1760905222583
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
+capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
+capture.js:47 🎯 [ComprasPageClient] Active quotations count: 0
+capture.js:47 🔎 [ComprasPageClient] Has active today? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 1
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
+capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [useShoppingList] useEffect triggered: Object
+capture.js:47 [useShoppingList] Loading specific list: 1760905222583
+capture.js:47 [useShoppingList] fetchSpecificList called with: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 [NewShoppingListClient] Props received: Object
+capture.js:47 [NewShoppingListClient] useShoppingList results: Object
+capture.js:47 [useShoppingList] useEffect triggered: Object
+capture.js:47 [useShoppingList] Loading specific list: 1760905222583
+capture.js:47 [useShoppingList] fetchSpecificList called with: Object
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
+capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
+capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
+capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
+capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
+capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by listId: 1760905222583
+capture.js:47 [useShoppingList] Firestore returned for specific listId: Object
+capture.js:47 [useShoppingList] Loading specific list: Object
+capture.js:47 [useShoppingList] Specific list items loaded: Object
+capture.js:47 [useShoppingList] Firestore returned for specific listId: Object
+capture.js:47 [useShoppingList] Loading specific list: Object
+capture.js:47 [useShoppingList] Specific list items loaded: Object
+capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎬 [ComprasPageClient] justSavedListRef cleared - auto-select re-enabled
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🔥 [ComprasPageClient] Firestore snapshot received: Object
+capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
+capture.js:47 📦 [SelecionarFornecedoresTab] Quotation data: Object
+capture.js:47 🎯 [SelecionarFornecedoresTab] Modal decision: Object
+capture.js:47 ⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (no quotation selected or nova-cotacao)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
+capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 ⏰ [ComprasPageClient] Checking for expired quotations...
+capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
+capture.js:47 📊 [ComprasPageClient] Today quotations: Object
+capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 4
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
+capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
+capture.js:47 🎯 [ComprasPageClient] Active quotations count: 1
+capture.js:47 🔎 [ComprasPageClient] Has active today? false
+capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 2
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (on iniciar-cotacao tab)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (on iniciar-cotacao tab)
+capture.js:47 🚀 [ComprasPageClient] handleQuotationStarted called: Object
+capture.js:47 ➡️ [ComprasPageClient] Navigating to gestao tab (step 4)
+capture.js:47 🔄 [ComprasPageClient] handleTabChange called: Object
+capture.js:47 🌐 [ComprasPageClient] Updating URL to: /compras?tab=gestao
+capture.js:47 📊 [ComprasPageClient] Tab transition state: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
+capture.js:47 ❌ [ComprasPageClient] No quotation selected
+capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 🎯 [ComprasPageClient] Auto-selecting newly created quotation: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso3: TRUE Object
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockGestao: TRUE Object
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Mon Oct 20 2025 00:00:00 GMT-0300 (Hora padrão de Brasília)
+capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
+capture.js:47 ✅ [ComprasPageClient] Using filtered as-is (has active). Count: 2
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
+capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
+capture.js:47 🔄 [ComprasPageClient] Status check: Object
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
+capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
+capture.js:47 🔄 [ComprasPageClient] Status check: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
+capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
+capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
+capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
+capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
+capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
+capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by selectedQuotationId: M6i7MsLotuejb5UCAAMr
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
+capture.js:47 📦 [SelecionarFornecedoresTab] Quotation data: Object
+capture.js:47 🎯 [SelecionarFornecedoresTab] Modal decision: Object
+capture.js:47 ✅ [SelecionarFornecedoresTab] SHOWING WARNING MODAL for quotation: M6i7MsLotuejb5UCAAMr
+capture.js:47 💾 [SelecionarFornecedoresTab] Saving to sessionStorage: Object
+capture.js:47 ✅ [SelecionarFornecedoresTab] Verification - sessionStorage now contains: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks","M6i7MsLotuejb5UCAAMr"]
+capture.js:47 📝 [SelecionarFornecedoresTab] Updated hasShownWarning Set: Array(3)
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
+capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
+capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
+capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
+capture.js:47 🔄 [ComprasPageClient] Status check: Object
+capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
+capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+capture.js:47 🎬 [ComprasPageClient] justStartedQuotationRef cleared - auto-select re-enabled
+capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
+capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object

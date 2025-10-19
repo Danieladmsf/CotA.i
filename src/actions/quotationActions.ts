@@ -56,7 +56,6 @@ export async function startQuotation(
     }
 
     // 2. Create the new quotation document
-    console.log(`[startQuotation] Creating quotation for listId: ${listId} with ${supplierIds.length} suppliers:`, supplierIds);
     const newQuotationRef = db.collection(QUOTATIONS_COLLECTION).doc();
     mainBatch.set(newQuotationRef, {
       shoppingListDate: Timestamp.fromDate(shoppingListDate),

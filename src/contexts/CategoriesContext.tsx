@@ -36,7 +36,6 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     setErrorCategories(null);
 
     try {
-      console.log('[CategoriesContext] Refreshing categories for user:', user.uid);
       // The real-time listener will handle the update
     } catch (error: any) {
       console.error("Error refreshing categories:", error);
@@ -49,13 +48,11 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!user) {
-      console.log('[CategoriesContext] No user, clearing categories');
       setCategories([]);
       setIsLoadingCategories(false);
       return;
     }
 
-    console.log('[CategoriesContext] Setting up real-time listener for user:', user.uid);
     setIsLoadingCategories(true);
     setErrorCategories(null);
 
@@ -68,7 +65,6 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log('[CategoriesContext] Received snapshot with', snapshot.docs.length, 'categories');
         const fetchedCategories: SupplyCategory[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -91,7 +87,6 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     );
 
     return () => {
-      console.log('[CategoriesContext] Cleaning up listener');
       unsubscribe();
     };
   }, [user, toast]);

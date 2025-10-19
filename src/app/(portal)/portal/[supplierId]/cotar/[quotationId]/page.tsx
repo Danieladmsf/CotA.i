@@ -176,15 +176,6 @@ const renderVendorFlowCard = (
 ) => {
   const { currentStep, selectedBrand, packagingType, unitsPerPackage, packageWeight, packagePrice, requiredPackages } = flow;
   
-  console.log('🔍 [renderVendorFlowCard] Flow extraction:', {
-    'flow_raw': flow,
-    'currentStep': currentStep,
-    'packagingType': packagingType,
-    'unitsPerPackage_extracted': unitsPerPackage,
-    'packageWeight_extracted': packageWeight,
-    'requiredPackages_extracted': requiredPackages,
-    'productUnit': product.unit
-  });
 
   const renderStep = () => {
     switch (currentStep) {
@@ -457,27 +448,6 @@ const renderVendorFlowCard = (
           : packagePrice / ((unitsPerPackage || 1) * (packageWeight || 1)); // Para caixa/fardo: preço por caixa / (unidades × peso unitário)
         
         // Calcular quantidade total oferecida
-        console.log('🔍 [Vendor Flow Step 6] Before tempOffer creation:', {
-          requiredPackages,
-          unitsPerPackage,
-          packageWeight,
-          packagingType,
-          isGranel,
-          productUnit: product.unit,
-          expectedCalculation: `${requiredPackages} caixas × ${unitsPerPackage} unid = ${requiredPackages * unitsPerPackage} unid`,
-          'FLOW_DEBUG': {
-            'COMPLETE_FLOW_OBJECT': JSON.stringify(flow, null, 2),
-            'flow.unitsPerPackage': flow.unitsPerPackage,
-            'flow.packageWeight': flow.packageWeight,
-            'WHERE_DOES_UNITS_COME_FROM': 'Checking if flow.unitsPerPackage is correct',
-            'packagingType_analysis': {
-              'flow.packagingType': flow.packagingType,
-              'packagingType_variable': packagingType,
-              'IS_GRANEL': packagingType === 'granel',
-              'isGranel': isGranel
-            }
-          }
-        });
         
         const tempOffer: OfferWithUI = {
           unitsInPackaging: requiredPackages,
@@ -498,25 +468,10 @@ const renderVendorFlowCard = (
           productId: ''
         };
         
-        console.log('🔍 [Vendor Flow Step 6] tempOffer created:', {
-          tempOffer,
-          'PROBLEM_ANALYSIS': {
-            unitsPerPackage_in_tempOffer: tempOffer.unitsPerPackage,
-            unitsPerPackage_from_flow: unitsPerPackage,
-            packageWeight_from_flow: packageWeight,
-            isGranel,
-            'EXPECTED_FOR_AMIDO': 'unitsPerPackage should be 30 for Amido de milho'
-          }
-        });
 
         // Calculate offered quantity for display
         const offeredQuantity = calculateTotalOfferedQuantity(tempOffer, product);
         
-        console.log('🔍 [Vendor Flow Step 6] After calculateTotalOfferedQuantity:', {
-          tempOffer,
-          offeredQuantity,
-          expectedForAmido: `Should be ${requiredPackages} × ${unitsPerPackage} = ${requiredPackages * unitsPerPackage} for Amido de milho`
-        });
 
         // For validation, compare in the same unit as the product
         const offeredAmount = offeredQuantity; // Already calculated in product's unit
@@ -552,7 +507,6 @@ const renderVendorFlowCard = (
             price?: number;
           }
         ) => {
-          console.log('🔧 [Vendor Flow Modal Confirm] Received:', { decision, correctedData });
 
           setVendorFlowDecisions(prev => ({ ...prev, [productId]: { decision, correctedData } }));
           setVendorFlowModalStates(prev => ({ ...prev, [productId]: false }));
@@ -572,7 +526,6 @@ const renderVendorFlowCard = (
               Object.entries(correctedFlowData).filter(([, value]) => value !== undefined)
             );
 
-            console.log('🔧 [Vendor Flow] Passing corrected data directly to completeVendorFlow:', payload);
             await completeVendorFlow(productId, payload);
 
           } else if (decision === 'adjust_to_request') {
@@ -582,7 +535,6 @@ const renderVendorFlowCard = (
             } else {
               requiredPackages = Math.ceil(requestedAmount / unitsPerPackage);
             }
-            console.log('🔧 [Vendor Flow] Adjusting to request, passing new requiredPackages:', requiredPackages);
             await completeVendorFlow(productId, { requiredPackages });
           
           } else if (decision !== 'cancel') {
@@ -597,18 +549,6 @@ const renderVendorFlowCard = (
             {/* Modal for quantity validation */}
             {boxValidation.requiresModal && (
               <>
-                {console.log('🔍 [Vendor Flow Modal] Data being passed to modal:', {
-                  productName: product.name,
-                  requestedQuantity: requestedAmount,
-                  offeredQuantity: offeredAmount,
-                  offeredPackages: offeredBoxes,
-                  unit: product.unit,
-                  unitsPerPackage: unitsPerPackage,
-                  unitWeight: packageWeight,
-                  totalPackagingPrice: packagePrice,
-                  packagingType: isGranel ? 'bulk' : 'closed_package',
-                  boxValidation
-                })}
                 <QuantityShortageModal
                   isOpen={vendorFlowModalOpen}
                   onClose={() => {
@@ -1786,13 +1726,6 @@ export default function SellerQuotationPage() {
   // NOTE: initVendorFlow and updateVendorFlowStep are provided by useGuidedFlows hook as startVendorFlow and updateVendorFlow
 
   const updateVendorFlowStep = (productId: string, field: string, value: any, nextStep?: number) => {
-    console.log('🔍 [updateVendorFlowStep] Called with:', {
-      productId,
-      field,
-      value,
-      nextStep,
-      currentFlow: vendorFlow[`${productId}_vendor_flow`]
-    });
     updateVendorFlow(productId, field as any, value, nextStep);
   };
 
@@ -1803,7 +1736,6 @@ export default function SellerQuotationPage() {
     if (!originalFlow || !currentSupplierDetails || !quotation) return;
 
     const flow = { ...originalFlow, ...correctedFlowData };
-    console.log('✅ [completeVendorFlow] Using flow data:', { original: originalFlow, corrected: correctedFlowData, final: flow });
 
     const product = productsToQuote.find(p => p.id === productId);
     if (!product) return;
@@ -1917,15 +1849,6 @@ export default function SellerQuotationPage() {
       const requestedQuantity = product.quantity;
       const boxValidation = validateBoxQuantityVariation(offeredQuantity, requestedQuantity);
 
-      console.log('📊 [Vendor Flow - Quantity Validation]', {
-        productName: product.name,
-        offeredQuantity,
-        requestedQuantity,
-        isValid: boxValidation.isValid,
-        shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
-        variationType: boxValidation.variationType,
-        variationAmount: boxValidation.variationAmount,
-      });
 
       // Notificar o comprador internamente (sistema de notificações do sino)
       // Don't notify if variationType is 'exact' (no variation)
@@ -1952,10 +1875,6 @@ export default function SellerQuotationPage() {
           });
 
           if (result.success) {
-            console.log('✅ [Vendor Flow] Internal notification created successfully', {
-              productName: product.name,
-              notificationId: result.id,
-            });
           } else {
             console.warn('⚠️ [Vendor Flow] Failed to create notification:', result.error);
           }
@@ -1966,10 +1885,6 @@ export default function SellerQuotationPage() {
           });
         }
       } else {
-        console.log('ℹ️ [Vendor Flow] No notification needed', {
-          shouldNotifyBuyer: boxValidation.shouldNotifyBuyer,
-          hasUserId: !!quotation.userId,
-        });
       }
 
       // Toast de sucesso
@@ -2093,8 +2008,6 @@ export default function SellerQuotationPage() {
         sellerUserId: sellerUser?.uid || currentSupplierDetails.id
       };
 
-      console.log('\n🟢 [completeNewBrandFlow] Enviando para API /api/brand-request');
-      console.log('🟢 [completeNewBrandFlow] Dados:', brandRequestData);
 
       // Enviar para API que cria a brand request E a notificação
       const response = await fetch('/api/brand-request', {
@@ -2111,7 +2024,6 @@ export default function SellerQuotationPage() {
       }
 
       const result = await response.json();
-      console.log('✅ [completeNewBrandFlow] Resposta da API:', result);
 
       // Check for notification error
       if (result.notificationError) {

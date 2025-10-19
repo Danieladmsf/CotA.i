@@ -119,7 +119,6 @@ export function useQuotationExport({
         description: `${ordersToExport.length} pedido(s) exportado(s).`,
       });
 
-      console.log('📄 [PDF Export] PDF gerado:', fileName);
     } catch (error) {
       console.error('❌ [PDF Export] Erro:', error);
       toast({
@@ -216,7 +215,6 @@ export function useQuotationExport({
         description: `${ordersToExport.length} pedido(s) exportado(s).`,
       });
 
-      console.log('📊 [Excel Export] Excel gerado:', fileName);
     } catch (error) {
       console.error('❌ [Excel Export] Erro:', error);
       toast({

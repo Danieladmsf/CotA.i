@@ -22,11 +22,6 @@ export function middleware(request: NextRequest) {
   // Extrair subdomínio
   const subdomain = hostname.split('.')[0];
 
-  console.log('🔒 [Middleware] Verificando acesso:', {
-    hostname,
-    subdomain,
-    pathname,
-  });
 
   // Definir subdomínios permitidos
   const SUPPLIER_SUBDOMAINS = ['fornecedor', 'portal', 'supplier'];

@@ -7,7 +7,6 @@ import type { IncomingMessage } from '@/types';
 const MESSAGES_COLLECTION = 'incoming_messages';
 
 export async function POST(req: NextRequest) {
-  console.log(`[API/send-whatsapp] Received a new POST request.`);
 
   // Check if Firebase Admin is initialized
   if (!isAdminInitialized) {
@@ -20,7 +19,6 @@ export async function POST(req: NextRequest) {
   let requestBody;
   try {
     requestBody = await req.json();
-    console.log(`[API/send-whatsapp] Request body parsed:`, requestBody);
   } catch (error) {
     console.error(`[API/send-whatsapp] Error parsing JSON body:`, error);
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
@@ -36,7 +34,6 @@ export async function POST(req: NextRequest) {
   const cleanedPhoneNumber = String(phoneNumber).replace(/\D/g, '');
 
   try {
-    console.log(`[API/send-whatsapp] Adding message to Firestore outgoing queue for ${cleanedPhoneNumber}...`);
 
     const db = adminDb();
     const messageEntry: Omit<IncomingMessage, 'id'> = {
@@ -51,7 +48,6 @@ export async function POST(req: NextRequest) {
     };
 
     const docRef = await db.collection(MESSAGES_COLLECTION).add(messageEntry);
-    console.log(`[API/send-whatsapp] Message successfully queued with ID: ${docRef.id}`);
 
     return NextResponse.json({ success: true, message: 'Message queued successfully.' });
 

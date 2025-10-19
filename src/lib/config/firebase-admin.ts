@@ -15,12 +15,6 @@ const getAdminDb = () => {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
     // Debug logs to identify missing variables
-    console.log('Firebase Admin Debug:', {
-      projectId: projectId ? '✓ Present' : '✗ Missing',
-      privateKey: privateKey ? '✓ Present' : '✗ Missing',
-      clientEmail: clientEmail ? '✓ Present' : '✗ Missing',
-      nodeEnv: process.env.NODE_ENV
-    });
 
     if (!projectId || !privateKey || !clientEmail) {
       throw new Error('Firebase Admin: Missing required environment variables.');
@@ -35,7 +29,6 @@ const getAdminDb = () => {
       projectId: projectId,
     });
 
-    console.log('Firebase Admin initialized successfully on demand.');
     return admin.firestore();
   } catch (error: any) {
     console.error('Firebase Admin Initialization Error:', error.message);

@@ -67,7 +67,6 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
         });
 
         if (notificationsToFix.length > 0) {
-          console.log(`[QuantityApprovalsTab] Auto-fixing ${notificationsToFix.length} inconsistent notifications`);
 
           // Fix all inconsistent notifications in parallel
           await Promise.all(
@@ -78,7 +77,6 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
                   isRead: true,
                   readAt: Timestamp.now()
                 });
-                console.log(`[QuantityApprovalsTab] Fixed notification ${notif.id} (${notif.productName})`);
               } catch (error) {
                 console.error(`[QuantityApprovalsTab] Failed to fix notification ${notif.id}:`, error);
               }
@@ -329,24 +327,13 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
                     if (!weightPerUnit || isSuspicious) {
                       const suggestions = metadata.suggestions as any;
 
-                      console.log('🔍 DEBUG - Calculating for old notification:', {
-                        adjustedBoxes,
-                        suggestions,
-                        hasFloor: !!suggestions?.floor,
-                        hasCeil: !!suggestions?.ceil,
-                        floorPackages: suggestions?.floor?.packages,
-                        ceilPackages: suggestions?.ceil?.packages,
-                        offeredQuantity: metadata.offeredQuantity
-                      });
 
                       // Try to find the matching suggestion (floor or ceil) based on adjustedBoxes
                       let matchingSuggestion = null;
                       if (suggestions?.floor?.packages === adjustedBoxes) {
                         matchingSuggestion = suggestions.floor;
-                        console.log('✓ Found floor match:', matchingSuggestion);
                       } else if (suggestions?.ceil?.packages === adjustedBoxes) {
                         matchingSuggestion = suggestions.ceil;
-                        console.log('✓ Found ceil match:', matchingSuggestion);
                       }
 
                       if (matchingSuggestion) {
@@ -354,31 +341,25 @@ export default function QuantityApprovalsTab({ quotationId }: { quotationId: str
                         // For example: 90kg / 3 caixas = 30kg per caixa
                         weightPerUnit = matchingSuggestion.totalQuantity / matchingSuggestion.packages;
                         finalQuantity = matchingSuggestion.totalQuantity;
-                        console.log('✓ Calculated from suggestion:', { weightPerUnit, finalQuantity });
                       } else {
                         // Fallback: try to calculate from offeredQuantity
                         const offeredQuantity = metadata.offeredQuantity as number;
-                        console.log('⚠️ No matching suggestion, using fallback');
                         if (offeredQuantity && suggestions) {
                           // Use any available suggestion to get weightPerUnit
                           const anySuggestion = suggestions.floor || suggestions.ceil;
                           if (anySuggestion) {
                             weightPerUnit = anySuggestion.totalQuantity / anySuggestion.packages;
                             finalQuantity = adjustedBoxes * weightPerUnit;
-                            console.log('✓ Calculated from any suggestion:', { weightPerUnit, finalQuantity });
                           } else {
                             weightPerUnit = 1;
                             finalQuantity = adjustedBoxes;
-                            console.log('❌ Using default (1)');
                           }
                         } else {
                           weightPerUnit = 1;
                           finalQuantity = adjustedBoxes;
-                          console.log('❌ Using default (1) - no data');
                         }
                       }
                     } else {
-                      console.log('✓ Using saved metadata:', { weightPerUnit, finalQuantity });
                     }
 
                     const difference = finalQuantity - requestedQuantity;

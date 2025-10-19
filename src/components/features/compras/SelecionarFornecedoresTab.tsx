@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,8 @@ export default function SelecionarFornecedoresTab({
 }: SelecionarFornecedoresTabProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'criar-editar';
 
   const isReadOnly = useMemo(() => quotationStatus === 'Fechada' || quotationStatus === 'Concluída', [quotationStatus]);
 
@@ -76,19 +79,27 @@ export default function SelecionarFornecedoresTab({
 
   // Ref to track if warning has been shown for current quotation to prevent repeated displays
   // Store Set of quotation IDs that have already shown the warning
+  // Use sessionStorage to persist across component unmount/remount within the same session
   const hasShownWarningRef = useRef<Set<string>>(new Set());
 
+  // Initialize from sessionStorage on mount
   useEffect(() => {
-    console.log('🔵 [SelecionarFornecedoresTab] useEffect triggered:', {
-      user: !!user,
-      listId,
-      selectedQuotationId,
-      hasShownWarningCount: hasShownWarningRef.current.size,
-      hasShownWarningIds: Array.from(hasShownWarningRef.current)
-    });
+    try {
+      const stored = sessionStorage.getItem('hasShownQuotationWarning');
+
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        hasShownWarningRef.current = new Set(parsed);
+      } else {
+      }
+    } catch (error) {
+      console.error('❌ [SelecionarFornecedoresTab] Failed to load from sessionStorage:', error);
+    }
+  }, []); // Run only once on mount
+
+  useEffect(() => {
 
     if (!user || (!listId && !selectedQuotationId)) {
-      console.log('⏸️ [SelecionarFornecedoresTab] No user or listId/selectedQuotationId - skipping');
       return;
     }
 
@@ -97,32 +108,20 @@ export default function SelecionarFornecedoresTab({
 
     if (selectedQuotationId) {
       // If a specific quotation is selected, fetch it directly
-      console.log('🔍 [SelecionarFornecedoresTab] Querying by selectedQuotationId:', selectedQuotationId);
       q = query(collectionRef, where('__name__', '==', selectedQuotationId), where('userId', '==', user.uid));
     } else if (listId) {
       // Otherwise, look for an active quotation for the given listId
-      console.log('🔍 [SelecionarFornecedoresTab] Querying by listId:', listId);
       q = query(collectionRef, where('listId', '==', listId), where('userId', '==', user.uid), where('status', 'in', ['Aberta', 'Pausada']));
     } else {
       return;
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log('📸 [SelecionarFornecedoresTab] Firestore snapshot received:', {
-        empty: snapshot.empty,
-        docsCount: snapshot.docs.length
-      });
 
       if (!snapshot.empty) {
         const quotationData = snapshot.docs[0].data() as Quotation;
         const quotation = { ...quotationData, id: snapshot.docs[0].id };
 
-        console.log('📦 [SelecionarFornecedoresTab] Quotation data:', {
-          id: quotation.id,
-          status: quotation.status,
-          listId: quotation.listId,
-          selectedQuotationId
-        });
 
         setExistingActiveQuotation(quotation);
 
@@ -163,39 +162,41 @@ export default function SelecionarFornecedoresTab({
         const hasSelectedQuotation = selectedQuotationId !== null && selectedQuotationId !== 'nova-cotacao';
         const isSameQuotation = selectedQuotationId === quotationId;
 
-        console.log('🎯 [SelecionarFornecedoresTab] Modal decision:', {
-          quotationId,
-          isActive,
-          isReadOnly,
-          hasAlreadyShown,
-          hasSelectedQuotation,
-          isSameQuotation,
-          selectedQuotationId,
-          hasShownWarningSet: Array.from(hasShownWarningRef.current)
-        });
+
+        // CRITICAL: Only show modal if we are on the "iniciar-cotacao" tab
+        // This prevents modal from showing when navigating TO gestao tab after creating quotation
+        const isOnCorrectTab = currentTab === 'iniciar-cotacao';
 
         const shouldShowWarning =
           isActive &&
           !isReadOnly &&
           !hasAlreadyShown &&
           hasSelectedQuotation &&
-          isSameQuotation; // Only show when actively working on THIS quotation
+          isSameQuotation &&
+          isOnCorrectTab; // Only show when ON the iniciar-cotacao tab
 
         if (shouldShowWarning) {
-            console.log('✅ [SelecionarFornecedoresTab] SHOWING WARNING MODAL for quotation:', quotationId);
             setIsWarningModalOpen(true);
             hasShownWarningRef.current.add(quotationId); // Add to Set so it won't show again
-            console.log('📝 [SelecionarFornecedoresTab] Updated hasShownWarning Set:', Array.from(hasShownWarningRef.current));
+
+            // Persist to sessionStorage to survive component unmount/remount
+            try {
+              const arrayToSave = Array.from(hasShownWarningRef.current);
+              const jsonString = JSON.stringify(arrayToSave);
+              sessionStorage.setItem('hasShownQuotationWarning', jsonString);
+
+              // Verify it was saved
+              const verification = sessionStorage.getItem('hasShownQuotationWarning');
+            } catch (error) {
+              console.error('❌ [SelecionarFornecedoresTab] Failed to save to sessionStorage:', error);
+            }
+
+        } else if (!isOnCorrectTab) {
         } else if (isActive && hasAlreadyShown) {
-            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (already shown for quotation):', quotationId);
         } else if (isActive && !hasSelectedQuotation) {
-            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (no quotation selected or nova-cotacao)');
         } else if (isActive && !isSameQuotation) {
-            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (different quotation selected)');
         } else if (!isActive) {
-            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (quotation not active)');
         } else if (isReadOnly) {
-            console.log('⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (read-only mode)');
         }
 
       } else {
@@ -206,7 +207,7 @@ export default function SelecionarFornecedoresTab({
     });
 
     return () => unsubscribe();
-  }, [listId, selectedQuotationId, user, isReadOnly]);
+  }, [listId, selectedQuotationId, user, isReadOnly, currentTab]); // Added currentTab to re-evaluate modal logic when tab changes
 
   // Mostrar toast de erro se houver problema ao carregar fornecedores
   useEffect(() => {
@@ -353,26 +354,12 @@ export default function SelecionarFornecedoresTab({
     );
   }
 
-  console.log('🎨 [SelecionarFornecedoresTab] Rendering component:', {
-    selectedQuotationId,
-    listId,
-    shoppingListDate,
-    isWarningModalOpen,
-    hasActiveQuotation,
-    quotationStatus,
-    isReadOnly
-  });
 
   return (
     <>
       <Dialog
         open={isWarningModalOpen}
         onOpenChange={(open) => {
-          console.log('🔔 [SelecionarFornecedoresTab] Modal state changing:', {
-            from: isWarningModalOpen,
-            to: open,
-            selectedQuotationId
-          });
           setIsWarningModalOpen(open);
         }}
       >
@@ -385,7 +372,6 @@ export default function SelecionarFornecedoresTab({
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => {
-              console.log('👆 [SelecionarFornecedoresTab] User clicked "Entendi" button');
               setIsWarningModalOpen(false);
             }}>Entendi</Button>
           </DialogFooter>

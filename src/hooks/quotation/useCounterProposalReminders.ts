@@ -45,10 +45,8 @@ export function useCounterProposalReminders(
         const minutesLeftForMessage = Math.round(REMIND_BEFORE_END_MS / 60000);
 
         if (timeoutDelayMs > 0 && minutesLeftForMessage > 0) {
-          console.log(`[Reminder] Scheduling reminder for ${product.name} (${counterProposalInfo.myBrand}) in ${timeoutDelayMs / 1000}s.`);
 
           const timerId = setTimeout(() => {
-            console.log(`[Reminder] Sending reminder for ${product.name} (${counterProposalInfo.myBrand}).`);
 
             sendCounterProposalReminder(
               currentSupplierDetails,
@@ -70,7 +68,6 @@ export function useCounterProposalReminders(
     const currentTimers = activeTimersRef.current;
     currentTimers.forEach((timerId, reminderKey) => {
       if (!requiredReminders.has(reminderKey)) {
-        console.log(`[Reminder] Clearing obsolete reminder: ${reminderKey}`);
         clearTimeout(timerId);
         currentTimers.delete(reminderKey);
       }
@@ -78,7 +75,6 @@ export function useCounterProposalReminders(
 
     // Cleanup on unmount
     return () => {
-      console.log("[Reminder] Component unmounting. Clearing all active timers.");
       const timers = activeTimersRef.current;
       timers.forEach(clearTimeout);
       timers.clear();

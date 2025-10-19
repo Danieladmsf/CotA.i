@@ -50,13 +50,6 @@ export default function NewShoppingListClient({
   const { toast } = useToast();
 
   // Log props received
-  console.log('[NewShoppingListClient] Props received:', {
-    selectedDate: selectedDate ? selectedDate.toISOString() : null,
-    hasActiveQuotation,
-    quotationStatus,
-    listId,
-    userId: user?.uid
-  });
 
   // ========== REFS ==========
   const quantityInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -120,19 +113,6 @@ export default function NewShoppingListClient({
   );
 
   // Log hook results
-  console.log('[NewShoppingListClient] useShoppingList results:', {
-    itemsCount: currentListItems.length,
-    currentListId,
-    currentMode,
-    isLoading: loadingList,
-    pendingItemsCount,
-    items: currentListItems.map(item => ({
-      supplyId: item.supplyId,
-      name: item.name,
-      status: item.status,
-      quantity: item.quantity
-    }))
-  });
 
   // ========== HANDLERS ==========
 

@@ -153,11 +153,6 @@ export default function CompleteSupplierRegistrationPage() {
         return;
     }
 
-    console.log('📝 [Registration] Dados do formulário recebidos:', {
-        empresa: data.empresa,
-        hasFotoFile: !!data.fotoFile,
-        fotoFileName: data.fotoFile?.name
-    });
 
     form.setValue("empresa", data.empresa, { shouldValidate: true }); // Trigger validation display
 
@@ -168,27 +163,16 @@ export default function CompleteSupplierRegistrationPage() {
         let fotoHint = supplier.fotoHint || 'generic logo';
 
         if (fotoFile) {
-            console.log('📸 [Upload] Iniciando upload do arquivo:', {
-                name: fotoFile.name,
-                type: fotoFile.type,
-                size: fotoFile.size
-            });
             toast({ title: "Enviando logo...", description: "Aguarde um momento." });
             try {
                 const response = await fetch(`/api/upload?filename=${encodeURIComponent(fotoFile.name)}`, {
                   method: 'POST',
                   body: fotoFile,
                 });
-                console.log('📸 [Upload] Resposta da API:', {
-                    status: response.status,
-                    ok: response.ok
-                });
                 const newBlob = await response.json();
-                console.log('📸 [Upload] Blob retornado:', newBlob);
                 if (!response.ok) throw new Error(newBlob.message || 'Falha no upload da imagem.');
                 fotoUrl = newBlob.url;
                 fotoHint = "custom logo";
-                console.log('✅ [Upload] Upload concluído com sucesso:', fotoUrl);
             } catch (uploadError: any) {
                 console.error("❌ [Upload] FALHA NO UPLOAD DA LOGO:", uploadError);
                 toast({
@@ -199,7 +183,6 @@ export default function CompleteSupplierRegistrationPage() {
                 });
             }
         } else {
-            console.log('⚠️ [Upload] Nenhum arquivo selecionado');
         }
 
         // 2. Hash the PIN for security
@@ -233,7 +216,6 @@ export default function CompleteSupplierRegistrationPage() {
         }
 
         // 4. Update the supplier document
-        console.log('📝 [Registration] Data to update:', dataToUpdate);
         const docRef = doc(db, FORNECEDORES_COLLECTION, supplier.id);
         await updateDoc(docRef, dataToUpdate);
 

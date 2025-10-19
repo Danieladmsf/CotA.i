@@ -29,7 +29,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   // Add global navigation error handler
   useEffect(() => {
     const handleRouteChange = () => {
-      console.log('🚀 [ROUTER] Route change detected:', window.location.pathname);
     };
 
     const handleError = (event: ErrorEvent) => {

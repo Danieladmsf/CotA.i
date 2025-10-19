@@ -85,13 +85,8 @@ export function useShoppingList(
 
   // Buscar lista específica por listId
   const fetchSpecificList = useCallback(async (listId: string) => {
-    console.log('[useShoppingList] fetchSpecificList called with:', {
-      listId,
-      userId
-    });
 
     if (!userId) {
-      console.log('[useShoppingList] No userId, skipping fetch');
       setIsLoading(false);
       setCurrentListItems([]);
       return;
@@ -112,16 +107,6 @@ export function useShoppingList(
       );
 
       const snapshot = await getDocs(specificListQuery);
-      console.log('[useShoppingList] Firestore returned for specific listId:', {
-        docsCount: snapshot.docs.length,
-        listId,
-        docs: snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name,
-          status: doc.data().status,
-          listId: doc.data().listId
-        }))
-      });
 
       if (snapshot.docs.length > 0) {
         const listItems = snapshot.docs.map(docSnap => ({
@@ -129,15 +114,6 @@ export function useShoppingList(
           ...docSnap.data()
         } as ShoppingListItem));
 
-        console.log('[useShoppingList] Loading specific list:', {
-          listId,
-          itemsInList: listItems.length,
-          items: listItems.map(item => ({
-            id: item.id,
-            name: item.name,
-            status: item.status
-          }))
-        });
 
         setCurrentMode('edit');
         setCurrentListId(listId);
@@ -158,19 +134,10 @@ export function useShoppingList(
           categoryId: item.categoryId,
         } as NewListItem));
 
-        console.log('[useShoppingList] Specific list items loaded:', {
-          totalItems: fetchedItems.length,
-          items: fetchedItems.map(item => ({
-            name: item.name,
-            status: item.status,
-            quantity: item.quantity
-          }))
-        });
 
         setCurrentListItems(fetchedItems);
         setOriginalListItems(fetchedItems);
       } else {
-        console.log('[useShoppingList] No items found for listId:', listId);
         setCurrentMode('new');
       }
 
@@ -187,13 +154,8 @@ export function useShoppingList(
 
   // Buscar lista existente para a data selecionada
   const fetchExistingItemsForDate = useCallback(async (date: Date) => {
-    console.log('[useShoppingList] fetchExistingItemsForDate called with:', {
-      date: date.toISOString(),
-      userId
-    });
 
     if (!userId) {
-      console.log('[useShoppingList] No userId, skipping fetch');
       setIsLoading(false);
       setCurrentListItems([]);
       return;
@@ -209,10 +171,6 @@ export function useShoppingList(
       const startOfSelectedDay = startOfDay(date);
       const endOfSelectedDay = endOfDay(date);
 
-      console.log('[useShoppingList] Querying Firestore with range:', {
-        start: startOfSelectedDay.toISOString(),
-        end: endOfSelectedDay.toISOString()
-      });
 
       // Buscar todos os itens do dia
       const allItemsForDayQuery = query(
@@ -224,16 +182,6 @@ export function useShoppingList(
       );
 
       const snapshot = await getDocs(allItemsForDayQuery);
-      console.log('[useShoppingList] Firestore returned:', {
-        docsCount: snapshot.docs.length,
-        docs: snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name,
-          status: doc.data().status,
-          listId: doc.data().listId,
-          listDate: doc.data().listDate?.toDate().toISOString()
-        }))
-      });
 
       const allItems = snapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -253,24 +201,11 @@ export function useShoppingList(
       // Encontrar a lista mais recente
       const sortedListIds = Object.keys(lists).sort((a, b) => parseInt(b) - parseInt(a));
 
-      console.log('[useShoppingList] Grouped lists:', {
-        listCount: sortedListIds.length,
-        listIds: sortedListIds
-      });
 
       if (sortedListIds.length > 0) {
         const loadedListId = sortedListIds[0];
         const listToLoad = lists[loadedListId];
 
-        console.log('[useShoppingList] Loading list:', {
-          listId: loadedListId,
-          itemsInList: listToLoad.length,
-          items: listToLoad.map(item => ({
-            id: item.id,
-            name: item.name,
-            status: item.status
-          }))
-        });
 
         setCurrentMode('edit');
         setCurrentListId(loadedListId);
@@ -293,19 +228,10 @@ export function useShoppingList(
           } as NewListItem));
           // Não filtrar por status "Encerrado" - queremos ver histórico completo
 
-        console.log('[useShoppingList] Items loaded (no filter applied):', {
-          totalItems: fetchedItems.length,
-          items: fetchedItems.map(item => ({
-            name: item.name,
-            status: item.status,
-            quantity: item.quantity
-          }))
-        });
 
         setCurrentListItems(fetchedItems);
         setOriginalListItems(fetchedItems);
       } else {
-        console.log('[useShoppingList] No lists found for this date');
         setCurrentMode('new');
       }
 
@@ -322,15 +248,9 @@ export function useShoppingList(
 
   // Efeito para carregar lista quando data ou listId específico muda
   useEffect(() => {
-    console.log('[useShoppingList] useEffect triggered:', {
-      specificListId,
-      selectedDate: selectedDate?.toISOString(),
-      hasValidDate: selectedDate && isValidDate(selectedDate)
-    });
 
     // Prioridade 1: Se tiver specificListId (string), carregar essa lista específica
     if (specificListId) {
-      console.log('[useShoppingList] Loading specific list:', specificListId);
       fetchSpecificList(specificListId);
       return;
     }
@@ -338,7 +258,6 @@ export function useShoppingList(
     // Se specificListId === undefined (não null), significa modo "nova lista vazia"
     // Não carregar nada por data
     if (specificListId === undefined) {
-      console.log('[useShoppingList] specificListId is undefined - forcing empty new list');
       setCurrentListItems([]);
       setOriginalListItems([]);
       setCurrentMode('new');
@@ -348,10 +267,8 @@ export function useShoppingList(
 
     // Prioridade 2: Carregar por data se disponível (apenas quando specificListId === null)
     if (selectedDate && isValidDate(selectedDate)) {
-      console.log('[useShoppingList] Loading by date:', selectedDate.toISOString());
       fetchExistingItemsForDate(selectedDate);
     } else {
-      console.log('[useShoppingList] No date or listId - clearing list');
       setCurrentListItems([]);
       setOriginalListItems([]);
       setCurrentMode('new');

@@ -10,7 +10,6 @@ import { createNotification } from './notificationService';
  */
 export async function createSampleNotifications(userId: string) {
   try {
-    console.log('🧪 Creating sample notifications for user:', userId);
     
     const notifications = [
       {
@@ -48,7 +47,6 @@ export async function createSampleNotifications(userId: string) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    console.log('✅ Sample notifications created successfully');
     return { success: true, created: results.length };
     
   } catch (error: any) {

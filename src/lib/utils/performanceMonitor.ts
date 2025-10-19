@@ -94,12 +94,9 @@ export class FirebasePerformanceMonitor {
 
     for (const [queryId, metrics] of this.metrics) {
       console.group(`Query: ${queryId}`);
-      console.log(`Execuções: ${metrics.length}`);
-      console.log(`Tempo médio: ${this.getAverageTime(queryId)}ms`);
       
       const worst = this.getWorstPerformance(queryId);
       if (worst) {
-        console.log(`Pior execução: ${worst.duration}ms em ${worst.timestamp}`);
       }
       
       const performanceDistribution = metrics.reduce((acc, metric) => {
@@ -107,7 +104,6 @@ export class FirebasePerformanceMonitor {
         return acc;
       }, {} as Record<string, number>);
       
-      console.log('Distribuição de performance:', performanceDistribution);
       console.groupEnd();
     }
     

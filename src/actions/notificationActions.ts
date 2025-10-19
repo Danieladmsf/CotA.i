@@ -180,23 +180,12 @@ export async function sendQuantityVariationNotification(
     },
     userId: string
 ): Promise<{ success: boolean; error?: string }> {
-    console.log('🔔 [sendQuantityVariationNotification] START', {
-        userId,
-        supplierName: notificationData.supplierName,
-        productName: notificationData.productName,
-        brandName: notificationData.brandName,
-        requestedQty: notificationData.requestedQuantity,
-        offeredQty: notificationData.offeredQuantity,
-        variationType: notificationData.variationType,
-        buyerInfoProvided: !!buyerInfo.whatsapp,
-    });
 
     // Se WhatsApp não foi fornecido, buscar do Firestore (server-side)
     let buyerWhatsApp = buyerInfo.whatsapp;
     let buyerName = buyerInfo.name || 'Comprador';
 
     if (!buyerWhatsApp) {
-        console.log('📞 [sendQuantityVariationNotification] Fetching buyer WhatsApp from database for userId:', userId);
 
         try {
             const db = adminDb();
@@ -211,11 +200,6 @@ export async function sendQuantityVariationNotification(
             buyerWhatsApp = settingsData?.buyer_whatsapp_number;
             buyerName = settingsData?.buyer_name || 'Comprador';
 
-            console.log('✅ [sendQuantityVariationNotification] Buyer info fetched:', {
-                hasWhatsApp: !!buyerWhatsApp,
-                buyerName,
-                whatsAppLength: buyerWhatsApp?.length || 0,
-            });
         } catch (fetchError: any) {
             console.error('❌ [sendQuantityVariationNotification] Error fetching buyer config:', {
                 error: fetchError.message,
@@ -243,15 +227,9 @@ export async function sendQuantityVariationNotification(
         `Variação: *${variationSign}${notificationData.variationPercentage.toFixed(1)}%* (${variationText} do pedido)\n\n` +
         `⚠️ Por favor, revise se esta variação é aceitável para sua operação.`;
 
-    console.log('📝 [sendQuantityVariationNotification] Message prepared:', {
-        messageLength: message.length,
-        buyerWhatsApp,
-        userId,
-    });
 
     try {
         await queueMessageForSending(buyerWhatsApp, message, userId, notificationData.supplierName);
-        console.log('✅ [sendQuantityVariationNotification] Message queued successfully');
         return { success: true };
     } catch (error: any) {
         console.error('❌ [sendQuantityVariationNotification] Error queuing message:', {

@@ -47,14 +47,12 @@ class FirestoreListenerManager {
       existing.refCount++;
       existing.lastUsed = Date.now();
 
-      console.log(`♻️ [FirestoreManager] Reusing listener: ${key} (refs: ${existing.refCount})`);
 
       // Return a function that decrements ref count
       return () => this.unsubscribe(key);
     }
 
     // Create new listener
-    console.log(`🔗 [FirestoreManager] Creating listener: ${key}`);
 
     const unsubscribe = onSnapshot(
       query,
@@ -84,12 +82,10 @@ class FirestoreListenerManager {
     listener.refCount--;
     listener.lastUsed = Date.now();
 
-    console.log(`🔓 [FirestoreManager] Unsubscribed from: ${key} (refs: ${listener.refCount})`);
 
     // If no more references, schedule for cleanup
     if (listener.refCount <= 0) {
       // Don't immediately unsubscribe - keep for a bit in case of re-subscription
-      console.log(`⏳ [FirestoreManager] Scheduling cleanup for: ${key}`);
     }
   }
 
@@ -99,7 +95,6 @@ class FirestoreListenerManager {
   forceCleanup(key: string): void {
     const listener = this.listeners.get(key);
     if (listener) {
-      console.log(`🗑️ [FirestoreManager] Force cleaning: ${key}`);
       listener.unsubscribe();
       this.listeners.delete(key);
     }
@@ -122,14 +117,12 @@ class FirestoreListenerManager {
     toRemove.forEach(key => {
       const listener = this.listeners.get(key);
       if (listener) {
-        console.log(`🧹 [FirestoreManager] Cleaning up idle listener: ${key}`);
         listener.unsubscribe();
         this.listeners.delete(key);
       }
     });
 
     if (toRemove.length > 0) {
-      console.log(`✨ [FirestoreManager] Cleaned up ${toRemove.length} idle listeners`);
     }
   }
 
@@ -139,7 +132,6 @@ class FirestoreListenerManager {
   private startCleanupCycle(): void {
     this.cleanupInterval = setInterval(() => {
       this.cleanupIdleListeners();
-      console.log(`📊 [FirestoreManager] Active listeners: ${this.listeners.size}`);
     }, this.CLEANUP_INTERVAL);
   }
 
@@ -147,7 +139,6 @@ class FirestoreListenerManager {
    * Cleanup all listeners and stop cleanup cycle
    */
   cleanup(): void {
-    console.log(`🛑 [FirestoreManager] Cleaning up all ${this.listeners.size} listeners`);
 
     this.listeners.forEach((listener, key) => {
       listener.unsubscribe();

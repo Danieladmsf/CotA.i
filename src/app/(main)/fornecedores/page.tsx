@@ -481,11 +481,8 @@ export default function FornecedoresPage() {
   };
 
   const handleOpenLinkModal = (fornecedor: Fornecedor) => {
-    console.log('Opening link modal for:', fornecedor);
-    console.log('isLinkModalOpen state before setting:', isLinkModalOpen);
     setSelectedSupplierForLink(fornecedor);
     setIsLinkModalOpen(true);
-    console.log('isLinkModalOpen state after setting:', true);
   };
 
   const handleSendLinkViaWhatsApp = async (supplier: Fornecedor, link: string) => {

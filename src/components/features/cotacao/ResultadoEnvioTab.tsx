@@ -65,23 +65,11 @@ export default function ResultadoEnvioTab({
 
   // Agrupar produtos por fornecedor (melhor oferta)
   const supplierOrders = useMemo((): SupplierOrder[] => {
-    console.log('📦 [ResultadoEnvioTab] Processando dados:', {
-      totalProducts: products.length,
-      totalOffers: offers.size,
-      quotationStatus: quotation.status,
-      productsIds: products.map(p => p.id),
-      offersKeys: Array.from(offers.keys()),
-    });
 
     const ordersBySupplier = new Map<string, SupplierOrder>();
 
     products.forEach(product => {
       const productOffers = offers.get(product.id) || [];
-      console.log(`📦 [ResultadoEnvioTab] Produto ${product.name}:`, {
-        productId: product.id,
-        totalOffers: productOffers.length,
-        validOffers: productOffers.filter(o => o.pricePerUnit > 0).length,
-      });
       const validOffers = productOffers.filter(o => o.pricePerUnit > 0);
 
       if (validOffers.length === 0) return;
@@ -126,10 +114,6 @@ export default function ResultadoEnvioTab({
       b.totalValue - a.totalValue
     );
 
-    console.log('📦 [ResultadoEnvioTab] Resultado final:', {
-      totalSuppliers: result.length,
-      suppliers: result.map(s => ({ name: s.supplierName, items: s.items.length, total: s.totalValue })),
-    });
 
     return result;
   }, [products, offers, suppliers]);
@@ -201,26 +185,14 @@ export default function ResultadoEnvioTab({
   };
 
   const handleSendToSuppliers = () => {
-    console.log('🔘 [ResultadoEnvioTab] Botão "Enviar" clicado:', {
-      selectedCount: selectedSuppliers.size,
-      selectedIds: Array.from(selectedSuppliers),
-    });
     sendToSuppliers(selectedSuppliers);
   };
 
   const handleExportPDF = () => {
-    console.log('🔘 [ResultadoEnvioTab] Botão "Exportar PDF" clicado:', {
-      selectedCount: selectedSuppliers.size,
-      selectedIds: Array.from(selectedSuppliers),
-    });
     exportToPDF();
   };
 
   const handleExportExcel = () => {
-    console.log('🔘 [ResultadoEnvioTab] Botão "Exportar Excel" clicado:', {
-      selectedCount: selectedSuppliers.size,
-      selectedIds: Array.from(selectedSuppliers),
-    });
     exportToExcel();
   };
 

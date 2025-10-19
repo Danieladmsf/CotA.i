@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
 
     await bucket.setCorsConfiguration(corsConfiguration);
 
-    console.log(`CORS configuration set for bucket ${bucketName}`);
     return NextResponse.json({ success: true, message: `CORS configuration updated successfully for bucket ${bucketName}.` });
   } catch (error: any) {
     console.error('Error setting CORS configuration:', error);

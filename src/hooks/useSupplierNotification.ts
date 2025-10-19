@@ -113,7 +113,6 @@ export function useSupplierNotification({
           });
 
           successCount++;
-          console.log(`✅ Mensagem adicionada à fila para ${order.supplierName}`);
         } catch (error) {
           console.error(`❌ Erro ao enviar para ${order.supplierName}:`, error);
           failedSuppliers.push(order.supplierName);
@@ -135,12 +134,6 @@ export function useSupplierNotification({
         });
       }
 
-      console.log('📤 [Send to Suppliers] Resumo:', {
-        quotationId: quotation.id,
-        success: successCount,
-        failed: failedSuppliers.length,
-        failedSuppliers,
-      });
 
       return successCount > 0;
     } catch (error) {

@@ -122,7 +122,6 @@ export default function SupplierPortalPage() {
       // Close expired quotations
       for (const expiredQuotation of quotationsToUpdate) {
         try {
-          console.log(`[Portal] Auto-closing expired quotation ${expiredQuotation.id}`);
           const quotationRef = doc(db, "quotations", expiredQuotation.id);
           await updateDoc(quotationRef, { status: "Fechada" });
         } catch (error) {
@@ -151,7 +150,6 @@ export default function SupplierPortalPage() {
   // Voice assistant welcome message
   useEffect(() => {
     if (!isLoading && supplier && !hasSpokenWelcome) {
-      console.log('[Voice] Portal welcome - triggering speech');
       const supplierName = supplier.empresa || 'Fornecedor';
       const openQuotationsActive = openQuotations.filter(q => q.status === 'Aberta');
 

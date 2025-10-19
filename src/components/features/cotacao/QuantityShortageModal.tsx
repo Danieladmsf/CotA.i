@@ -68,7 +68,6 @@ export default function QuantityShortageModal({
   variationPercentage,
   offeredPackages
 }: QuantityShortageModalProps) {
-  console.log('variationPercentage in modal:', variationPercentage);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showCorrectionInputs, setShowCorrectionInputs] = useState(false);
 
@@ -135,19 +134,15 @@ export default function QuantityShortageModal({
 
   const handleConfirm = () => {
     if (selectedOption === 'typing_error') {
-      console.log('🔧 [Modal] Sending corrected data:', correctedData);
       onConfirm('typing_error', correctedData);
     } else if (selectedOption === 'buyer_approval_excess') {
-      console.log('🔧 [Modal] Sending excess approval with corrected data:', correctedData);
       onConfirm('buyer_approval_excess', correctedData);
     } else if (selectedOption) {
-      console.log('🔧 [Modal] Sending decision without corrected data:', selectedOption);
       onConfirm(selectedOption as 'stock_shortage' | 'typing_error' | 'buyer_approval_excess');
     }
   };
 
   const handleOptionChange = (value: string) => {
-    console.log('🔄 [Option Change]', { value, showCorrectionInputs, selectedOption });
     setSelectedOption(value);
     if (value === 'typing_error') {
       setShowCorrectionInputs(true);
@@ -155,10 +150,8 @@ export default function QuantityShortageModal({
       // Manter inputs visíveis quando seleciona opção de excesso
       // (fornecedor já corrigiu os valores, está apenas escolhendo enviar para aprovação)
       setShowCorrectionInputs(true);
-      console.log('✅ [Option Change] Mantendo inputs visíveis para buyer_approval_excess');
     } else {
       setShowCorrectionInputs(false);
-      console.log('❌ [Option Change] Escondendo inputs para:', value);
     }
   };
 
