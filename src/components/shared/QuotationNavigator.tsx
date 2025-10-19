@@ -154,12 +154,6 @@ export default function QuotationNavigator({
               </div>
             )}
 
-            {showBadgeInfo && !selectedDate && allQuotations.length > 0 && !selectedQuotationId && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
-                Mostrando {Math.min(filteredQuotations.length, 10)} mais recentes de {allQuotations.length} total
-              </Badge>
-            )}
-
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
@@ -188,7 +182,38 @@ export default function QuotationNavigator({
                 disabled={isLoading || filteredQuotations.length === 0}
               >
                 <SelectTrigger className="flex-1 input-modern text-sm min-w-[250px]">
-                  <SelectValue placeholder={isLoading ? "Carregando..." : "Selecione uma Cotação"} />
+                  <SelectValue placeholder={isLoading ? "Carregando..." : "Selecione uma Cotação"}>
+                    {selectedQuotationId && (() => {
+                      const selected = filteredQuotations.find(q => q.id === selectedQuotationId);
+                      if (!selected) return "Selecione uma Cotação";
+
+                      // Handle virtual "nova-cotacao"
+                      if (selected.id === 'nova-cotacao') {
+                        const quotationsOnSameDay = allQuotations.filter(q =>
+                          q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selected.shoppingListDate.toDate())
+                        );
+                        const nextNumber = quotationsOnSameDay.length + 1;
+                        return `Nova cotação nº ${nextNumber} de ${format(selected.shoppingListDate.toDate(), "dd/MM/yy")}`;
+                      }
+
+                      // Handle regular quotations
+                      const quotationsOnSameDay = allQuotations.filter(q =>
+                         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selected.shoppingListDate.toDate())
+                      );
+
+                      const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
+                        const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
+                        const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
+                        return aTime - bTime;
+                      });
+
+                      const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === selected.id) + 1;
+
+                      return selected.createdAt && selected.shoppingListDate
+                        ? `Cotação nº ${quotationNumber} de ${format((selected.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((selected.createdAt as any).toDate(), "HH:mm")}) - ${selected.status}`
+                        : `Cotação de ${selected.shoppingListDate ? format((selected.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${selected.status})`;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="card-professional">
                   {filteredQuotations.length === 0 && !isLoading &&

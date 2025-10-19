@@ -328,14 +328,25 @@ export function useShoppingList(
       hasValidDate: selectedDate && isValidDate(selectedDate)
     });
 
-    // Prioridade 1: Se tiver specificListId, carregar essa lista específica
+    // Prioridade 1: Se tiver specificListId (string), carregar essa lista específica
     if (specificListId) {
       console.log('[useShoppingList] Loading specific list:', specificListId);
       fetchSpecificList(specificListId);
       return;
     }
 
-    // Prioridade 2: Carregar por data se disponível
+    // Se specificListId === undefined (não null), significa modo "nova lista vazia"
+    // Não carregar nada por data
+    if (specificListId === undefined) {
+      console.log('[useShoppingList] specificListId is undefined - forcing empty new list');
+      setCurrentListItems([]);
+      setOriginalListItems([]);
+      setCurrentMode('new');
+      setIsLoading(false);
+      return;
+    }
+
+    // Prioridade 2: Carregar por data se disponível (apenas quando specificListId === null)
     if (selectedDate && isValidDate(selectedDate)) {
       console.log('[useShoppingList] Loading by date:', selectedDate.toISOString());
       fetchExistingItemsForDate(selectedDate);

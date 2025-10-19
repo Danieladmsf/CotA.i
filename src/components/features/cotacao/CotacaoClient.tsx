@@ -192,22 +192,34 @@ export default function CotacaoClient() {
     }
     closingQuotationsRef.current.add(quotationId);
 
+    // Optimistic UI update - atualiza o status localmente antes da resposta do servidor
+    setActiveQuotationDetails(prev => prev ? { ...prev, status: 'Fechada' } : null);
+
     const result = await closeQuotationAndItems(quotationId, user.uid);
-    
+
     if (result.success && (result.updatedItemsCount ?? 0) > 0) {
       toast({
         title: "Cotação Encerrada Automaticamente",
-        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como \'Encerrado\'.`,
+        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como 'Encerrado'.`,
       });
+
+      // Limpa seleção após 2 segundos para permitir visualização do status
+      setTimeout(() => {
+        setSelectedQuotationId("");
+        setActiveQuotationDetails(null);
+        router.replace('/cotacao', { scroll: false });
+      }, 2000);
     } else if (!result.success) {
-     toast({
-      title: "Erro ao fechar cotação",
-      description: result.error || "Não foi possível atualizar o status da cotação e dos itens.",
-      variant: "destructive",
-    });
+      // Reverte optimistic update em caso de erro
+      setActiveQuotationDetails(prev => prev ? { ...prev, status: 'Aberta' } : null);
+      toast({
+        title: "Erro ao fechar cotação",
+        description: result.error || "Não foi possível atualizar o status da cotação e dos itens.",
+        variant: "destructive",
+      });
     }
     closingQuotationsRef.current.delete(quotationId);
-  }, [toast, user]);
+  }, [toast, user, router]);
 
   // UseEffects existentes mantidos...
   useEffect(() => {
@@ -328,14 +340,30 @@ export default function CotacaoClient() {
       const shoppingListSnapshot = await getDocs(shoppingListQuery);
       const items = shoppingListSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ShoppingListItem))
         .sort((a, b) => a.name.localeCompare(b.name));
-      
+
       const initialOffersByProduct = new Map<string, Map<string, Offer>>();
-      setActiveQuotationDetails({
+
+      // Atualiza com o status mais recente do Firestore
+      setActiveQuotationDetails(prev => {
+        const newDetails = {
           id: quotationSnap.id,
           deadline: quotationData.deadline,
           status: quotationData.status,
           shoppingListItems: items,
-          offersByProduct: initialOffersByProduct,
+          offersByProduct: prev?.offersByProduct || initialOffersByProduct,
+        };
+
+        // Se o status mudou para 'Fechada', limpar countdown
+        if (quotationData.status === 'Fechada' && prev?.status !== 'Fechada') {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          setTimeLeft("Prazo Encerrado");
+          setIsDeadlinePassed(true);
+        }
+
+        return newDetails;
       });
 
       listenersToUnsubscribe.filter(unsub => unsub !== unsubQuotationDoc).forEach(unsub => unsub()); 

@@ -75,15 +75,8 @@ export default function SelecionarFornecedoresTab({
   const [existingActiveQuotation, setExistingActiveQuotation] = useState<Quotation | null>(null);
 
   // Ref to track if warning has been shown for current quotation to prevent repeated displays
-  const hasShownWarningRef = useRef<string | null>(null);
-
-  // Reset warning flag when quotation changes
-  useEffect(() => {
-    const currentKey = selectedQuotationId || listId || 'none';
-    if (hasShownWarningRef.current !== currentKey) {
-      hasShownWarningRef.current = null;
-    }
-  }, [selectedQuotationId, listId]);
+  // Store Set of quotation IDs that have already shown the warning
+  const hasShownWarningRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user || (!listId && !selectedQuotationId)) return;
@@ -136,21 +129,26 @@ export default function SelecionarFornecedoresTab({
         }
 
         // Only show warning modal if:
-        // 1. The quotation is NOT Fechada or Concluída (check the actual status from the fetched data)
-        // 2. We are creating/editing (not in read-only mode from props)
-        // 3. We haven't shown the warning for this quotation yet in this session
-        // 4. There is an existing quotation but we're coming from a new list creation context
-        const currentKey = quotation.id;
+        // 1. The quotation is ACTIVE (Aberta or Pausada) - situação ROXA
+        // 2. We are editing an existing quotation (selectedQuotationId exists)
+        // 3. We haven't shown the warning for this quotation yet (check Set)
+        // 4. User is adding items to an active quotation (coming back to step 2)
+        const quotationId = quotation.id;
+        const hasAlreadyShown = hasShownWarningRef.current.has(quotationId);
         const shouldShowWarning =
-          quotation.status !== 'Fechada' &&
-          quotation.status !== 'Concluída' &&
+          (quotation.status === 'Aberta' || quotation.status === 'Pausada') &&
           !isReadOnly &&
-          hasShownWarningRef.current !== currentKey &&
-          !selectedQuotationId; // Only show if we're NOT navigating to an existing quotation
+          !hasAlreadyShown &&
+          selectedQuotationId !== null &&
+          selectedQuotationId !== 'nova-cotacao' &&
+          selectedQuotationId === quotationId; // Only show when actively working on THIS quotation
 
         if (shouldShowWarning) {
+            console.log('ℹ️ [SelecionarFornecedoresTab] Showing warning modal for quotation:', quotationId);
             setIsWarningModalOpen(true);
-            hasShownWarningRef.current = currentKey;
+            hasShownWarningRef.current.add(quotationId); // Add to Set so it won't show again
+        } else if ((quotation.status === 'Aberta' || quotation.status === 'Pausada') && hasAlreadyShown) {
+            console.log('⏭️ [SelecionarFornecedoresTab] Skipping warning modal (already shown for quotation):', quotationId);
         }
 
       } else {
