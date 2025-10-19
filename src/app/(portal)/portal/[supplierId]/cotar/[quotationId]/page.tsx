@@ -2798,7 +2798,7 @@ export default function SellerQuotationPage() {
                                         {/* Render discount buttons if product.counterProposalInfo exists */}
                                         {product.counterProposalInfo && (
                                           <div className="flex flex-wrap gap-2 mt-2 mb-2">
-                                            <span className="text-sm font-medium text-muted-foreground">Aplicar Desconto:</span>
+                                            <span className="text-sm font-semibold text-orange-600">Aplicar Desconto:</span>
                                             {[1, 2, 3, 4, 5].map(discount => (
                                               <Button
                                                 key={discount}

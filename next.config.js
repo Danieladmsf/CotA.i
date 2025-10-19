@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: false,
   // Enable SWC minifier for better performance
   swcMinify: true,

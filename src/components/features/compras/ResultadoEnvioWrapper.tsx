@@ -47,10 +47,6 @@ export default function ResultadoEnvioWrapper({ selectedQuotationId, onTabChange
   }, [selectedQuotationId, user]);
 
   useEffect(() => {
-    console.log("ResultadoEnvioWrapper received new selectedQuotationId:", selectedQuotationId);
-  }, [selectedQuotationId]);
-
-  useEffect(() => {
     if (!selectedQuotationId) return;
 
     const fetchQuotationData = async () => {
@@ -90,14 +86,15 @@ export default function ResultadoEnvioWrapper({ selectedQuotationId, onTabChange
     fetchQuotationData();
   }, [selectedQuotationId]);
 
-  // Auto-redirect to step 2 if no quotation selected
+  // Auto-redirect to step 1 if no quotation or nova-cotacao
   useEffect(() => {
-    if (!selectedQuotationId && onTabChange) {
-      console.log('[ResultadoEnvioWrapper] Sem cotação selecionada - redirecionando para Passo 2');
-      onTabChange('iniciar-cotacao');
+    const shouldRedirect = !selectedQuotationId || selectedQuotationId === 'nova-cotacao';
+
+    if (shouldRedirect && onTabChange) {
+      onTabChange('criar-editar');
       toast({
-        title: "Redirecionado para Passo 2",
-        description: "Selecione fornecedores e inicie uma cotação primeiro para ver os resultados.",
+        title: "Redirecionado para Passo 1",
+        description: "Inicie uma cotação primeiro para ver os resultados.",
         variant: "default"
       });
     }
@@ -107,14 +104,14 @@ export default function ResultadoEnvioWrapper({ selectedQuotationId, onTabChange
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
-  if (!quotation) {
+  if (!quotation || selectedQuotationId === 'nova-cotacao') {
     return (
       <Card>
         <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
           <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-          <p className="text-lg font-semibold text-foreground">Redirecionando para Passo 2...</p>
+          <p className="text-lg font-semibold text-foreground">Redirecionando para Passo 1...</p>
           <p className="text-muted-foreground mt-2">
-            Você precisa iniciar uma cotação primeiro.
+            Inicie uma cotação primeiro para ver os resultados.
           </p>
         </CardContent>
       </Card>

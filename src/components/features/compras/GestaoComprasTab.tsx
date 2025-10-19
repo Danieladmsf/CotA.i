@@ -36,9 +36,10 @@ const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
 
 interface GestaoComprasTabProps {
   selectedQuotationId: string | null;
+  onTabChange?: (tab: string) => void;
 }
 
-export default function GestaoComprasTab({ selectedQuotationId }: GestaoComprasTabProps) {
+export default function GestaoComprasTab({ selectedQuotationId, onTabChange }: GestaoComprasTabProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -169,6 +170,35 @@ export default function GestaoComprasTab({ selectedQuotationId }: GestaoComprasT
       default: return 'secondary';
     }
   };
+
+  // Auto-redirect to step 1 if no quotation or nova-cotacao
+  React.useEffect(() => {
+    const shouldRedirect = !selectedQuotationId || selectedQuotationId === 'nova-cotacao';
+
+    if (shouldRedirect && onTabChange) {
+      onTabChange('criar-editar');
+      toast({
+        title: "Redirecionado para Passo 1",
+        description: "Inicie uma cotação primeiro para gerenciar as compras.",
+        variant: "default"
+      });
+    }
+  }, [selectedQuotationId, onTabChange, toast]);
+
+  // Return loading state while redirecting
+  if (!selectedQuotationId || selectedQuotationId === 'nova-cotacao') {
+    return (
+      <Card>
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+          <p className="text-lg font-semibold text-foreground">Redirecionando para Passo 1...</p>
+          <p className="text-muted-foreground mt-2">
+            Inicie uma cotação primeiro.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

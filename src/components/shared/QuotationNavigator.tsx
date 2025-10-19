@@ -68,33 +68,13 @@ export default function QuotationNavigator({
 
   // Função interna de navegação
   const handleNavigate = (direction: 'prev' | 'next') => {
-    console.log('[QuotationNavigator] ========== NAVEGAÇÃO INICIADA ==========');
-    console.log('[QuotationNavigator] Direção:', direction === 'prev' ? '⮜ PREV (retroceder)' : '⮞ NEXT (avançar)');
-
-    if (quotationsForNavigation.length === 0) {
-      console.log('[QuotationNavigator] ❌ Nenhuma cotação disponível para navegação');
-      return;
-    }
-
-    console.log('[QuotationNavigator] Total de cotações:', quotationsForNavigation.length);
-    console.log('[QuotationNavigator] Cotações ordenadas:', quotationsForNavigation.map((q, idx) => ({
-      index: idx,
-      id: q.id,
-      date: q.shoppingListDate ? new Date(q.shoppingListDate.toDate()).toLocaleDateString('pt-BR') : 'N/A',
-      status: q.status
-    })));
+    if (quotationsForNavigation.length === 0) return;
 
     let currentIndex = quotationsForNavigation.findIndex(q => q.id === selectedQuotationId);
-    console.log('[QuotationNavigator] Cotação atual:', {
-      selectedQuotationId,
-      currentIndex,
-      isValid: currentIndex !== -1
-    });
 
     // Se nenhuma cotação está selecionada, começar do início ou fim
     if (currentIndex === -1) {
       currentIndex = direction === 'prev' ? 0 : -1;
-      console.log('[QuotationNavigator] Nenhuma cotação selecionada - usando índice:', currentIndex);
     }
 
     let nextIndex = -1;
@@ -106,123 +86,53 @@ export default function QuotationNavigator({
 
     if (direction === 'prev') {
       // Retroceder no tempo = avançar no array (índice maior)
-      console.log('[QuotationNavigator] ⮜ Calculando PREV (retroceder):');
-      console.log('  - currentIndex:', currentIndex);
-      console.log('  - length - 1:', quotationsForNavigation.length - 1);
-      console.log('  - enableNavigationLoop:', enableNavigationLoop);
-
       if (enableNavigationLoop) {
-        // Com loop: volta ao início se estiver no final
         nextIndex = currentIndex < quotationsForNavigation.length - 1 ? currentIndex + 1 : 0;
-        console.log('  - COM LOOP: nextIndex =', nextIndex);
       } else {
-        // Sem loop: para no final (cotação mais antiga)
         nextIndex = currentIndex < quotationsForNavigation.length - 1 ? currentIndex + 1 : -1;
-        console.log('  - SEM LOOP: nextIndex =', nextIndex);
       }
     } else {
       // Avançar no tempo = retroceder no array (índice menor)
-      console.log('[QuotationNavigator] ⮞ Calculando NEXT (avançar):');
-      console.log('  - currentIndex:', currentIndex);
-      console.log('  - enableNavigationLoop:', enableNavigationLoop);
-
       if (enableNavigationLoop) {
-        // Com loop: volta ao final se estiver no início
         nextIndex = currentIndex > 0 ? currentIndex - 1 : quotationsForNavigation.length - 1;
-        console.log('  - COM LOOP: nextIndex =', nextIndex);
       } else {
-        // Sem loop: para no início (cotação mais recente = "Nova cotação")
         nextIndex = currentIndex > 0 ? currentIndex - 1 : -1;
-        console.log('  - SEM LOOP: nextIndex =', nextIndex);
       }
     }
 
-    console.log('[QuotationNavigator] Resultado: nextIndex =', nextIndex);
-
     if (nextIndex !== -1 && quotationsForNavigation[nextIndex]) {
       const nextQuotation = quotationsForNavigation[nextIndex];
-      console.log('[QuotationNavigator] ✅ Navegando para:', {
-        index: nextIndex,
-        id: nextQuotation.id,
-        date: nextQuotation.shoppingListDate ? new Date(nextQuotation.shoppingListDate.toDate()).toLocaleDateString('pt-BR') : 'N/A',
-        status: nextQuotation.status
-      });
 
-      // CRITICAL FIX: Atualizar cotação selecionada ANTES da data
+      // CRITICAL: Atualizar cotação selecionada ANTES da data
       // Isso previne que o auto-select baseado na data selecione a cotação errada
       onQuotationSelect(nextQuotation.id);
 
       // Atualizar data se configurado
       if (updateDateOnNavigate && nextQuotation.shoppingListDate) {
-        const quotationDate = nextQuotation.shoppingListDate.toDate();
-        console.log('[QuotationNavigator] 📅 Atualizando data para:', quotationDate.toLocaleDateString('pt-BR'));
-        onDateChange(quotationDate);
+        onDateChange(nextQuotation.shoppingListDate.toDate());
       }
-    } else {
-      console.log('[QuotationNavigator] ❌ Navegação bloqueada - chegou ao limite');
     }
-
-    console.log('[QuotationNavigator] ========== NAVEGAÇÃO FINALIZADA ==========\n');
   };
 
   // Verificar se pode navegar
   // prev (⮜) = retroceder no tempo = ir para cotações mais antigas (índice maior)
   // next (⮞) = avançar no tempo = ir para cotações mais recentes (índice menor)
   const canNavigatePrev = useMemo(() => {
-    console.log('[QuotationNavigator] 🔍 Verificando canNavigatePrev (⮜):');
-    console.log('  - Total de cotações:', quotationsForNavigation.length);
-    console.log('  - selectedQuotationId:', selectedQuotationId);
-
-    if (quotationsForNavigation.length === 0) {
-      console.log('  - ❌ Nenhuma cotação disponível');
-      return false;
-    }
-    if (quotationsForNavigation.length < 2) {
-      console.log('  - ❌ Menos de 2 cotações');
-      return false;
-    }
-
-    if (enableNavigationLoop) {
-      // Com loop, sempre pode navegar se houver pelo menos 2 cotações
-      console.log('  - ✅ Loop habilitado - sempre pode navegar');
-      return true;
-    }
+    if (quotationsForNavigation.length < 2) return false;
+    if (enableNavigationLoop) return true;
 
     // Sem loop: pode retroceder se não está no final (cotação mais antiga)
     const currentIndex = quotationsForNavigation.findIndex(q => q.id === selectedQuotationId);
-    const canNav = currentIndex !== -1 && currentIndex < quotationsForNavigation.length - 1;
-    console.log('  - currentIndex:', currentIndex);
-    console.log('  - length - 1:', quotationsForNavigation.length - 1);
-    console.log(`  - ${canNav ? '✅' : '❌'} Pode retroceder: ${currentIndex} < ${quotationsForNavigation.length - 1}`);
-    return canNav;
+    return currentIndex !== -1 && currentIndex < quotationsForNavigation.length - 1;
   }, [quotationsForNavigation, selectedQuotationId, enableNavigationLoop]);
 
   const canNavigateNext = useMemo(() => {
-    console.log('[QuotationNavigator] 🔍 Verificando canNavigateNext (⮞):');
-    console.log('  - Total de cotações:', quotationsForNavigation.length);
-    console.log('  - selectedQuotationId:', selectedQuotationId);
-
-    if (quotationsForNavigation.length === 0) {
-      console.log('  - ❌ Nenhuma cotação disponível');
-      return false;
-    }
-    if (quotationsForNavigation.length < 2) {
-      console.log('  - ❌ Menos de 2 cotações');
-      return false;
-    }
-
-    if (enableNavigationLoop) {
-      // Com loop, sempre pode navegar se houver pelo menos 2 cotações
-      console.log('  - ✅ Loop habilitado - sempre pode navegar');
-      return true;
-    }
+    if (quotationsForNavigation.length < 2) return false;
+    if (enableNavigationLoop) return true;
 
     // Sem loop: pode avançar se não está no início (cotação mais recente)
     const currentIndex = quotationsForNavigation.findIndex(q => q.id === selectedQuotationId);
-    const canNav = currentIndex > 0;
-    console.log('  - currentIndex:', currentIndex);
-    console.log(`  - ${canNav ? '✅' : '❌'} Pode avançar: ${currentIndex} > 0`);
-    return canNav;
+    return currentIndex > 0;
   }, [quotationsForNavigation, selectedQuotationId, enableNavigationLoop]);
 
   // Conteúdo da navegação (sem wrapper)

@@ -15,7 +15,7 @@ import { useOptimizedSuppliers } from '@/hooks/useOptimizedSuppliers';
 import type { Fornecedor, Quotation } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, Send, Calendar as IconCalendar, UserCheck, AlertTriangle, Timer, Bell, RefreshCw, Lock, Info } from 'lucide-react';
+import { Loader2, Send, Calendar as IconCalendar, UserCheck, AlertTriangle, Timer, Bell, Lock, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { db } from '@/lib/config/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -107,11 +107,6 @@ export default function SelecionarFornecedoresTab({
         const quotation = { ...quotationData, id: snapshot.docs[0].id };
 
         // Log for debugging
-        console.log('[SelecionarFornecedoresTab] Quotation updated:', {
-          id: quotation.id,
-          status: quotation.status,
-          supplierCount: quotation.supplierIds?.length || 0
-        });
 
         setExistingActiveQuotation(quotation);
 
@@ -283,28 +278,30 @@ export default function SelecionarFornecedoresTab({
     }
   };
 
-  // Auto-redirect to step 1 if no shopping list
+  // Auto-redirect to step 1 if no list or nova-cotacao
+  // BUT: Don't redirect if user just saved a list (listId exists)
   useEffect(() => {
-    if (!shoppingListDate && onTabChange) {
-      console.log('[SelecionarFornecedoresTab] Sem lista de compras - redirecionando para Passo 1');
+    const shouldRedirect = (!shoppingListDate || selectedQuotationId === 'nova-cotacao') && !listId;
+
+    if (shouldRedirect && onTabChange) {
       onTabChange('criar-editar');
       toast({
         title: "Redirecionado para Passo 1",
-        description: "Crie ou carregue uma lista de compras primeiro para iniciar a cotação.",
+        description: "Configure a lista de compras antes de selecionar fornecedores.",
         variant: "default"
       });
     }
-  }, [shoppingListDate, onTabChange, toast]);
+  }, [shoppingListDate, selectedQuotationId, listId, onTabChange, toast]);
 
-  // Return loading state while redirecting
-  if (!shoppingListDate) {
+  // Return loading state while redirecting (but not if listId exists - user just saved)
+  if ((!shoppingListDate || selectedQuotationId === 'nova-cotacao') && !listId) {
     return (
         <Card>
             <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
                 <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
                 <p className="text-lg font-semibold text-foreground">Redirecionando para Passo 1...</p>
                 <p className="text-muted-foreground mt-2">
-                    Você precisa criar uma lista de compras primeiro.
+                    Configure a lista de compras primeiro.
                 </p>
             </CardContent>
         </Card>
