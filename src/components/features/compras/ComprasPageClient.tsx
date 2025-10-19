@@ -642,10 +642,16 @@ export default function ComprasPageClient() {
       }
 
       // Prioridade 1: Se há cotação ativa, selecionar a primeira
-      const firstActive = filteredQuotations.find(q => q.status === 'Aberta' || q.status === 'Pausada');
+      // IMPORTANTE: Buscar em allQuotations quando não há filtro de data (página recém-carregada)
+      const quotationsToSearch = selectedDate ? filteredQuotations : allQuotations;
+      const firstActive = quotationsToSearch.find(q => q.status === 'Aberta' || q.status === 'Pausada');
 
       if (firstActive) {
         setSelectedQuotationId(firstActive.id);
+        // Se não há data selecionada, setar a data da cotação ativa
+        if (!selectedDate && firstActive.shoppingListDate) {
+          setSelectedDate(firstActive.shoppingListDate.toDate());
+        }
         return;
       }
 
@@ -665,10 +671,16 @@ export default function ComprasPageClient() {
 
       if (!novaCotacaoStillExists) {
         // Trocar para a cotação ativa mais recente
-        const firstActive = filteredQuotations.find(q => q.status === 'Aberta' || q.status === 'Pausada');
+        // IMPORTANTE: Buscar em allQuotations quando não há filtro de data
+        const quotationsToSearch = selectedDate ? filteredQuotations : allQuotations;
+        const firstActive = quotationsToSearch.find(q => q.status === 'Aberta' || q.status === 'Pausada');
 
         if (firstActive) {
           setSelectedQuotationId(firstActive.id);
+          // Se não há data selecionada, setar a data da cotação ativa
+          if (!selectedDate && firstActive.shoppingListDate) {
+            setSelectedDate(firstActive.shoppingListDate.toDate());
+          }
           return;
         }
       }
