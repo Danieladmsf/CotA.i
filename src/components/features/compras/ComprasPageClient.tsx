@@ -241,22 +241,18 @@ export default function ComprasPageClient() {
     return () => clearInterval(intervalId);
   }, [allQuotations, handleAutoCloseQuotation]);
 
-  // Build navigable quotations list (allQuotations + virtual "nova cotacao" if needed)
+  // Build navigable quotations list for arrow navigation
+  // Includes virtual "nova-cotacao" at the TOP (most recent) when needed
   useEffect(() => {
     const today = new Date();
 
-    // Check if there's an active quotation for today
-    const todayQuotations = allQuotations.filter(q =>
-      q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), today)
-    );
-
-
-    const hasActiveTodayQuotation = todayQuotations.some(q =>
+    // Check if there's ANY active quotation (regardless of date)
+    // User should finish/close current quotation before starting a new one
+    const hasAnyActiveQuotation = allQuotations.some(q =>
       q.status === 'Aberta' || q.status === 'Pausada'
     );
 
-
-    if (!hasActiveTodayQuotation) {
+    if (!hasAnyActiveQuotation) {
       // Add virtual "nova cotacao" for today at the BEGINNING (most recent)
       // This ensures chronological reverse order: newest first
       const virtualNewQuotation = createVirtualNewQuotation(today, user?.uid || '');
@@ -298,13 +294,12 @@ export default function ComprasPageClient() {
 
 
       // Check if we should add "nova cotacao" for today
-      const todayQuotations = allQuotations.filter(q =>
-        q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), today)
+      // User should finish/close current quotation before starting a new one (regardless of date)
+      const hasAnyActiveQuotation = allQuotations.some(q =>
+        q.status === 'Aberta' || q.status === 'Pausada'
       );
-      const hasActiveTodayQuotation = todayQuotations.some(q => q.status === 'Aberta' || q.status === 'Pausada');
 
-
-      if (!hasActiveTodayQuotation) {
+      if (!hasAnyActiveQuotation) {
         const virtualNewQuotation = createVirtualNewQuotation(today, user?.uid || '');
         const finalFiltered = [virtualNewQuotation, ...activeQuotations.slice(0, 10)];
         setFilteredQuotations(finalFiltered);
@@ -552,12 +547,23 @@ export default function ComprasPageClient() {
         }
     } else if (selectedQuotationId === 'nova-cotacao') {
         // Keep them null for nova-cotacao
-    } else if (!selectedQuotationId && !justSavedListRef.current && !justStartedQuotationRef.current) {
-        // Only clear if no quotation is selected (i.e., we're in "Sem Cotação" state)
-        // AND we didn't just save a list (to preserve the data for navigation)
-        // AND we didn't just start a quotation (to preserve the data while waiting for Firestore)
+        console.log('🆕 [ComprasPageClient] nova-cotacao mode - keeping listDate/listId as null');
+    } else if (!selectedQuotationId && !justSavedListRef.current && !justStartedQuotationRef.current && tab !== 'criar-editar') {
+        // Only clear if:
+        // - No quotation is selected (i.e., we're in "Sem Cotação" state)
+        // - We didn't just save a list (to preserve the data for navigation)
+        // - We didn't just start a quotation (to preserve the data while waiting for Firestore)
+        // - We're NOT on the criar-editar tab (to avoid clearing while user is actively creating a list)
+        console.log('🧹 [ComprasPageClient] Clearing listDate/listId:', {
+          tab,
+          selectedQuotationId,
+          justSavedList: justSavedListRef.current,
+          justStartedQuotation: justStartedQuotationRef.current
+        });
         setListDateForQuotation(null);
         setListIdForQuotation(null);
+    } else if (!selectedQuotationId && tab === 'criar-editar') {
+        console.log('✋ [ComprasPageClient] NOT clearing - user is on criar-editar tab');
     }
 
     // Initialize date if not already set
@@ -930,6 +936,14 @@ export default function ComprasPageClient() {
               // IMPORTANTE: Se não há cotação selecionada E não há listDateForQuotation,
               // passar undefined para listId para forçar criação de nova lista vazia
               const listIdToPass = hasNoQuotationSelected && !listDateForQuotation ? undefined : listIdForQuotation;
+
+              console.log('📋 [ComprasPageClient] Rendering NewShoppingListClient:', {
+                hasNoQuotationSelected,
+                listDateForQuotation: listDateForQuotation ? format(listDateForQuotation, 'yyyy-MM-dd') : null,
+                listIdForQuotation,
+                listIdToPass,
+                dateToPass: dateToPass ? format(dateToPass, 'yyyy-MM-dd') : null
+              });
 
               return (
                 <NewShoppingListClient

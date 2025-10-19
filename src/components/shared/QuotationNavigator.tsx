@@ -189,25 +189,19 @@ export default function QuotationNavigator({
 
                       // Handle virtual "nova-cotacao"
                       if (selected.id === 'nova-cotacao') {
-                        const quotationsOnSameDay = allQuotations.filter(q =>
-                          q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selected.shoppingListDate.toDate())
-                        );
-                        const nextNumber = quotationsOnSameDay.length + 1;
+                        // Número sequencial global = total de cotações + 1
+                        const nextNumber = allQuotations.length + 1;
                         return `Nova cotação nº ${nextNumber} de ${format(selected.shoppingListDate.toDate(), "dd/MM/yy")}`;
                       }
 
-                      // Handle regular quotations
-                      const quotationsOnSameDay = allQuotations.filter(q =>
-                         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selected.shoppingListDate.toDate())
-                      );
-
-                      const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
+                      // Handle regular quotations - número sequencial global
+                      const sortedAllQuotations = [...allQuotations].sort((a,b) => {
                         const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
                         const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
                         return aTime - bTime;
                       });
 
-                      const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === selected.id) + 1;
+                      const quotationNumber = sortedAllQuotations.findIndex(q => q.id === selected.id) + 1;
 
                       return selected.createdAt && selected.shoppingListDate
                         ? `Cotação nº ${quotationNumber} de ${format((selected.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((selected.createdAt as any).toDate(), "HH:mm")}) - ${selected.status}`
@@ -227,10 +221,8 @@ export default function QuotationNavigator({
                   {filteredQuotations.map((quotation) => {
                     // Handle virtual "nova-cotacao" entry
                     if (quotation.id === 'nova-cotacao') {
-                      const quotationsOnSameDay = allQuotations.filter(q =>
-                        q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                      );
-                      const nextNumber = quotationsOnSameDay.length + 1;
+                      // Número sequencial global = total de cotações + 1
+                      const nextNumber = allQuotations.length + 1;
                       const quotationName = `Nova cotação nº ${nextNumber} de ${format(quotation.shoppingListDate.toDate(), "dd/MM/yy")}`;
 
                       return (
@@ -240,18 +232,14 @@ export default function QuotationNavigator({
                       );
                     }
 
-                    // Handle regular quotations
-                    const quotationsOnSameDay = allQuotations.filter(q =>
-                       q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                    );
-
-                    const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
+                    // Handle regular quotations - número sequencial global
+                    const sortedAllQuotations = [...allQuotations].sort((a,b) => {
                       const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
                       const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
                       return aTime - bTime;
                     });
 
-                    const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === quotation.id) + 1;
+                    const quotationNumber = sortedAllQuotations.findIndex(q => q.id === quotation.id) + 1;
 
                     const quotationName = quotation.createdAt && quotation.shoppingListDate
                         ? `Cotação nº ${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`

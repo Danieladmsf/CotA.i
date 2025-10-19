@@ -1,319 +1,1019 @@
-react-dom.development.js:38560 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
-capture.js:47 [CategoriesContext] No user, clearing categories
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
-capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
-capture.js:47 📊 [ComprasPageClient] Today quotations: Object
-capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 1
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
-capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
-capture.js:47 🎯 [ComprasPageClient] Active quotations count: 0
-capture.js:47 🔎 [ComprasPageClient] Has active today? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 1
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🧹 [ComprasPageClient] Clearing list data (no quotation selected)
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⚠️ [ComprasPageClient] No quotation to auto-select
-capture.js:47 [CategoriesContext] Setting up real-time listener for user: eSHP0qXE50OhyB84NYqdp1P7ofv1
-capture.js:47 [CategoriesContext] Setting up real-time listener for user: eSHP0qXE50OhyB84NYqdp1P7ofv1
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Sun Oct 19 2025 17:20:13 GMT-0300 (Hora padrão de Brasília)
-capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
-capture.js:47 ➕ [ComprasPageClient] Adding virtual to filtered (all closed or empty). Total: 1
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🧹 [ComprasPageClient] Clearing list data (no quotation selected)
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ✨ [ComprasPageClient] Auto-selecting first active quotation: nova-cotacao
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: nova-cotacao
-capture.js:47 🆕 [ComprasPageClient] Handling nova-cotacao selection
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔥 [ComprasPageClient] Firestore snapshot received: Object
-capture.js:47 [CategoriesContext] Received snapshot with 14 categories
-capture.js:47 [CategoriesContext] Received snapshot with 14 categories
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso2: FALSE Object
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [useShoppingList] useEffect triggered: Object
-capture.js:47 [useShoppingList] specificListId is undefined - forcing empty new list
-capture.js:47 ⏰ [ComprasPageClient] Checking for expired quotations...
-capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
-capture.js:47 📊 [ComprasPageClient] Today quotations: Object
-capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 3
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Sun Oct 19 2025 17:20:13 GMT-0300 (Hora padrão de Brasília)
-capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
-capture.js:47 ➕ [ComprasPageClient] Adding virtual to filtered (all closed or empty). Total: 2
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: nova-cotacao
-capture.js:47 🆕 [ComprasPageClient] Handling nova-cotacao selection
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [useShoppingList] useEffect triggered: Object
-capture.js:47 [useShoppingList] specificListId is undefined - forcing empty new list
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 💾 [ComprasPageClient] handleListSaved called: Object
-capture.js:47 ➡️ [ComprasPageClient] Navigating to iniciar-cotacao tab
-capture.js:47 🔄 [ComprasPageClient] handleTabChange called: Object
-capture.js:47 🌐 [ComprasPageClient] Updating URL to: /compras?tab=iniciar-cotacao&date=2025-10-20&listId=1760905222583
-capture.js:47 📊 [ComprasPageClient] Tab transition state: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
-capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
-capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
-capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
-capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
-capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by listId: 1760905222583
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
-capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
-capture.js:47 🎯 [ComprasPageClient] Active quotations count: 0
-capture.js:47 🔎 [ComprasPageClient] Has active today? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 1
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
-capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [useShoppingList] useEffect triggered: Object
-capture.js:47 [useShoppingList] Loading specific list: 1760905222583
-capture.js:47 [useShoppingList] fetchSpecificList called with: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 [NewShoppingListClient] Props received: Object
-capture.js:47 [NewShoppingListClient] useShoppingList results: Object
-capture.js:47 [useShoppingList] useEffect triggered: Object
-capture.js:47 [useShoppingList] Loading specific list: 1760905222583
-capture.js:47 [useShoppingList] fetchSpecificList called with: Object
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
-capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
-capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
-capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
-capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
-capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by listId: 1760905222583
-capture.js:47 [useShoppingList] Firestore returned for specific listId: Object
-capture.js:47 [useShoppingList] Loading specific list: Object
-capture.js:47 [useShoppingList] Specific list items loaded: Object
-capture.js:47 [useShoppingList] Firestore returned for specific listId: Object
-capture.js:47 [useShoppingList] Loading specific list: Object
-capture.js:47 [useShoppingList] Specific list items loaded: Object
-capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎬 [ComprasPageClient] justSavedListRef cleared - auto-select re-enabled
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🔥 [ComprasPageClient] Firestore snapshot received: Object
-capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
-capture.js:47 📦 [SelecionarFornecedoresTab] Quotation data: Object
-capture.js:47 🎯 [SelecionarFornecedoresTab] Modal decision: Object
-capture.js:47 ⏭️ [SelecionarFornecedoresTab] SKIPPING warning modal (no quotation selected or nova-cotacao)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockPasso3: FALSE
-capture.js:47 🔒 [ComprasPageClient] shouldUnlockGestao: FALSE
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 ⏰ [ComprasPageClient] Checking for expired quotations...
-capture.js:47 🔵 [ComprasPageClient] Building navigableQuotations
-capture.js:47 📊 [ComprasPageClient] Today quotations: Object
-capture.js:47 🎯 [ComprasPageClient] Has active today quotation? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual nova-cotacao. Total navigable: 4
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: undefined
-capture.js:47 📋 [ComprasPageClient] No date selected. Building from active quotations.
-capture.js:47 🎯 [ComprasPageClient] Active quotations count: 1
-capture.js:47 🔎 [ComprasPageClient] Has active today? false
-capture.js:47 ➕ [ComprasPageClient] Adding virtual to active list. Total: 2
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (on iniciar-cotacao tab)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (new list created)
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (on iniciar-cotacao tab)
-capture.js:47 🚀 [ComprasPageClient] handleQuotationStarted called: Object
-capture.js:47 ➡️ [ComprasPageClient] Navigating to gestao tab (step 4)
-capture.js:47 🔄 [ComprasPageClient] handleTabChange called: Object
-capture.js:47 🌐 [ComprasPageClient] Updating URL to: /compras?tab=gestao
-capture.js:47 📊 [ComprasPageClient] Tab transition state: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: NEW_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: null
-capture.js:47 ❌ [ComprasPageClient] No quotation selected
-capture.js:47 📝 [ComprasPageClient] NEW_QUOTATION with saved list - Navigation allowed to step 2: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 🎯 [ComprasPageClient] Auto-selecting newly created quotation: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso3: TRUE Object
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockGestao: TRUE Object
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🟢 [ComprasPageClient] Filtering quotations. selectedDate: Mon Oct 20 2025 00:00:00 GMT-0300 (Hora padrão de Brasília)
-capture.js:47 🔍 [ComprasPageClient] Filtered by date: Object
-capture.js:47 ✅ [ComprasPageClient] Using filtered as-is (has active). Count: 2
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
-capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
-capture.js:47 🔄 [ComprasPageClient] Status check: Object
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
-capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
-capture.js:47 🔄 [ComprasPageClient] Status check: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Component mounted, initializing from sessionStorage
-capture.js:47 🔍 [SelecionarFornecedoresTab] sessionStorage.getItem result: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks"]
-capture.js:47 🔍 [SelecionarFornecedoresTab] typeof stored: string
-capture.js:47 🔍 [SelecionarFornecedoresTab] Parsed value: Array(2)
-capture.js:47 ✅ [SelecionarFornecedoresTab] Restored from sessionStorage: Array(2)
-capture.js:47 🔵 [SelecionarFornecedoresTab] useEffect triggered: Object
-capture.js:47 🔍 [SelecionarFornecedoresTab] Querying by selectedQuotationId: M6i7MsLotuejb5UCAAMr
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 📸 [SelecionarFornecedoresTab] Firestore snapshot received: Object
-capture.js:47 📦 [SelecionarFornecedoresTab] Quotation data: Object
-capture.js:47 🎯 [SelecionarFornecedoresTab] Modal decision: Object
-capture.js:47 ✅ [SelecionarFornecedoresTab] SHOWING WARNING MODAL for quotation: M6i7MsLotuejb5UCAAMr
-capture.js:47 💾 [SelecionarFornecedoresTab] Saving to sessionStorage: Object
-capture.js:47 ✅ [SelecionarFornecedoresTab] Verification - sessionStorage now contains: ["FvPkWWMT8GRZoRXVIz0V","HS8ksXlUhUBRGQcn17Ks","M6i7MsLotuejb5UCAAMr"]
-capture.js:47 📝 [SelecionarFornecedoresTab] Updated hasShownWarning Set: Array(3)
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 📑 [ComprasPageClient] searchParams useEffect triggered: Object
-capture.js:47 🔀 [ComprasPageClient] Tab change detected in URL: Object
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎨 [SelecionarFornecedoresTab] Rendering component: Object
-capture.js:47 🟡 [ComprasPageClient] Selected quotation changed: M6i7MsLotuejb5UCAAMr
-capture.js:47 📌 [ComprasPageClient] Found selected quotation: Object
-capture.js:47 🔄 [ComprasPageClient] Status check: Object
-capture.js:47 🟣 [ComprasPageClient] Auto-select check: Object
-capture.js:47 ⏸️ [ComprasPageClient] Skipping auto-select (flag set)
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🔓 [ComprasPageClient] shouldUnlockPasso2: TRUE (quotation selected) Object
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
-capture.js:47 🎬 [ComprasPageClient] justStartedQuotationRef cleared - auto-select re-enabled
-capture.js:47 🎯 [ComprasPageClient] Page Mode: ACTIVE_QUOTATION
-capture.js:47 🎨 [ComprasPageClient] RENDERING with: Object
+       213 +          });
+       214 +  
+       215            if (shouldShowWarning) {
+       216 +              console.log('🚨 
+           + [MODAL-MONITOR] SHOWING MODAL for
+           +  quotation:', quotationId);
+       217                
+             setIsWarningModalOpen(true);
+       218                hasShownWarningRef.c
+             urrent.add(quotationId); // Add 
+             to Set so it won't show again
+       219 +              console.log('✅ 
+           + [MODAL-MONITOR] Added to 
+           + hasShownWarning Set:', Array.from
+           + (hasShownWarningRef.current));
+       220    
+       221                // Persist to 
+             sessionStorage to survive 
+             component unmount/remount
+       222                try {
+       223                  const arrayToSave 
+             = Array.from(hasShownWarningRef.c
+             urrent);
+       224                  const jsonString =
+              JSON.stringify(arrayToSave);
+       225                  sessionStorage.set
+             Item('hasShownQuotationWarning', 
+             jsonString);
+       226 +                console.log('💾 
+           + [MODAL-MONITOR] Saved to 
+           + sessionStorage:', jsonString);
+       227    
+       228                  // Verify it was 
+             saved
+       229                  const verification
+              = sessionStorage.getItem('hasSho
+             wnQuotationWarning');
+       230 +                console.log('✔️ 
+           + [MODAL-MONITOR] Verification read
+           +  from sessionStorage:', 
+           + verification);
+       231                } catch (error) {
+       232 -                console.error('❌ 
+           -  [SelecionarFornecedoresTab
+           -  ] Failed to save to 
+           -  sessionStorage:', error);
+       232 +                console.error('❌ 
+           +  [MODAL-MONITOR
+           +  ] Failed to save to 
+           +  sessionStorage:', error);
+       233                }
+       234    
+       235            } else if 
+             (!isOnCorrectTab) {
+       236 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - wrong 
+           + tab:', currentTab);
+       237            } else if (isActive && 
+             hasAlreadyShown) {
+       238 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - already
+           +  shown for quotation:', 
+           + quotationId);
+       239            } else if (isActive && 
+             !hasSelectedQuotation) {
+       240 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - no 
+           + quotation selected or 
+           + nova-cotacao');
+       241            } else if (isActive && 
+             !isSameQuotation) {
+       242 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - 
+           + different quotation (selected vs 
+           + found)');
+       243            } else if (!isActive) {
+       244 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - 
+           + quotation not active:', 
+           + quotation.status);
+       245            } else if (isReadOnly) {
+       246 +            console.log('⏭️ 
+           + [MODAL-MONITOR] Skipped - 
+           + read-only mode');
+       247            }
+       248    
+       249          } else {
+
+● Agora vou adicionar logs para quando o modal
+  for fechado e para monitorar mudanças de
+  estado:
+
+● Update(~/pagina-cota.i/src/components/features/comp
+        ras/SelecionarFornecedoresTab.tsx)
+  ⎿  Updated ../src/components/features/compras/
+     elecionarFornecedoresTab.tsx with 5
+     additions and 1 removal
+       257            }
+       258    
+       259          } else {
+       260 +          console.log('📭 
+           + [MODAL-MONITOR] No quotation 
+           + found in snapshot');
+       261            
+             setExistingActiveQuotation(null);
+       262            
+             setSelectedSuppliers({});
+       263            
+             setOriginalSupplierIds([]);
+       264          }
+       265        });
+       266    
+       267 -      return () => unsubscribe();
+       267 +      return () => {
+       268 +        console.log('🧹 
+           + [MODAL-MONITOR] Cleaning up 
+           + Firestore subscription');
+       269 +        unsubscribe();
+       270 +      };
+       271      }, [listId, 
+             selectedQuotationId, user, 
+             isReadOnly, currentTab]); // 
+             Added currentTab to re-evaluate 
+             modal logic when tab changes
+       272    
+       273      // Mostrar toast de erro se 
+             houver problema ao carregar 
+             fornecedores
+
+● Update(~/pagina-cota.i/src/components/features/comp
+        ras/SelecionarFornecedoresTab.tsx)
+  ⎿  Updated ../src/components/features/compras/
+     elecionarFornecedoresTab.tsx with 9
+     additions
+       421          <Dialog
+       422            
+             open={isWarningModalOpen}
+       423            onOpenChange={(open) => 
+             {
+       424 +            console.log('🔔 
+           + [MODAL-MONITOR] Modal state 
+           + changed:', {
+       425 +              from: 
+           + isWarningModalOpen,
+       426 +              to: open,
+       427 +              quotationId: 
+           + existingActiveQuotation?.id
+       428 +            });
+       429              
+             setIsWarningModalOpen(open);
+       430            }}
+       431          >
+     ...
+       433              </DialogHeader>
+       434              <DialogFooter>
+       435                <Button onClick={() 
+             => {
+       436 +                console.log('👆 
+           + [MODAL-MONITOR] User clicked 
+           + "Entendi" button', {
+       437 +                  quotationId: 
+           + existingActiveQuotation?.id,
+       438 +                  
+           + hasShownWarningSet: Array.from(ha
+           + sShownWarningRef.current)
+       439 +                });
+       440                  
+             setIsWarningModalOpen(false);
+       441                }}>Entendi</Button>
+       442              </DialogFooter>
+
+● Agora vou adicionar um log para rastrear quando
+   o componente renderiza e o estado do modal:
+
+● Update(~/pagina-cota.i/src/components/features/comp
+        ras/SelecionarFornecedoresTab.tsx)
+  ⎿  Updated ../src/components/features/compras/
+     elecionarFornecedoresTab.tsx with 22
+     additions
+       385        }
+       386      };
+       387    
+       388 +    // Monitor props changes
+       389 +    useEffect(() => {
+       390 +      console.log('🔄 
+           + [MODAL-MONITOR] Props changed:', 
+           + {
+       391 +        shoppingListDate: 
+           + shoppingListDate ? 
+           + format(shoppingListDate, 
+           + 'yyyy-MM-dd') : null,
+       392 +        listId,
+       393 +        selectedQuotationId,
+       394 +        quotationStatus,
+       395 +        hasActiveQuotation,
+       396 +        currentTab
+       397 +      });
+       398 +    }, [shoppingListDate, listId, 
+           + selectedQuotationId, 
+           + quotationStatus, 
+           + hasActiveQuotation, currentTab]);
+       399 +  
+       400 +    // Monitor modal state changes
+       401 +    useEffect(() => {
+       402 +      console.log('📱 
+           + [MODAL-MONITOR] Modal state:', {
+       403 +        isWarningModalOpen,
+       404 +        existingActiveQuotation: 
+           + existingActiveQuotation?.id || 
+           + null,
+       405 +        timestamp: new 
+           + Date().toISOString()
+       406 +      });
+       407 +    }, [isWarningModalOpen, 
+           + existingActiveQuotation]);
+       408 +  
+       409      // Auto-redirect to step 1 if 
+             no list or nova-cotacao
+       410      // BUT: Don't redirect if user
+              just saved a list (listId 
+             exists)
+       411      useEffect(() => {
+       412        const shouldRedirect = 
+             (!shoppingListDate || 
+             selectedQuotationId === 
+             'nova-cotacao') && !listId;
+       413    
+       414        if (shouldRedirect && 
+             onTabChange) {
+       415 +        console.log('🔀 
+           + [MODAL-MONITOR] Auto-redirecting 
+           + to step 1');
+       416          
+             onTabChange('criar-editar');
+       417          toast({
+       418            title: "Redirecionado 
+             para Passo 1",
+
+● Agora vou adicionar logs no botão de "Iniciar
+  Cotação":
+
+● Update(~/pagina-cota.i/src/components/features/comp
+        ras/SelecionarFornecedoresTab.tsx)
+  ⎿  Updated ../src/components/features/compras/
+     elecionarFornecedoresTab.tsx with 16
+     additions
+       298      const selectedSupplierIds = 
+             Object.keys(selectedSuppliers).fi
+             lter(id => 
+             selectedSuppliers[id]);
+       299    
+       300      const handleStartQuotation = 
+             async () => {
+       301 +      console.log('🚀 
+           + [MODAL-MONITOR] 
+           + handleStartQuotation called', {
+       302 +        hasUser: !!user,
+       303 +        shoppingListDate: 
+           + shoppingListDate ? 
+           + format(shoppingListDate, 
+           + 'yyyy-MM-dd') : null,
+       304 +        listId,
+       305 +        selectedSupplierIds: 
+           + selectedSupplierIds.length,
+       306 +        existingActiveQuotation: 
+           + existingActiveQuotation?.id || 
+           + null
+       307 +      });
+       308 +  
+       309        if (!user) {
+       310          toast({ title: "Acesso 
+             Negado", description: "Você 
+             precisa estar logado para iniciar
+              uma cotação.", variant: 
+             "destructive" });
+       311          return;
+     ...
+       334          return;
+       335        }
+       336    
+       337 +      console.log('✅ 
+           + [MODAL-MONITOR] All validations 
+           + passed, starting quotation...');
+       338        
+             setIsStartingQuotation(true);
+       339    
+       340        const 
+             formattedDeadlineForMessage = 
+             format(finalDeadline, "dd 'de' 
+             MMMM 'às' HH:mm", { locale: ptBR 
+             });
+     ...
+       341        try {
+       342          let result;
+       343          if 
+             (existingActiveQuotation) {
+       344 +          console.log('📝 
+           + [MODAL-MONITOR] Updating existing
+           +  quotation:', 
+           + existingActiveQuotation.id);
+       345            // Update existing 
+             quotation
+       346            result = await 
+             updateQuotation(
+       347              
+             existingActiveQuotation.id,
+     ...
+       354              user.uid
+       355            );
+       356          } else {
+       357 +          console.log('🆕 
+           + [MODAL-MONITOR] Creating new 
+           + quotation');
+       358            // Start new quotation
+       359            result = await 
+             startQuotation(
+       360              listId,
+     ...
+       368          }
+       369    
+       370          if (!result.success) {
+       371 +          console.error('❌ 
+           + [MODAL-MONITOR] Quotation action 
+           + failed:', result.error);
+       372            throw new 
+             Error(result.error || "Ocorreu um
+              erro desconhecido no 
+             servidor.");
+       373          }
+       374    
+       375 +        console.log('✅ 
+           + [MODAL-MONITOR] Quotation action 
+           + successful, showing toast and 
+           + redirecting');
+       376          toast({
+       377            title: 
+             existingActiveQuotation ? 
+             "Cotação Atualizada!" : "Cotação 
+             Iniciada!",
+       378            description: `Convites 
+             enviados para 
+             ${selectedSupplierIds.length} 
+             fornecedor(es). 
+             Redirecionando...`,
+       379          });
+       380    
+       381 +        console.log('🔀 
+           + [MODAL-MONITOR] Calling 
+           + onQuotationStarted callback');
+       382          onQuotationStarted();
+       383    
+       384        } catch (error: any) {
+       385 +        console.error('❌ 
+           + [MODAL-MONITOR] Error in 
+           + handleStartQuotation:', error);
+       386          toast({ title: "Erro ao 
+             iniciar cotação", description: 
+             error.message, variant: 
+             "destructive" });
+       387        } finally {
+       388 +        console.log('🏁 
+           + [MODAL-MONITOR] 
+           + handleStartQuotation finished');
+       389          
+             setIsStartingQuotation(false);
+       390        }
+       391      };
+
+● Perfeito! Agora vou criar um documento
+  explicativo sobre o monitoramento que foi
+  adicionado:
+
+● Write(MODAL-MONITOR-GUIDE.md)
+  ⎿  Wrote 176 lines to MODAL-MONITOR-GUIDE.md  
+     # Guia de Monitoramento do Modal "Cotação em
+      Andamento"
+     ## 📍 Localização
+     `src/components/features/compras/SelecionarF
+     ornecedoresTab.tsx`
+     ## 🎯 Objetivo
+     Este sistema de logs foi criado para
+     diagnosticar a intermitência do modal
+     "Cotação em Andamento Detectada" que aparece
+      no **Passo 2: Iniciar Cotação**.
+     ## 🔍 Logs Implementados
+     … +166 lines (ctrl+o to expand)
+
+● Perfeito! ✅ Sistema de monitoramento completo
+  implementado.
+
+  Resumo do que foi adicionado:
+
+  🎯 10 Pontos de Monitoramento
+
+  1. 🎬 Montagem do componente - Rastreia quando
+  o componente é montado e carrega o
+  sessionStorage
+  2. 🔄 Firestore useEffect - Monitora disparos
+  do useEffect e queries ao Firestore
+  3. 🔍 Decisão do Modal - Analisa todas as
+  variáveis que decidem se o modal deve aparecer
+  4. 🚨 Exibição do Modal - Confirma quando o
+  modal é exibido e salva no sessionStorage
+  5. ⏭️ Motivos de Skip - Explica por que o modal
+   NÃO foi exibido
+  6. 👆 Interações do Usuário - Rastreia cliques
+  e mudanças de estado do modal
+  7. 🚀 Iniciar Cotação - Monitora todo o fluxo
+  de criar/atualizar cotação
+  8. 🔄 Mudanças de Props - Rastreia quando as
+  props do componente mudam
+  9. 📱 Estado do Modal - Monitora mudanças no
+  estado interno do modal
+  10. 🧹 Limpeza - Registra limpeza de recursos e
+   snapshots vazios
+
+  📄 Documentação Criada
+
+  Criei o arquivo .claude/MODAL-MONITOR-GUIDE.md
+  com:
+  - Explicação de todos os logs
+  - Como usar para debugging
+  - Cenários de teste
+  - Como analisar intermitência
+
+  🔍 Como usar agora
+
+  1. Abra o Console do navegador (F12)
+  2. Filtre por [MODAL-MONITOR]
+  3. Navegue pela aplicação e reproduza a
+  intermitência
+  4. Os logs vão mostrar:
+    - Quantas vezes o modal está sendo exibido
+    - Por que está sendo exibido
+    - Se o sessionStorage está funcionando
+  corretamente
+    - Se há múltiplos snapshots do Firestore
+
+  💡 O que procurar
+
+  - Se o modal aparece múltiplas vezes, você verá
+   múltiplos 🚨 SHOWING MODAL
+  - Se o hasShownWarningSet estiver sendo limpo,
+  vai aparecer vazio nos logs
+  - Se o Firestore estiver enviando múltiplos
+  snapshots, você verá vários 📸 Firestore 
+  snapshot received
+
+  Agora você tem visibilidade completa sobre o
+  comportamento do modal! 🎉
+
+> Download the React DevTools for a better 
+development experience: 
+https://reactjs.org/link/react-devtools
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+ [Fast Refresh] rebuilding
+ [Fast Refresh] done in 12824ms
+ 🎬 [MODAL-MONITOR] Component mounted - 
+SelecionarFornecedoresTab
+ 📦 [MODAL-MONITOR] SessionStorage on mount: null
+ ℹ️ [MODAL-MONITOR] No previous warnings in 
+sessionStorage
+ 🔄 [MODAL-MONITOR] Firestore useEffect triggered
+ Object
+ 🔍 [MODAL-MONITOR] Querying by listId: 
+1760909117263
+ 🔄 [MODAL-MONITOR] Props changed: Object
+ 📱 [MODAL-MONITOR] Modal state: Object
+ 🧹 [MODAL-MONITOR] Cleaning up Firestore 
+subscription
+ 🎬 [MODAL-MONITOR] Component mounted - 
+SelecionarFornecedoresTab
+ 📦 [MODAL-MONITOR] SessionStorage on mount: null
+ ℹ️ [MODAL-MONITOR] No previous warnings in 
+sessionStorage
+ 🔄 [MODAL-MONITOR] Firestore useEffect triggered
+ Object
+ 🔍 [MODAL-MONITOR] Querying by listId: 
+1760909117263
+ 🔄 [MODAL-MONITOR] Props changed: Object
+ 📱 [MODAL-MONITOR] Modal state: Object
+ 📸 [MODAL-MONITOR] Firestore snapshot received 
+Object
+ 📭 [MODAL-MONITOR] No quotation found in 
+snapshot
+ 🚀 [MODAL-MONITOR] handleStartQuotation called 
+Object
+ ✅ [MODAL-MONITOR] All validations passed, 
+starting quotation...
+capture.js:47 🆕 [MODAL-MONITOR] Creating new 
+quotation
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received Object
+capture.js:47 📋 [MODAL-MONITOR] Quotation data: 
+Object
+capture.js:47 🔍 [MODAL-MONITOR] Modal decision 
+variables: Object
+capture.js:47 🎯 [MODAL-MONITOR] Should show 
+warning? false Object
+capture.js:47 ⏭️ [MODAL-MONITOR] Skipped - no 
+quotation selected or nova-cotacao
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 ✅ [MODAL-MONITOR] Quotation action
+ successful, showing toast and redirecting
+capture.js:47 🔀 [MODAL-MONITOR] Calling 
+onQuotationStarted callback
+capture.js:47 🏁 [MODAL-MONITOR] 
+handleStartQuotation finished
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🎬 [MODAL-MONITOR] Component 
+mounted - SelecionarFornecedoresTab
+capture.js:47 📦 [MODAL-MONITOR] SessionStorage 
+on mount: null
+capture.js:47 ℹ️ [MODAL-MONITOR] No previous 
+warnings in sessionStorage
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 �� [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received Object
+capture.js:47 📋 [MODAL-MONITOR] Quotation data: 
+Object
+capture.js:47 🔍 [MODAL-MONITOR] Modal decision 
+variables: Object
+capture.js:47 🎯 [MODAL-MONITOR] Should show 
+warning? true Object
+capture.js:47 🚨 [MODAL-MONITOR] SHOWING MODAL 
+for quotation: KZP6niJlGvg9A88gjQl9
+capture.js:47 ✅ [MODAL-MONITOR] Added to 
+hasShownWarning Set: Array(1)
+capture.js:47 💾 [MODAL-MONITOR] Saved to 
+sessionStorage: ["KZP6niJlGvg9A88gjQl9"]
+capture.js:47 ✔️ [MODAL-MONITOR] Verification 
+read from sessionStorage: 
+["KZP6niJlGvg9A88gjQl9"]
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+react-dom.development.js:38560 Download the React
+ DevTools for a better development experience: 
+https://reactjs.org/link/react-devtools
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+The resource <URL> was preloaded using link 
+preload but not used within a few seconds from 
+the window's load event. Please make sure it has 
+an appropriate `as` value and it is preloaded 
+intentionally.
+capture.js:47 [Fast Refresh] rebuilding
+capture.js:47 [Fast Refresh] done in 12824ms
+capture.js:47 🎬 [MODAL-MONITOR] Component 
+mounted - SelecionarFornecedoresTab
+capture.js:47 📦 [MODAL-MONITOR] SessionStorage 
+on mount: null
+capture.js:47 ℹ️ [MODAL-MONITOR] No previous 
+warnings in sessionStorage
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+listId: 1760909117263
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🎬 [MODAL-MONITOR] Component 
+mounted - SelecionarFornecedoresTab
+capture.js:47 📦 [MODAL-MONITOR] SessionStorage 
+on mount: null
+capture.js:47 ℹ️ [MODAL-MONITOR] No previous 
+warnings in sessionStorage
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+listId: 1760909117263
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received Object
+capture.js:47 📭 [MODAL-MONITOR] No quotation 
+found in snapshot
+capture.js:47 🚀 [MODAL-MONITOR] 
+handleStartQuotation called Object
+capture.js:47 ✅ [MODAL-MONITOR] All validations 
+passed, starting quotation...
+capture.js:47 🆕 [MODAL-MONITOR] Creating new 
+quotation
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received Object
+capture.js:47 �� [MODAL-MONITOR] Quotation data: 
+Object
+capture.js:47 🔍 [MODAL-MONITOR] Modal decision 
+variables: Object
+capture.js:47 🎯 [MODAL-MONITOR] Should show 
+warning? false Object
+capture.js:47 ⏭️ [MODAL-MONITOR] Skipped - no 
+quotation selected or nova-cotacao
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 ✅ [MODAL-MONITOR] Quotation action
+ successful, showing toast and redirecting
+capture.js:47 🔀 [MODAL-MONITOR] Calling 
+onQuotationStarted callback
+capture.js:47 🏁 [MODAL-MONITOR] 
+handleStartQuotation finished
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🎬 [MODAL-MONITOR] Component 
+mounted - SelecionarFornecedoresTab
+capture.js:47 📦 [MODAL-MONITOR] SessionStorage 
+on mount: null
+capture.js:47 ℹ️ [MODAL-MONITOR] No previous 
+warnings in sessionStorage
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received Object
+capture.js:47 📋 [MODAL-MONITOR] Quotation data: 
+Object
+capture.js:47 🔍 [MODAL-MONITOR] Modal decision 
+variables: Object
+capture.js:47 🎯 [MODAL-MONITOR] Should show 
+warning? true Object
+capture.js:47 🚨 [MODAL-MONITOR] SHOWING MODAL 
+for quotation: KZP6niJlGvg9A88gjQl9
+capture.js:47 ✅ [MODAL-MONITOR] Added to 
+hasShownWarning Set: Array(1)
+capture.js:47 💾 [MODAL-MONITOR] Saved to 
+sessionStorage: ["KZP6niJlGvg9A88gjQl9"]
+capture.js:47 ✔️ [MODAL-MONITOR] Verification 
+read from sessionStorage: 
+["KZP6niJlGvg9A88gjQl9"]
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+Object
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered Object
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+Object
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🎬 [MODAL-MONITOR] Component 
+mounted - SelecionarFornecedoresTab
+capture.js:47 📦 [MODAL-MONITOR] SessionStorage 
+on mount: ["KZP6niJlGvg9A88gjQl9"]
+capture.js:47 ✅ [MODAL-MONITOR] Loaded shown 
+quotations from storage: ['KZP6niJlGvg9A88gjQl9']
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered {user: true, listId: 
+'1760909117263', selectedQuotationId: 
+'KZP6niJlGvg9A88gjQl9', currentTab: 'gestao', 
+isReadOnly: false}
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+capture.js:47 🔄 [MODAL-MONITOR] Props changed: 
+{shoppingListDate: '2025-10-19', listId: 
+'1760909117263', selectedQuotationId: 
+'KZP6niJlGvg9A88gjQl9', quotationStatus: 
+'Aberta', hasActiveQuotation: true, …}
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+{isWarningModalOpen: false, 
+existingActiveQuotation: null, timestamp: 
+'2025-10-19T21:25:53.002Z'}
+capture.js:47 📸 [MODAL-MONITOR] Firestore 
+snapshot received {empty: false, docCount: 1}
+capture.js:47 📋 [MODAL-MONITOR] Quotation data: 
+{id: 'KZP6niJlGvg9A88gjQl9', status: 'Aberta', 
+listId: '1760909117263', supplierIds: 2}
+capture.js:47 🔍 [MODAL-MONITOR] Modal decision 
+variables: {quotationId: 'KZP6niJlGvg9A88gjQl9', 
+hasAlreadyShown: true, hasShownWarningSet: 
+Array(1), isActive: true, hasSelectedQuotation: 
+true, …}
+capture.js:47 🎯 [MODAL-MONITOR] Should show 
+warning? false {conditions: {…}}
+capture.js:47 ⏭️ [MODAL-MONITOR] Skipped - wrong 
+tab: gestao
+capture.js:47 📱 [MODAL-MONITOR] Modal state: 
+{isWarningModalOpen: false, 
+existingActiveQuotation: 'KZP6niJlGvg9A88gjQl9', 
+timestamp: '2025-10-19T21:25:53.039Z'}
+capture.js:47 🧹 [MODAL-MONITOR] Cleaning up 
+Firestore subscription
+capture.js:47 🔄 [MODAL-MONITOR] Firestore 
+useEffect triggered {user: true, listId: 
+'1760909117263', selectedQuotationId: 
+'KZP6niJlGvg9A88gjQl9', currentTab: 
+'iniciar-cotacao', isReadOnly: false}
+capture.js:47 🔍 [MODAL-MONITOR] Querying by 
+selectedQuotationId: KZP6niJlGvg9A88gjQl9
+ 🔄 [MODAL-MONITOR] Props changed: 
+{shoppingListDate: '2025-10-19', listId: 
+'1760909117263', selectedQuotationId: 
+'KZP6niJlGvg9A88gjQl9', quotationStatus: 
+'Aberta', hasActiveQuotation: true, …}
+ 🔄 [MODAL-MONITOR] Props changed: 
+{shoppingListDate: '2025-10-19', listId: 
+'1760909117263', selectedQuotationId: 
+'KZP6niJlGvg9A88gjQl9', quotationStatus: 
+'Aberta', hasActiveQuotation: true, …}
+ 📸 [MODAL-MONITOR] Firestore snapshot received 
+{empty: false, docCount: 1}
+ 📋 [MODAL-MONITOR] Quotation data: {id: 
+'KZP6niJlGvg9A88gjQl9', status: 'Aberta', listId:
+ '1760909117263', supplierIds: 2}
+ 🔍 [MODAL-MONITOR] Modal decision variables: 
+{quotationId: 'KZP6niJlGvg9A88gjQl9', 
+hasAlreadyShown: true, hasShownWarningSet: 
+Array(1), isActive: true, hasSelectedQuotation: 
+true, …}
+ 🎯 [MODAL-MONITOR] Should show warning? false 
+{conditions: {…}}
+ ⏭️ [MODAL-MONITOR] Skipped - already shown for 
+quotation: KZP6niJlGvg9A88gjQl9
+ �� [MODAL-MONITOR] Modal state: 
+{isWarningModalOpen: false, 
+existingActiveQuotation: 'KZP6niJlGvg9A88gjQl9', 
+timestamp: '2025-10-19T21:25:53.155Z'} 
+
+● Perfeito! 🎉 Os logs estão funcionando
+  perfeitamente e revelaram informações
+  importantes sobre o comportamento do modal. Vou
+   analisar o que aconteceu:
+
+  📊 Análise dos Logs
+
+  ✅ Comportamento CORRETO Detectado
+
+  Primeira execução da cotação:
+  1. ✅ Modal NÃO apareceu ao criar nova cotação
+  (correto!)
+  2. ✅ Modal APARECEU ao navegar automaticamente
+   para a aba gestao depois de criar
+  3. ✅ Modal foi salvo no sessionStorage:
+  ["KZP6niJlGvg9A88gjQl9"]
+
+  Segunda vez (após voltar para Passo 2):
+  1. ✅ SessionStorage foi carregado
+  corretamente: ['KZP6niJlGvg9A88gjQl9']
+  2. ✅ Modal NÃO apareceu porque
+  hasAlreadyShown: true
+  3. ✅ Razão do skip: "⏭️ Skipped - already 
+  shown for quotation: KZP6niJlGvg9A88gjQl9"
+
+  🔍 Descoberta Importante
+
+  O problema está aqui:
+  📸 [MODAL-MONITOR] Firestore snapshot received
+  📋 [MODAL-MONITOR] Quotation data: Object
+  🔍 [MODAL-MONITOR] Modal decision variables:
+  Object
+  🎯 [MODAL-MONITOR] Should show warning? true
+  Object
+  🚨 [MODAL-MONITOR] SHOWING MODAL for quotation:
+   KZP6niJlGvg9A88gjQl9
+
+  O modal está aparecendo quando:
+  - Usuário acabou de criar a cotação
+  - Sistema navega automaticamente para aba
+  gestao
+  - MAS o componente SelecionarFornecedoresTab 
+  ainda está montado brevemente
+  - Nesse breve momento, o Firestore retorna a
+  nova cotação
+  - E o modal é exibido!
+
+  🐛 Causa Raiz da Intermitência
+
+  O modal está aparecendo durante a transição de 
+  navegação após criar a cotação:
+
+  1. User clica "Iniciar Cotação"
+  2. Cotação é criada no Firestore
+  3. Sistema chama onQuotationStarted() → navega
+  para aba gestao
+  4. RACE CONDITION: Firestore snapshot chega
+  ANTES do componente ser desmontado
+  5. Modal decide mostrar porque todas as
+  condições são verdadeiras naquele momento
+  6. Modal aparece rapidamente e é salvo no
+  sessionStorage
+  7. Componente é desmontado e usuário vai para
+  gestao
+
+  💡 A Solução
+
+  Precisamos adicionar uma verificação adicional:
+   não mostrar o modal se a cotação foi criada há
+   menos de X segundos. Isso vai prevenir que o
+  modal apareça durante a transição.
+
+  Quer que eu implemente essa correção?
+
+> sim isto é uma gambiarra ou e a correção na 
+causa raiz? 

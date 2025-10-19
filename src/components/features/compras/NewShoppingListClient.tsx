@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { CheckCircle, Save, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
 
 // Custom hooks
 import { useSuppliesData } from '@/hooks/shopping-list/useSuppliesData';
@@ -50,6 +51,12 @@ export default function NewShoppingListClient({
   const { toast } = useToast();
 
   // Log props received
+  console.log('🎨 [NewShoppingListClient] Rendered with props:', {
+    selectedDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd HH:mm') : null,
+    listId,
+    hasActiveQuotation,
+    quotationStatus
+  });
 
   // ========== REFS ==========
   const quantityInputRefs = useRef<Record<string, HTMLInputElement | null>>({});

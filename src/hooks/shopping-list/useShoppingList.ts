@@ -248,9 +248,15 @@ export function useShoppingList(
 
   // Efeito para carregar lista quando data ou listId específico muda
   useEffect(() => {
+    console.log('🔄 [useShoppingList] Effect triggered:', {
+      specificListId,
+      selectedDate: selectedDate ? selectedDate.toISOString() : null,
+      currentItemsCount: currentListItems.length
+    });
 
     // Prioridade 1: Se tiver specificListId (string), carregar essa lista específica
     if (specificListId) {
+      console.log('📋 [useShoppingList] Loading specific list:', specificListId);
       fetchSpecificList(specificListId);
       return;
     }
@@ -258,6 +264,8 @@ export function useShoppingList(
     // Se specificListId === undefined (não null), significa modo "nova lista vazia"
     // Não carregar nada por data
     if (specificListId === undefined) {
+      console.log('🆕 [useShoppingList] Creating NEW empty list (specificListId === undefined)');
+      console.log('⚠️ [useShoppingList] CLEARING all items!', { previousCount: currentListItems.length });
       setCurrentListItems([]);
       setOriginalListItems([]);
       setCurrentMode('new');
@@ -267,8 +275,10 @@ export function useShoppingList(
 
     // Prioridade 2: Carregar por data se disponível (apenas quando specificListId === null)
     if (selectedDate && isValidDate(selectedDate)) {
+      console.log('📅 [useShoppingList] Loading by date:', selectedDate.toISOString());
       fetchExistingItemsForDate(selectedDate);
     } else {
+      console.log('❌ [useShoppingList] No valid date, clearing items');
       setCurrentListItems([]);
       setOriginalListItems([]);
       setCurrentMode('new');
@@ -278,11 +288,23 @@ export function useShoppingList(
 
   // Adicionar insumo à lista
   const addSupply = useCallback((supply: Supply) => {
-    if (!supply.id || !selectedDate) return;
+    console.log('➕ [useShoppingList] addSupply called:', {
+      supplyId: supply.id,
+      supplyName: supply.name,
+      hasSelectedDate: !!selectedDate,
+      currentItemsCount: currentListItems.length
+    });
+
+    if (!supply.id || !selectedDate) {
+      console.log('⚠️ [useShoppingList] Cannot add supply - missing id or date');
+      return;
+    }
 
     // Verificar se já existe
     setCurrentListItems(prev => {
+      console.log('🔍 [useShoppingList] Checking if supply already exists in:', prev.length, 'items');
       if (prev.some(item => item.supplyId === supply.id)) {
+        console.log('⚠️ [useShoppingList] Supply already exists!');
         if (onError) onError(`${supply.name} já foi adicionado.`);
         return prev;
       }
@@ -299,6 +321,12 @@ export function useShoppingList(
         status: 'Pendente',
         categoryId: supply.categoryId,
       };
+
+      console.log('✅ [useShoppingList] Adding new item to list:', {
+        itemName: newItem.name,
+        previousCount: prev.length,
+        newCount: prev.length + 1
+      });
 
       return [newItem, ...prev];
     });

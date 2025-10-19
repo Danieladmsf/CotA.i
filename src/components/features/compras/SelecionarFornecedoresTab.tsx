@@ -74,31 +74,9 @@ export default function SelecionarFornecedoresTab({
   const [counterOfferTime, setCounterOfferTime] = useState('15');
   const [reminderPercentage, setReminderPercentage] = useState('50');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
   const [existingActiveQuotation, setExistingActiveQuotation] = useState<Quotation | null>(null);
 
-  // Ref to track if warning has been shown for current quotation to prevent repeated displays
-  // Store Set of quotation IDs that have already shown the warning
-  // Use sessionStorage to persist across component unmount/remount within the same session
-  const hasShownWarningRef = useRef<Set<string>>(new Set());
-
-  // Initialize from sessionStorage on mount
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem('hasShownQuotationWarning');
-
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        hasShownWarningRef.current = new Set(parsed);
-      } else {
-      }
-    } catch (error) {
-      console.error('❌ [SelecionarFornecedoresTab] Failed to load from sessionStorage:', error);
-    }
-  }, []); // Run only once on mount
-
-  useEffect(() => {
-
     if (!user || (!listId && !selectedQuotationId)) {
       return;
     }
@@ -117,11 +95,9 @@ export default function SelecionarFornecedoresTab({
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-
       if (!snapshot.empty) {
         const quotationData = snapshot.docs[0].data() as Quotation;
         const quotation = { ...quotationData, id: snapshot.docs[0].id };
-
 
         setExistingActiveQuotation(quotation);
 
@@ -150,55 +126,6 @@ export default function SelecionarFornecedoresTab({
             setReminderPercentage(String(quotation.counterProposalReminderPercentage));
         }
 
-        // Only show warning modal if:
-        // 1. The quotation is ACTIVE (Aberta or Pausada) - situação ROXA
-        // 2. We are editing an existing quotation (selectedQuotationId exists)
-        // 3. We haven't shown the warning for this quotation yet (check Set)
-        // 4. User is adding items to an active quotation (coming back to step 2)
-        const quotationId = quotation.id;
-        const hasAlreadyShown = hasShownWarningRef.current.has(quotationId);
-
-        const isActive = quotation.status === 'Aberta' || quotation.status === 'Pausada';
-        const hasSelectedQuotation = selectedQuotationId !== null && selectedQuotationId !== 'nova-cotacao';
-        const isSameQuotation = selectedQuotationId === quotationId;
-
-
-        // CRITICAL: Only show modal if we are on the "iniciar-cotacao" tab
-        // This prevents modal from showing when navigating TO gestao tab after creating quotation
-        const isOnCorrectTab = currentTab === 'iniciar-cotacao';
-
-        const shouldShowWarning =
-          isActive &&
-          !isReadOnly &&
-          !hasAlreadyShown &&
-          hasSelectedQuotation &&
-          isSameQuotation &&
-          isOnCorrectTab; // Only show when ON the iniciar-cotacao tab
-
-        if (shouldShowWarning) {
-            setIsWarningModalOpen(true);
-            hasShownWarningRef.current.add(quotationId); // Add to Set so it won't show again
-
-            // Persist to sessionStorage to survive component unmount/remount
-            try {
-              const arrayToSave = Array.from(hasShownWarningRef.current);
-              const jsonString = JSON.stringify(arrayToSave);
-              sessionStorage.setItem('hasShownQuotationWarning', jsonString);
-
-              // Verify it was saved
-              const verification = sessionStorage.getItem('hasShownQuotationWarning');
-            } catch (error) {
-              console.error('❌ [SelecionarFornecedoresTab] Failed to save to sessionStorage:', error);
-            }
-
-        } else if (!isOnCorrectTab) {
-        } else if (isActive && hasAlreadyShown) {
-        } else if (isActive && !hasSelectedQuotation) {
-        } else if (isActive && !isSameQuotation) {
-        } else if (!isActive) {
-        } else if (isReadOnly) {
-        }
-
       } else {
         setExistingActiveQuotation(null);
         setSelectedSuppliers({});
@@ -206,8 +133,10 @@ export default function SelecionarFornecedoresTab({
       }
     });
 
-    return () => unsubscribe();
-  }, [listId, selectedQuotationId, user, isReadOnly, currentTab]); // Added currentTab to re-evaluate modal logic when tab changes
+    return () => {
+      unsubscribe();
+    };
+  }, [listId, selectedQuotationId, user, isReadOnly, currentTab]);
 
   // Mostrar toast de erro se houver problema ao carregar fornecedores
   useEffect(() => {
@@ -235,6 +164,11 @@ export default function SelecionarFornecedoresTab({
   };
 
   const selectedSupplierIds = Object.keys(selectedSuppliers).filter(id => selectedSuppliers[id]);
+
+  // Identificar fornecedores novos (que não estavam na cotação original)
+  const newSupplierIds = selectedSupplierIds.filter(id => !originalSupplierIds.includes(id));
+  const hasNewSuppliers = newSupplierIds.length > 0;
+  const hasOnlyOriginalSuppliers = selectedSupplierIds.length > 0 && newSupplierIds.length === 0;
 
   const handleStartQuotation = async () => {
     if (!user) {
@@ -310,9 +244,13 @@ export default function SelecionarFornecedoresTab({
         throw new Error(result.error || "Ocorreu um erro desconhecido no servidor.");
       }
 
+      // Mensagem específica baseada no tipo de ação
+      const notificationCount = existingActiveQuotation ? newSupplierIds.length : selectedSupplierIds.length;
       toast({
-        title: existingActiveQuotation ? "Cotação Atualizada!" : "Cotação Iniciada!",
-        description: `Convites enviados para ${selectedSupplierIds.length} fornecedor(es). Redirecionando...`,
+        title: existingActiveQuotation ? "Fornecedores Adicionados!" : "Cotação Iniciada!",
+        description: existingActiveQuotation
+          ? `Convites enviados para ${notificationCount} novo(s) fornecedor(es). Redirecionando...`
+          : `Convites enviados para ${notificationCount} fornecedor(es). Redirecionando...`,
       });
 
       onQuotationStarted();
@@ -357,27 +295,6 @@ export default function SelecionarFornecedoresTab({
 
   return (
     <>
-      <Dialog
-        open={isWarningModalOpen}
-        onOpenChange={(open) => {
-          setIsWarningModalOpen(open);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cotação em Andamento Detectada</DialogTitle>
-            <DialogDescription>
-              Existe uma cotação ativa para esta lista de compras. Você pode adicionar novos fornecedores, ajustar os prazos ou atualizar os itens antes de prosseguir.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => {
-              setIsWarningModalOpen(false);
-            }}>Entendi</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {hasActiveQuotation && (
         <div className="flex items-start gap-3 p-3 mb-6 bg-purple-50 border border-purple-200 rounded-lg">
           <Info className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
@@ -580,15 +497,19 @@ export default function SelecionarFornecedoresTab({
             </div>
         </CardContent>
         <CardFooter>
-            <Button 
+            <Button
                 className="w-full text-lg py-6"
                 onClick={handleStartQuotation}
-                disabled={isStartingQuotation || selectedSupplierIds.length === 0 || !deadlineDate || isReadOnly}
+                disabled={isStartingQuotation || selectedSupplierIds.length === 0 || !deadlineDate || isReadOnly || hasOnlyOriginalSuppliers}
             >
                 {isReadOnly ? (
                     <><Lock className="mr-2 h-5 w-5"/> Cotação Encerrada (Apenas Visualização)</>
+                ) : hasOnlyOriginalSuppliers ? (
+                    <><Info className="mr-2 h-5 w-5"/> Nenhum Novo Fornecedor Adicionado</>
                 ) : isStartingQuotation ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin"/> Iniciando Cotação...</>
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin"/> {existingActiveQuotation ? 'Adicionando Fornecedores...' : 'Iniciando Cotação...'}</>
+                ) : existingActiveQuotation && hasNewSuppliers ? (
+                    <><Send className="mr-2 h-5 w-5"/> Adicionar {newSupplierIds.length} Novo(s) Fornecedor(es)</>
                 ) : (
                     <><Send className="mr-2 h-5 w-5"/> Iniciar Cotação e Notificar</>
                 )}
