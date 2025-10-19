@@ -273,10 +273,19 @@ export default function ComprasPageClient() {
         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selectedDate)
       );
 
+      // Check if there's ANY active quotation (regardless of date)
+      // User should finish/close current quotation before starting a new one
+      const hasAnyActiveQuotation = allQuotations.some(q =>
+        q.status === 'Aberta' || q.status === 'Pausada'
+      );
 
-      // Add virtual "new quotation" option if all quotations are closed
-      const allClosed = filtered.length > 0 && filtered.every(q => q.status === 'Fechada' || q.status === 'Concluída');
-      if (allClosed || filtered.length === 0) {
+      // Add virtual "new quotation" option ONLY if:
+      // 1. There are NO active quotations anywhere (hasAnyActiveQuotation === false)
+      // 2. OR all quotations on this specific date are closed
+      const allClosedOnThisDate = filtered.length > 0 && filtered.every(q => q.status === 'Fechada' || q.status === 'Concluída');
+      const shouldAddNewQuotation = !hasAnyActiveQuotation && (allClosedOnThisDate || filtered.length === 0);
+
+      if (shouldAddNewQuotation) {
         // Create a virtual quotation entry for "new quotation" - ALWAYS for TODAY
         // Add at BEGINNING to maintain chronological reverse order
         const virtualNewQuotation = createVirtualNewQuotation(today, user?.uid || '');
