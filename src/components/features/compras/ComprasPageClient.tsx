@@ -667,9 +667,10 @@ export default function ComprasPageClient() {
         }
     } else if (selectedQuotationId === 'nova-cotacao') {
         // Keep them null for nova-cotacao
-    } else if (!selectedQuotationId && !justSavedListRef.current) {
+    } else if (!selectedQuotationId && !justSavedListRef.current && !justStartedQuotationRef.current) {
         // Only clear if no quotation is selected (i.e., we're in "Sem Cotação" state)
         // AND we didn't just save a list (to preserve the data for navigation)
+        // AND we didn't just start a quotation (to preserve the data while waiting for Firestore)
         console.log('🧹 [ComprasPageClient] Clearing list data (no quotation selected)');
         setListDateForQuotation(null);
         setListIdForQuotation(null);
