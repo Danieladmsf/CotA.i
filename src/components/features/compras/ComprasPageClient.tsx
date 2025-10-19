@@ -754,8 +754,27 @@ export default function ComprasPageClient() {
       navigableCount: navigableQuotations.length,
       filteredCount: filteredQuotations.length,
       justSavedList: justSavedListRef.current,
-      isAutoClearing: isAutoClearingRef.current
+      isAutoClearing: isAutoClearingRef.current,
+      justStartedQuotation: justStartedQuotationRef.current,
+      activeTab
     });
+
+    // SPECIAL CASE: If we just started a quotation and we're on gestao tab, try to auto-select the new quotation
+    if (justStartedQuotationRef.current && activeTab === 'gestao' && !selectedQuotationId && listIdForQuotation) {
+      const newQuotation = allQuotations.find(q => q.listId === listIdForQuotation);
+      if (newQuotation) {
+        console.log('🎯 [ComprasPageClient] Auto-selecting newly created quotation:', {
+          quotationId: newQuotation.id,
+          status: newQuotation.status
+        });
+        previousStatusRef.current = null; // Reset to track this new quotation's status
+        setSelectedQuotationId(newQuotation.id);
+        setSelectedDate(newQuotation.shoppingListDate.toDate());
+        return;
+      } else {
+        console.log('⏳ [ComprasPageClient] Waiting for newly created quotation...');
+      }
+    }
 
     // Não auto-selecionar se acabamos de salvar a lista, estamos auto-clearing, ou acabamos de iniciar cotação
     if (justSavedListRef.current || isAutoClearingRef.current || justStartedQuotationRef.current) {
@@ -809,7 +828,7 @@ export default function ComprasPageClient() {
         }
       }
     }
-  }, [selectedQuotationId, selectedDate, navigableQuotations, filteredQuotations, activeTab]);
+  }, [selectedQuotationId, selectedDate, navigableQuotations, filteredQuotations, activeTab, listIdForQuotation, allQuotations]);
 
   const handleListSaved = (listId: string, date: Date) => {
     console.log('💾 [ComprasPageClient] handleListSaved called:', { listId, date });
@@ -847,39 +866,19 @@ export default function ComprasPageClient() {
     // Set flag to prevent auto-select during transition to gestao tab
     justStartedQuotationRef.current = true;
 
-    // After quotation is started, wait for Firestore to sync and auto-select the new quotation
-    setTimeout(() => {
-      if (listIdForQuotation && !selectedQuotationId) {
-        console.log('🔍 [ComprasPageClient] Searching for newly created quotation:', {
-          listIdForQuotation,
-          totalQuotations: allQuotations.length
-        });
-
-        // Find the quotation that was just created for this list
-        const newQuotation = allQuotations.find(q => q.listId === listIdForQuotation);
-        if (newQuotation) {
-          console.log('✅ [ComprasPageClient] Found new quotation, auto-selecting:', {
-            quotationId: newQuotation.id,
-            status: newQuotation.status
-          });
-          previousStatusRef.current = null; // Reset to track this new quotation's status
-          setSelectedQuotationId(newQuotation.id);
-          setSelectedDate(newQuotation.shoppingListDate.toDate());
-        } else {
-          console.log('⚠️ [ComprasPageClient] New quotation not found yet');
-        }
-      }
-    }, 1000); // Wait 1 second for Firestore to sync
-
     console.log('➡️ [ComprasPageClient] Navigating to gestao tab (step 4)');
     handleTabChange('gestao');
 
-    // Reset flag after Firestore sync and auto-select complete
-    // Increased to 2000ms to ensure quotation is created and selected
+    // The Firestore snapshot listener will automatically detect the new quotation
+    // and the auto-select logic will pick it up once justStartedQuotationRef is cleared
+    // No need to manually search - just wait for Firestore to sync
+
+    // Reset flag after giving Firestore time to sync
+    // Increased to 3000ms to ensure quotation is created and Firestore snapshot received
     setTimeout(() => {
       justStartedQuotationRef.current = false;
       console.log('🎬 [ComprasPageClient] justStartedQuotationRef cleared - auto-select re-enabled');
-    }, 2000);
+    }, 3000);
   };
 
   const handleDateChangeForList = (newDate: Date) => {
