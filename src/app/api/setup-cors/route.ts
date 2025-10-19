@@ -1,13 +1,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { admin } from '@/lib/config/firebase-admin';
-import { serviceAccountCredentials } from '@/lib/services/serviceAccount';
+import { admin, isAdminInitialized } from '@/lib/config/firebase-admin';
 
 // This API route configures CORS for the Firebase Storage bucket.
 // It allows the web app to upload files directly to Storage.
 export async function POST(req: NextRequest) {
+  // Check if Firebase Admin is initialized
+  if (!isAdminInitialized) {
+    console.warn('Firebase Admin not initialized. Cannot setup CORS.');
+    return NextResponse.json({
+      success: false,
+      error: 'Firebase Admin service unavailable. Check environment variables.'
+    }, { status: 503 });
+  }
+
   try {
-    const bucketName = `${serviceAccountCredentials.projectId}.appspot.com`;
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+    if (!projectId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Project ID not found in environment variables.'
+      }, { status: 400 });
+    }
+
+    const bucketName = `${projectId}.appspot.com`;
     const bucket = admin.storage().bucket(bucketName);
 
     const corsConfiguration = [

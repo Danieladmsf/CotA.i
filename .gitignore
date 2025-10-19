@@ -50,3 +50,6 @@ serviceAccountKey.json
 # Debug logs
 *-debug.log
 dev.log
+
+# Claude Code logs
+.claude/log.txt

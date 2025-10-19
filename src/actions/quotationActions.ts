@@ -3,11 +3,12 @@
 
 import { admin, adminDb } from '@/lib/config/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { Fornecedor, ShoppingListItem, Offer } from '@/types';
+import type { Fornecedor, ShoppingListItem, Offer, Quotation } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 // Import the new centralized notification actions
 import { sendQuotationInvitation, sendQuotationClosureNotice, sendBuyerQuotationClosureNotice } from './notificationActions';
+import { notifyQuotationStarted, notifyQuotationClosed } from './notificationService';
 
 const QUOTATIONS_COLLECTION = 'quotations';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
@@ -38,11 +39,13 @@ export async function startQuotation(
   }
 
   try {
-    const mainBatch = adminDb.batch();
+    const db = adminDb();
+    const mainBatch = db.batch();
 
     // 1. Find items to be included in the quotation
-    const itemsQuery = adminDb
+    const itemsQuery = db
       .collection(SHOPPING_LIST_ITEMS_COLLECTION)
+      .where('userId', '==', userId)
       .where('listId', '==', listId)
       .where('status', '==', 'Pendente');
     const itemsSnapshot = await itemsQuery.get();
@@ -53,7 +56,8 @@ export async function startQuotation(
     }
 
     // 2. Create the new quotation document
-    const newQuotationRef = adminDb.collection(QUOTATIONS_COLLECTION).doc();
+    console.log(`[startQuotation] Creating quotation for listId: ${listId} with ${supplierIds.length} suppliers:`, supplierIds);
+    const newQuotationRef = db.collection(QUOTATIONS_COLLECTION).doc();
     mainBatch.set(newQuotationRef, {
       shoppingListDate: Timestamp.fromDate(shoppingListDate),
       listId: listId,
@@ -77,11 +81,10 @@ export async function startQuotation(
 
     // 5. Fetch selected suppliers and send invitations
     if (supplierIds.length > 30) {
-        console.warn("Aviso: A consulta de fornecedores excede o limite de 30 IDs da consulta 'in'. Apenas os primeiros 30 serão convidados.");
         supplierIds = supplierIds.slice(0, 30);
     }
     
-    const suppliersQuery = adminDb.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', supplierIds);
+    const suppliersQuery = db.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', supplierIds);
     const suppliersSnapshot = await suppliersQuery.get();
 
     for (const doc of suppliersSnapshot.docs) {
@@ -90,17 +93,130 @@ export async function startQuotation(
           // Use the new centralized notification action
           await sendQuotationInvitation(supplier, formattedDeadline, userId);
       } catch (invitationError: any) {
-          console.error(`Erro ao gerar convite para ${supplier.empresa}:`, invitationError);
           // Do not throw, just log the error and continue with the next supplier.
       }
+    }
+    
+    // 6. Create notification for quotation start
+    try {
+      const quotationName = `Cotação #${newQuotationRef.id.slice(-6)} de ${format(deadline, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+      await notifyQuotationStarted({
+        userId: userId,
+        quotationId: newQuotationRef.id,
+        quotationName: quotationName,
+        itemsCount: itemsToInclude.length,
+        suppliersCount: supplierIds.length,
+        deadline: deadline
+      });
+    } catch (notificationError: any) {
+      console.error('❌ Error creating quotation start notification:', notificationError);
     }
     
     return { success: true };
 
   } catch (error: any) {
-    console.error('Erro detalhado ao iniciar cotação:', error);
     // This is where the error is caught and sent back to the client.
     const errorMessage = error.message || 'Ocorreu um erro desconhecido ao iniciar a cotação.';
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Updates an existing quotation with new items and potentially new suppliers/deadline.
+ * @returns An object indicating success or failure.
+ */
+export async function updateQuotation(
+  quotationId: string,
+  listId: string,
+  shoppingListDateISO: string,
+  newSupplierIds: string[], // All selected suppliers, including existing ones
+  deadlineISO: string,
+  counterProposalTimeInMinutes: number,
+  counterProposalReminderPercentage: number,
+  formattedDeadline: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const shoppingListDate = new Date(shoppingListDateISO);
+  const deadline = new Date(deadlineISO);
+
+  if (!quotationId || !listId || !shoppingListDate || newSupplierIds.length === 0 || !deadline || !formattedDeadline || !userId) {
+    return { success: false, error: 'Dados insuficientes para atualizar a cotação.' };
+  }
+
+  try {
+    const db = adminDb();
+    const mainBatch = db.batch();
+
+    const quotationRef = db.collection(QUOTATIONS_COLLECTION).doc(quotationId);
+    const quotationSnap = await quotationRef.get();
+
+    if (!quotationSnap.exists) {
+      throw new Error('Cotação existente não encontrada.');
+    }
+
+    const existingQuotationData = quotationSnap.data() as Quotation;
+    const existingSupplierIds = new Set(existingQuotationData.supplierIds || []);
+    const suppliersToAdd = newSupplierIds.filter(id => !existingSupplierIds.has(id));
+
+    // 1. Find new items to be included in the quotation (items with this listId but no quotationId)
+    const newItemsQuery = db
+      .collection(SHOPPING_LIST_ITEMS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('listId', '==', listId)
+      .where('status', '==', 'Pendente'); // Only pending items can be added to an existing quotation
+    const newItemsSnapshot = await newItemsQuery.get();
+    const newItemsToInclude = newItemsSnapshot.docs.filter(doc => !doc.data().quotationId);
+
+    // 2. Update the existing quotation document
+    mainBatch.update(quotationRef, {
+      supplierIds: admin.firestore.FieldValue.arrayUnion(...newSupplierIds), // Add new suppliers
+      deadline: Timestamp.fromDate(deadline),
+      counterProposalTimeInMinutes: counterProposalTimeInMinutes,
+      counterProposalReminderPercentage: counterProposalReminderPercentage,
+      status: 'Aberta', // Ensure status is 'Aberta' if it was 'Pausada'
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 3. Update new shopping list items to link them to this quotation
+    newItemsToInclude.forEach(doc => {
+      mainBatch.update(doc.ref, { quotationId: quotationId, status: 'Cotado' });
+    });
+
+    // 4. Commit main database writes
+    await mainBatch.commit();
+
+    // 5. Fetch new suppliers and send invitations
+    if (suppliersToAdd.length > 0) {
+      const suppliersQuery = db.collection(FORNECEDORES_COLLECTION).where(admin.firestore.FieldPath.documentId(), 'in', suppliersToAdd);
+      const suppliersSnapshot = await suppliersQuery.get();
+
+      for (const doc of suppliersSnapshot.docs) {
+        const supplier = { id: doc.id, ...doc.data() } as Fornecedor;
+        try {
+          await sendQuotationInvitation(supplier, formattedDeadline, userId);
+        } catch (invitationError: any) {
+          console.error(`Error sending invitation to new supplier ${supplier.id}:`, invitationError);
+        }
+      }
+    }
+
+    // 6. Create notification for quotation update (if new items or suppliers were added)
+    if (newItemsToInclude.length > 0 || suppliersToAdd.length > 0) {
+      const quotationName = `Cotação #${quotationId.slice(-6)} de ${format(deadline, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+      await notifyQuotationStarted({ // Reusing notifyQuotationStarted for now, might need a new type
+        userId: userId,
+        quotationId: quotationId,
+        quotationName: quotationName,
+        itemsCount: newItemsToInclude.length,
+        suppliersCount: suppliersToAdd.length,
+        deadline: deadline
+      });
+    }
+
+    return { success: true };
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Ocorreu um erro desconhecido ao atualizar a cotação.';
     return { success: false, error: errorMessage };
   }
 }
@@ -113,9 +229,14 @@ export async function startQuotation(
  */
 export async function closeQuotationAndItems(
   quotationId: string,
+  userId: string
 ): Promise<{ success: boolean; updatedItemsCount?: number; error?: string }> {
+    if (!userId) {
+        return { success: false, error: "User not authenticated." };
+    }
     try {
-        const quotationRef = adminDb.collection(QUOTATIONS_COLLECTION).doc(quotationId);
+        const db = adminDb();
+        const quotationRef = db.collection(QUOTATIONS_COLLECTION).doc(quotationId);
         const quotationSnap = await quotationRef.get();
 
         if (!quotationSnap.exists) {
@@ -127,8 +248,8 @@ export async function closeQuotationAndItems(
             return { success: true, updatedItemsCount: 0 };
         }
 
-        if (!quotationData.userId) { // Check for userId
-            throw new Error("Quotation is missing a userId.");
+        if (quotationData.userId !== userId) {
+            throw new Error("Unauthorized access to quotation.");
         }
         
         const listDate = quotationData.shoppingListDate?.toDate();
@@ -136,11 +257,11 @@ export async function closeQuotationAndItems(
              throw new Error("Quotation is missing a shopping list date.");
         }
         
-        const batch = adminDb.batch();
+        const batch = db.batch();
 
         batch.update(quotationRef, { status: "Fechada" });
 
-        const itemsQuery = adminDb.collection(SHOPPING_LIST_ITEMS_COLLECTION)
+        const itemsQuery = db.collection(SHOPPING_LIST_ITEMS_COLLECTION)
             .where("quotationId", "==", quotationId);
         
         const itemsSnapshot = await itemsQuery.get();
@@ -164,7 +285,7 @@ export async function closeQuotationAndItems(
                 const quotationName = quotationData.name || `Cotação de ${format(listDate, "dd/MM/yyyy", { locale: ptBR })}`;
                 
                 for (const supplierId of invitedSupplierIds) {
-                    const supplierDoc = await adminDb.collection(FORNECEDORES_COLLECTION).doc(supplierId).get();
+                    const supplierDoc = await db.collection(FORNECEDORES_COLLECTION).doc(supplierId).get();
                     if (supplierDoc.exists) {
                         const supplierData = supplierDoc.data() as Fornecedor;
                         if (supplierData.whatsapp) {
@@ -175,12 +296,12 @@ export async function closeQuotationAndItems(
                 }
             }
         } catch (notificationError: any) {
-            console.error("Failed to send closure notifications to suppliers:", notificationError);
+            // silently ignore
         }
 
         // --- Notify Buyer ---
         try {
-            const settingsDocRef = adminDb.collection('whatsapp_config').doc(quotationData.userId);
+            const settingsDocRef = db.collection('whatsapp_config').doc(quotationData.userId);
             const settingsDoc = await settingsDocRef.get();
             if (settingsDoc.exists) {
                 const settingsData = settingsDoc.data();
@@ -193,13 +314,36 @@ export async function closeQuotationAndItems(
                 }
             }
         } catch (buyerNotificationError: any) {
-            console.error("Failed to send closure notification to buyer:", buyerNotificationError);
+            // silently ignore
+        }
+
+        // --- Create System Notification ---
+        try {
+            // Count total offers received
+            const quotationDoc = db.collection('quotations').doc(quotationId);
+            const productsSnapshot = await quotationDoc.collection('products').get();
+            let totalOffers = 0;
+            
+            for (const productDoc of productsSnapshot.docs) {
+                const offersSnapshot = await productDoc.ref.collection('offers').get();
+                totalOffers += offersSnapshot.size;
+            }
+            
+            const quotationName = quotationData.name || `Cotação #${quotationId.slice(-6)} de ${format(listDate, 'dd/MM/yy (HH:mm)', { locale: ptBR })}`;
+            await notifyQuotationClosed({
+                userId: quotationData.userId,
+                quotationId: quotationId,
+                quotationName: quotationName,
+                totalOffers: totalOffers,
+                closedItemsCount: updatedItemsCount
+            });
+        } catch (notificationError: any) {
+            console.error('❌ Error creating quotation closure notification:', notificationError);
         }
 
         return { success: true, updatedItemsCount };
 
     } catch (error: any) {
-        console.error("Error in closeQuotationAndItems:", error);
         return { success: false, error: error.message };
     }
 }

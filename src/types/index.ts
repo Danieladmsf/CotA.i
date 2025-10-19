@@ -47,6 +47,8 @@ export interface ShoppingListItem {
   hasSpecificDate?: boolean; // True if the user explicitly set a date for this item
   quotationId?: string | null; // Links this item to a specific quotation
   userId: string; // To scope list items to a user
+  categoryId?: string; // Denormalized from Supply
+  categoryName?: string; // Denormalized from Supply
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
 }
@@ -57,6 +59,8 @@ export interface Fornecedor {
   cnpj: string;
   vendedor: string;
   whatsapp: string;
+  email?: string; // Email do vendedor (opcional)
+  pin?: string; // PIN de acesso ao portal (4-6 dígitos, hasheado)
   fotoUrl: string;
   fotoHint: string;
   status?: 'ativo' | 'pendente';
@@ -84,17 +88,45 @@ export interface Quotation {
 
 export interface Offer {
   id?: string; // Firestore document ID
+  quotationId: string; // Added to enable collection group queries
   supplierId: string;
   supplierName: string;
   supplierInitials: string; // Ex: "JG" para Juliana G.
   pricePerUnit: number;
   brandOffered: string;
   packagingDescription: string;
+  packagingType?: 'closed_package' | 'bulk'; // 'closed_package' = Caixa/Fardo fechado, 'bulk' = A Granel
   unitsInPackaging: number;
+  unitsPerPackage?: number; // Para 'closed_package': quantas unidades vêm em cada caixa
+  unitWeight?: number; // Para 'bulk': peso/volume de cada embalagem individual
   totalPackagingPrice: number;
   updatedAt: Timestamp | FieldValue;
   createdAt?: Timestamp | FieldValue; // Added to track when offer was created
   productId: string; // Added to explicitly link offer to product within the offer data itself
+}
+
+export interface PendingBrandRequest {
+  id?: string; // Firestore document ID
+  quotationId: string;
+  productId: string;
+  productName: string; // Denormalized from ShoppingListItem for convenience
+  supplierId: string;
+  supplierName: string;
+  supplierInitials: string;
+  brandName: string;
+  packagingDescription: string;
+  unitsInPackaging: number;
+  unitWeight?: number; // Peso unitário da embalagem
+  totalPackagingPrice: number;
+  pricePerUnit: number; // Calculated from totalPackagingPrice / unitsInPackaging
+  imageUrl?: string; // URL do Vercel Blob Storage
+  imageFileName?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  buyerUserId: string; // ID do comprador que vai aprovar
+  sellerUserId: string; // ID do vendedor que sugeriu
+  createdAt: Timestamp | FieldValue;
+  updatedAt: Timestamp | FieldValue;
+  rejectionReason?: string; // Motivo da rejeição, se aplicável
 }
 
 
@@ -128,4 +160,69 @@ export interface WhatsAppSessionRequest {
   status: 'requested' | 'processing' | 'active' | 'failed';
   requestedAt: Timestamp | FieldValue;
   processedAt?: Timestamp | FieldValue;
+}
+
+export type NotificationType =
+  | 'brand_approval_pending'
+  | 'brand_approval_approved'
+  | 'brand_approval_rejected'
+  | 'quantity_variation_detected'
+  | 'buyer_quantity_adjustment_requested'
+  | 'buyer_adjustment_applied'
+  | 'quantity_adjustment_approved'
+  | 'quantity_adjustment_rejected'
+  | 'quotation_started'
+  | 'quotation_closed'
+  | 'offer_received'
+  | 'offer_outbid'
+  | 'deadline_approaching'
+  | 'system_message';
+
+export interface SystemNotification {
+  id: string;
+  userId?: string; // The user who the notification is for (e.g., the buyer) - optional for supplier notifications
+  targetSupplierId?: string; // The supplier this notification is for (for anonymous portal access)
+  type: NotificationType;
+  title: string;
+  message: string;
+  quotationId?: string;
+  quotationName?: string;
+  productId?: string;
+  productName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  brandName?: string;
+  isRead: boolean;
+  priority: 'low' | 'medium' | 'high';
+  createdAt: Timestamp | FieldValue;
+  readAt?: Timestamp | FieldValue;
+  actionUrl?: string; // URL para navegar quando clicado
+  metadata?: Record<string, any>; // Para dados extras específicos do tipo
+  entityId?: string; // ID da entidade relacionada (ex: brand request ID)
+}
+
+export interface PriceProgression {
+  from_price: number | null;
+  to_price: number;
+  variation: number;
+  date: string; // ISO date string
+}
+
+export interface PriceHistory {
+  id: string;
+  supplyId: string; // Reference to Supply
+  supplyName?: string; // Denormalized for display
+  old_price: number | null;
+  new_price: number;
+  supplier: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  category: string;
+  percentage_change: number;
+  min_price: number;
+  max_price: number;
+  total_variation: number;
+  price_progression: PriceProgression[];
+  userId: string; // To scope history to a user
+  createdAt?: Timestamp | FieldValue;
+  updatedAt?: Timestamp | FieldValue;
 }

@@ -6,14 +6,21 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Loader2, Building, Clock, FileText } from 'lucide-react';
+import { ArrowRight, Loader2, Building, Clock, FileText, Settings } from 'lucide-react';
 import { db } from '@/lib/config/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc, getDocs } from 'firebase/firestore';
 import type { Quotation, Fornecedor } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
+import AddFornecedorModal, { FornecedorFormValues } from '@/components/features/fornecedores/AddFornecedorModal';
+import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
+import { voiceMessages } from '@/config/voiceMessages';
+import { useSupplierAuth } from '@/hooks/useSupplierAuth';
+import SupplierPinModal from '@/components/features/portal/SupplierPinModal';
 
 const QUOTATIONS_COLLECTION = "quotations";
 const FORNECEDORES_COLLECTION = "fornecedores";
@@ -48,14 +55,18 @@ const getQuotationCardStyle = (status: Quotation['status']) => {
 export default function SupplierPortalPage() {
   const router = useRouter();
   const params = useParams();
-  // LÓGICA DO PORTAL: O ID do fornecedor é capturado diretamente da URL.
-  // Este ID é a "chave" que garante o isolamento dos dados.
   const supplierId = params.supplierId as string;
   const { toast } = useToast();
+  const { speak } = useVoiceAssistant();
+
+  // PIN Authentication
+  const { isAuthenticated, isLoading: authLoading, supplier: authSupplier, showPinModal, verifyPin } = useSupplierAuth(supplierId);
 
   const [supplier, setSupplier] = useState<Fornecedor | null>(null);
   const [openQuotations, setOpenQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [hasSpokenWelcome, setHasSpokenWelcome] = useState(false);
 
   useEffect(() => {
     if (!supplierId) {
@@ -68,7 +79,6 @@ export default function SupplierPortalPage() {
       return;
     }
 
-    // Carrega os dados do fornecedor para garantir que o ID é válido
     const supplierDocRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
     const unsubSupplier = onSnapshot(supplierDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -92,17 +102,34 @@ export default function SupplierPortalPage() {
       setSupplier(null);
     });
 
-    // LÓGICA DE ISOLAMENTO: A busca por cotações é filtrada para incluir apenas aquelas
-    // onde o ID do fornecedor (da URL) está presente no array `supplierIds`.
-    // Isso impede que um fornecedor veja cotações para as quais não foi convidado.
     const quotationsQuery = query(
         collection(db, "quotations"), 
         where("supplierIds", "array-contains", supplierId),
         where("status", "in", ["Aberta", "Pausada", "Fechada", "Concluída"]), 
         orderBy("deadline", "desc")
     );
-    const unsubQuotations = onSnapshot(quotationsQuery, (querySnapshot) => {
+    const unsubQuotations = onSnapshot(quotationsQuery, async (querySnapshot) => {
       const fetchedQuotations = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
+      
+      // Check for expired quotations and update their status
+      const currentTime = new Date();
+      const quotationsToUpdate = fetchedQuotations.filter(quotation => 
+        quotation.status === 'Aberta' && 
+        quotation.deadline && 
+        quotation.deadline.toDate() <= currentTime
+      );
+
+      // Close expired quotations
+      for (const expiredQuotation of quotationsToUpdate) {
+        try {
+          console.log(`[Portal] Auto-closing expired quotation ${expiredQuotation.id}`);
+          const quotationRef = doc(db, "quotations", expiredQuotation.id);
+          await updateDoc(quotationRef, { status: "Fechada" });
+        } catch (error) {
+          console.error(`Failed to close expired quotation ${expiredQuotation.id}:`, error);
+        }
+      }
+
       setOpenQuotations(fetchedQuotations);
       setIsLoading(false);
     }, (error) => {
@@ -121,11 +148,114 @@ export default function SupplierPortalPage() {
     };
   }, [supplierId, toast]);
 
+  // Voice assistant welcome message
+  useEffect(() => {
+    if (!isLoading && supplier && !hasSpokenWelcome) {
+      console.log('[Voice] Portal welcome - triggering speech');
+      const supplierName = supplier.empresa || 'Fornecedor';
+      const openQuotationsActive = openQuotations.filter(q => q.status === 'Aberta');
+
+      const speakWelcome = async () => {
+        if (openQuotationsActive.length > 0) {
+          // Buscar a data de entrega da primeira cotação aberta
+          const firstQuotation = openQuotationsActive[0];
+
+          try {
+            const itemsQuery = query(
+              collection(db, "shopping_list_items"),
+              where("quotationId", "==", firstQuotation.id)
+            );
+            const itemsSnapshot = await getDocs(itemsQuery);
+
+            if (!itemsSnapshot.empty) {
+              const firstItem = itemsSnapshot.docs[0].data();
+              if (firstItem.deliveryDate) {
+                const deliveryDate = firstItem.deliveryDate.toDate();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                deliveryDate.setHours(0, 0, 0, 0);
+
+                const isToday = deliveryDate.getTime() === today.getTime();
+                const dateStr = isToday ? 'hoje' : format(deliveryDate, "dd 'de' MMMM", { locale: ptBR });
+
+                speak(`Olá ${supplierName}! Você tem ${openQuotationsActive.length} ${openQuotationsActive.length === 1 ? 'cotação aberta' : 'cotações abertas'} na data de ${dateStr}.`);
+              } else {
+                speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+              }
+            } else {
+              speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+            }
+          } catch (error) {
+            console.error('Error fetching quotation items:', error);
+            speak(voiceMessages.welcome.supplierPortal(supplierName, openQuotationsActive.length));
+          }
+        } else {
+          speak(voiceMessages.welcome.supplierPortal(supplierName, 0));
+        }
+      };
+
+      speakWelcome();
+      setHasSpokenWelcome(true);
+    }
+  }, [isLoading, supplier, openQuotations, hasSpokenWelcome, speak]);
+
+  const handleUpdateSupplier = async (data: FornecedorFormValues) => {
+    if (!supplierId) return;
+    try {
+      const supplierRef = doc(db, FORNECEDORES_COLLECTION, supplierId);
+      await updateDoc(supplierRef, data);
+      toast({
+        title: "Sucesso",
+        description: "Seus dados foram atualizados.",
+        variant: "default",
+      });
+      setIsModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Show loading while checking authentication or loading data
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  // Show PIN modal if not authenticated
+  if (showPinModal && authSupplier) {
+    return (
+      <SupplierPinModal
+        isOpen={true}
+        supplierName={authSupplier.empresa}
+        onVerify={verifyPin}
+      />
+    );
+  }
+
+  // Block access if not authenticated (and supplier has PIN)
+  if (!isAuthenticated && authSupplier?.pin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Aguardando autenticação...</p>
+      </div>
+    );
+  }
+
+  // If supplier has no PIN, allow access (backward compatibility)
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Carregando portal do fornecedor...</p>
+        <p className="text-lg text-muted-foreground">Carregando portal...</p>
       </div>
     );
   }
@@ -142,63 +272,110 @@ export default function SupplierPortalPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 min-h-screen bg-background">
-      <header className="mb-8 text-center md:text-left">
-        <h1 className="text-3xl md:text-4xl font-bold text-primary mb-2">Portal do Fornecedor</h1>
-        <p className="text-xl text-foreground">Bem-vindo(a), {supplier.empresa}!</p>
-        <p className="text-md text-muted-foreground">Aqui você pode visualizar e responder às cotações abertas.</p>
-      </header>
+    <>
+      <div className="container mx-auto p-4 md:p-6 lg:p-8 min-h-screen bg-background">
+        <header className="mb-8">
+          <Card className="shadow-lg overflow-hidden">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6 bg-card">
+              <div className="relative">
+                <Avatar className="h-24 w-24 border-4 border-background shadow-md">
+                  {supplier.fotoUrl ? (
+                                        <Image src={supplier.fotoUrl} alt={supplier.empresa} width={96} height={96} className="object-cover w-full h-full" />
+                  ) : (
+                    <AvatarFallback className="text-3xl bg-primary text-primary-foreground">
+                      {supplier.empresa.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              </div>
+              <div className="flex-grow text-center sm:text-left">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{supplier.empresa}</h1>
+                <p className="text-md text-muted-foreground">Bem-vindo(a) ao seu portal, {supplier.vendedor}!</p>
+                <p className="text-sm text-muted-foreground mt-1">Aqui você pode visualizar e responder às cotações abertas.</p>
+              </div>
+              <div className="flex-shrink-0 self-center sm:self-start">
+                <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Editar Dados
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </header>
 
-      {openQuotations.length === 0 ? (
-        <Card className="shadow-lg text-center">
-          <CardHeader>
-            <CardTitle>Nenhuma Cotação Encontrada</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Nenhuma cotação foi encontrada para você no momento. Cotações em que você for convidado aparecerão aqui.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-foreground">Cotações Recentes ({openQuotations.length})</h2>
-          {openQuotations.map((quotation) => {
-            const style = getQuotationCardStyle(quotation.status);
-            return(
-                <Card key={quotation.id} className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
-                    <CardHeader className={`p-0 ${style.headerClass}`}>
-                        <div className="p-6">
-                            <CardTitle className="text-xl flex items-center justify-between">
-                                <span>
-                                    Cotação para Entrega em: {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
-                                </span>
-                                <Badge variant="outline" className={style.badgeClass}>{quotation.status}</Badge>
-                            </CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-3">
-                        <div className="flex items-center text-muted-foreground">
-                            <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <span>Prazo final para envio: <span className="font-semibold text-foreground">{format(quotation.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></span>
-                        </div>
-                        <div className="flex items-center text-muted-foreground text-sm">
-                            <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">Ref ID: {quotation.id}</span>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/50 p-4 border-t">
-                        <Button asChild className="w-full md:w-auto ml-auto" variant={quotation.status === 'Aberta' ? 'default' : 'secondary'}>
-                            {/* O link para a página de cotação também inclui o `supplierId` e `quotationId`, 
-                                mantendo o contexto seguro e isolado. */}
-                            <Link href={`/portal/${supplierId}/cotar/${quotation.id}`}>
-                                {quotation.status === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-            )
-          })}
-        </div>
+        {openQuotations.length === 0 ? (
+          <Card className="shadow-lg text-center">
+            <CardHeader>
+              <CardTitle>Nenhuma Cotação Encontrada</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Nenhuma cotação foi encontrada para você no momento. Cotações em que você for convidado aparecerão aqui.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-foreground">Cotações Recentes ({openQuotations.length})</h2>
+            {openQuotations.map((quotation) => {
+              const style = getQuotationCardStyle(quotation.status);
+              const now = new Date();
+              const isExpired = quotation.deadline && quotation.deadline.toDate() <= now;
+              const actualStatus = (quotation.status === 'Aberta' && isExpired) ? 'Fechada' : quotation.status;
+              
+              return(
+                  <Card key={quotation.id} className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                      <CardHeader className={`p-0 ${style.headerClass}`}>
+                          <div className="p-6">
+                              <CardTitle className="text-xl flex items-center justify-between">
+                                  <span>
+                                      {actualStatus === 'Aberta' ? 'Cotação para:' : 'Cotação encerrada:'} {format(quotation.shoppingListDate.toDate(), "dd/MM/yyyy", { locale: ptBR })}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className={style.badgeClass}>{actualStatus}</Badge>
+                                    {isExpired && quotation.status === 'Aberta' && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Expirada
+                                      </Badge>
+                                    )}
+                                  </div>
+                              </CardTitle>
+                          </div>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-3">
+                          <div className="flex items-center text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span>Prazo final para envio: <span className="font-semibold text-foreground">{format(quotation.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></span>
+                              {isExpired && (
+                                <Badge variant="outline" className="ml-2 text-xs text-destructive border-destructive">
+                                  Expirado
+                                </Badge>
+                              )}
+                          </div>
+                          <div className="flex items-center text-muted-foreground text-sm">
+                              <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span className="truncate">Ref ID: {quotation.id}</span>
+                          </div>
+                      </CardContent>
+                      <CardFooter className="bg-muted/50 p-4 border-t">
+                          <Button asChild className="w-full md:w-auto ml-auto" variant={actualStatus === 'Aberta' ? 'default' : 'secondary'}>
+                              <Link href={`/portal/${supplierId}/cotar/${quotation.id}`}>
+                                  {actualStatus === 'Aberta' ? 'Visualizar e Cotar' : 'Ver Resultado'} <ArrowRight className="ml-2 h-4 w-4" />
+                              </Link>
+                          </Button>
+                      </CardFooter>
+                  </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      {isModalOpen && (
+        <AddFornecedorModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleUpdateSupplier}
+          fornecedor={supplier}
+        />
       )}
-    </div>
+    </>
   );
 }

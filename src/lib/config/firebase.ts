@@ -1,46 +1,52 @@
+import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
+import { getFirestore, Firestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
+import { getAuth, Auth } from "firebase/auth";
 
-// Import the functions you need from the SDKs you need
-import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getAuth, type Auth } from "firebase/auth";
-
-// Your web app's Firebase configuration, provided from your project settings
-const firebaseConfig = {
-  apiKey: "AIzaSyCvAwRaUrnMrrYVzCoq4l0XQ5NffasG2yk",
-  authDomain: "cotao-online.firebaseapp.com",
-  projectId: "cotao-online",
-  storageBucket: "cotao-online.firebasestorage.app",
-  messagingSenderId: "613398815464",
-  appId: "1:613398815464:web:5b495025fd93a974155f5d"
-};
-
-// Initialize Firebase
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+// Suppress Firestore transport error warnings in console
+if (typeof window !== 'undefined') {
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    const message = args[0]?.toString() || '';
+    // Suppress specific Firestore warnings that are non-critical
+    if (message.includes('WebChannelConnection RPC') && message.includes('transport errored')) {
+      return; // Silent suppress
+    }
+    originalWarn.apply(console, args);
+  };
 }
 
-const db: Firestore = getFirestore(app);
-const storage: FirebaseStorage = getStorage(app);
-const auth: Auth = getAuth(app);
-
-// A flag to check if Firebase was initialized (it always will be with this config)
-export const isFirebaseInitialized = true;
-
-// Debug function to log Firebase config (without sensitive data)
-export const debugFirebaseConfig = () => {
-  console.log('🔧 Firebase Debug Info:');
-  console.log('- Project ID:', firebaseConfig.projectId);
-  console.log('- Auth Domain:', firebaseConfig.authDomain);
-  console.log('- Apps initialized:', getApps().length);
-  console.log('- Current URL:', window.location.origin);
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Export the instances for use in client components
-export { db, storage, auth };
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 
-// Optionally, export the app instance if needed elsewhere
-export default app;
+const isFirebaseInitialized = firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId;
+
+if (isFirebaseInitialized) {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
+  }
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
+} else {
+  console.error('❌ Firebase: Configuração incompleta - verificar variáveis de ambiente');
+  app = {} as FirebaseApp;
+  auth = {} as Auth;
+  db = {} as Firestore;
+  storage = {} as FirebaseStorage;
+}
+
+export { db, storage, auth, app, isFirebaseInitialized };

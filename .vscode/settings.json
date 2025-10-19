@@ -3,5 +3,10 @@
     "IDX.aI.enableCodebaseIndexing": false,
     "git.ignoreLimitWarning": true,
     "IDX.agenticWorkspace": false,
-    "IDX.aI.showChatInEditorTab": false
+    "IDX.aI.showChatInEditorTab": true,
+    "livePreview.autoRefreshPreview": "On Changes to Saved Files",
+    "livePreview.showStatusBarItem": true,
+    "livePreview.openPreviewTarget": "External Browser",
+    "workbench.statusBar.visible": true,
+    "geminicodeassist.enable": true
 }

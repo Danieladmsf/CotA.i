@@ -1,13 +1,12 @@
-
 "use client";
 
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { format, addDays, subDays, startOfDay, endOfDay, isSameDay } from "date-fns";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { db } from '@/lib/config/firebase';
-import { collection, query, where, onSnapshot, Timestamp, doc, updateDoc, orderBy, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import type { ShoppingListItem, Quotation } from '@/types';
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -24,99 +23,90 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 
 import {
-    ChevronLeft,
-    ChevronRight,
-    Calendar as IconCalendar,
     Search,
-    Download,
-    Eye,
     Loader2,
-    Info,
     PauseCircle,
     PlayCircle,
     FileBarChart,
+    Calendar as IconCalendar
 } from 'lucide-react';
 
 const QUOTATIONS_COLLECTION = 'quotations';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
 
 interface GestaoComprasTabProps {
-  selectedDate: Date;
-  onDateChange: (date: Date) => void;
+  selectedQuotationId: string | null;
 }
 
-export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoComprasTabProps) {
+export default function GestaoComprasTab({ selectedQuotationId }: GestaoComprasTabProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
   
+  const [activeQuotation, setActiveQuotation] = useState<Quotation | null>(null);
   const [shoppingListItems, setShoppingListItems] = useState<ShoppingListItem[]>([]);
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos-status");
-  const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
 
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [quotationToResume, setQuotationToResume] = useState<Quotation | null>(null);
   const [newDeadlineDate, setNewDeadlineDate] = useState<Date | undefined>();
   const [newDeadlineTime, setNewDeadlineTime] = useState("17:00");
 
-  const activeQuotation = useMemo(() => {
-    return quotations.find(q => q.id === selectedQuotationId) || quotations.find(q => q.status === 'Aberta' || q.status === 'Pausada') || quotations[0] || null;
-  }, [quotations, selectedQuotationId]);
-
+  // Fetch the selected quotation
   useEffect(() => {
-    if (!user || !selectedDate) {
+    if (!selectedQuotationId || !user) {
+      setActiveQuotation(null);
+      setShoppingListItems([]);
       setIsLoading(false);
       return;
     }
-    
+
     setIsLoading(true);
-    const startOfSelectedDay = startOfDay(selectedDate);
-    const endOfSelectedDay = endOfDay(selectedDate);
-    
-    // Listener for Quotations
-    const qQuotations = query(
+    const qQuotation = query(
       collection(db, QUOTATIONS_COLLECTION),
-      where("userId", "==", user.uid),
-      where("shoppingListDate", ">=", Timestamp.fromDate(startOfSelectedDay)),
-      where("shoppingListDate", "<=", Timestamp.fromDate(endOfSelectedDay))
+      where("userId", "==", user.uid)
     );
-    const unsubQuotations = onSnapshot(qQuotations, (snapshot) => {
+
+    const unsubscribeQuotation = onSnapshot(qQuotation, (snapshot) => {
       const fetchedQuotations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
-      setQuotations(fetchedQuotations);
+      const found = fetchedQuotations.find(q => q.id === selectedQuotationId);
+      setActiveQuotation(found || null);
     }, (error) => {
-      console.error("Error fetching quotations:", error);
-      toast({title: "Erro ao buscar cotações", description: error.message, variant: "destructive"});
+      console.error("Error fetching quotation:", error);
+      toast({ title: "Erro ao carregar cotação", description: error.message, variant: "destructive" });
+      setIsLoading(false);
     });
 
-    // Listener for Shopping List Items
+    return () => unsubscribeQuotation();
+  }, [selectedQuotationId, user, toast]);
+
+  useEffect(() => {
+    if (!activeQuotation) {
+      setShoppingListItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
     const qItems = query(
       collection(db, SHOPPING_LIST_ITEMS_COLLECTION),
-      where("userId", "==", user.uid),
-      where("listDate", ">=", Timestamp.fromDate(startOfSelectedDay)),
-      where("listDate", "<=", Timestamp.fromDate(endOfSelectedDay))
+      where("quotationId", "==", activeQuotation.id)
     );
-    const unsubItems = onSnapshot(qItems, (snapshot) => {
+
+    const unsubscribe = onSnapshot(qItems, (snapshot) => {
       const fetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingListItem));
       setShoppingListItems(fetchedItems);
       setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching list items:", error);
-      toast({title: "Erro ao carregar lista de compras", description: error.message, variant: "destructive"});
+      console.error("Error fetching items for quotation:", error);
+      toast({ title: "Erro ao carregar itens da cotação", description: error.message, variant: "destructive" });
       setIsLoading(false);
     });
 
-    return () => {
-      unsubQuotations();
-      unsubItems();
-    };
-  }, [selectedDate, user, toast]);
-
-  const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
-  const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
+    return () => unsubscribe();
+  }, [activeQuotation, toast]);
 
   const handlePauseToggle = async () => {
     if (!activeQuotation) return;
@@ -161,22 +151,18 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
   };
   
   const itemsToDisplay = useMemo(() => {
-    const listToFilter = activeQuotation
-      ? shoppingListItems.filter(item => item.quotationId === activeQuotation.id)
-      : shoppingListItems.filter(item => !item.quotationId);
-
-    return listToFilter.filter(item => {
+    return shoppingListItems.filter(item => {
       const searchTermMatch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const statusMatch = statusFilter === 'todos-status' || item.status === statusFilter;
       return searchTermMatch && statusMatch;
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [shoppingListItems, activeQuotation, searchTerm, statusFilter]);
+  }, [shoppingListItems, searchTerm, statusFilter]);
 
-  const getStatusBadgeVariant = (status: ShoppingListItem['status']): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: ShoppingListItem['status']): "default" | "secondary" | "destructive" | "outline" | "success" => {
     switch (status) {
       case 'Comprado': return 'default';
       case 'Pendente': return 'outline';
-      case 'Cotado': return 'secondary';
+      case 'Cotado': return 'success';
       case 'Recebido': return 'secondary';
       case 'Cancelado': return 'destructive';
       case 'Encerrado': return 'destructive';
@@ -188,39 +174,6 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
     <>
       <Card>
         <CardHeader className="flex-wrap !flex-row gap-4 justify-between items-center">
-          <div className="flex items-center flex-wrap">
-            <Button variant="outline" size="icon" onClick={handlePreviousDay} className="rounded-r-none border-r-0">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="min-w-[240px] justify-start text-left font-normal rounded-none">
-                  <IconCalendar className="mr-2 h-4 w-4" />
-                  {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && onDateChange(d)} initialFocus locale={ptBR} />
-              </PopoverContent>
-            </Popover>
-            <Button variant="outline" size="icon" onClick={handleNextDay} className="rounded-l-none border-l-0">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          {quotations.length > 1 && (
-            <Select value={selectedQuotationId || ""} onValueChange={setSelectedQuotationId}>
-              <SelectTrigger className="w-full sm:w-auto">
-                <SelectValue placeholder="Ver cotação específica" />
-              </SelectTrigger>
-              <SelectContent>
-                {quotations.map((q) => (
-                  <SelectItem key={q.id} value={q.id}>
-                    Cotação de {format(q.shoppingListDate.toDate(), "dd/MM/yy HH:mm")} - {q.status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -245,11 +198,11 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
           ) : (
             <>
               {activeQuotation && (
-                <Alert variant={activeQuotation.status === 'Aberta' ? 'default' : 'destructive'} className="bg-primary/5 border-primary/20">
+                <Alert variant={activeQuotation.status === 'Aberta' ? 'default' : 'destructive'} className="bg-blue-100 border-blue-300 text-blue-800 p-4 rounded-lg">
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center w-full gap-2">
                     <div>
-                      <AlertTitle className="text-primary">{`Cotação ${activeQuotation.status}`}</AlertTitle>
-                      <p className="text-sm text-muted-foreground">Prazo: {format(activeQuotation.deadline.toDate(), "dd/MM/yyyy HH:mm")}</p>
+                      <AlertTitle className="text-lg font-bold text-blue-900">{`Cotação ${activeQuotation.status}`}</AlertTitle>
+                      <p className="text-md text-blue-800">Prazo: {format(activeQuotation.deadline.toDate(), "dd/MM/yyyy HH:mm")}</p>
                     </div>
                     <div className="flex items-center gap-2 self-start sm:self-center">
                       {(activeQuotation.status === 'Aberta' || activeQuotation.status === 'Pausada') && (
@@ -277,7 +230,7 @@ export default function GestaoComprasTab({ selectedDate, onDateChange }: GestaoC
                     {itemsToDisplay.length > 0 ? (
                       itemsToDisplay.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell><Badge variant={getStatusBadgeVariant(item.status)}>{item.status}</Badge></TableCell>
+                          <TableCell><Badge variant={getStatusBadgeVariant(item.status)}>{item.status === 'Cotado' ? 'Cotando' : item.status}</Badge></TableCell>
                           <TableCell>{`${item.quantity} ${item.unit}`}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>{item.preferredBrands || "-"}</TableCell>

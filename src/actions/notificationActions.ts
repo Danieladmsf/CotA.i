@@ -29,7 +29,8 @@ async function queueMessageForSending(phoneNumber: string, messageContent: strin
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     
-    await adminDb.collection(MESSAGES_COLLECTION).add(messageEntry);
+    const db = adminDb();
+    await db.collection(MESSAGES_COLLECTION).add(messageEntry);
 }
 
 
@@ -158,6 +159,106 @@ export async function sendCounterProposalReminder(
         await queueMessageForSending(supplier.whatsapp, message, userId, supplier.empresa);
         return { success: true };
     } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Sends a notification to the buyer about quantity variations in supplier offers.
+ */
+export async function sendQuantityVariationNotification(
+    buyerInfo: { whatsapp?: string; name?: string },
+    notificationData: {
+      supplierName: string;
+      productName: string;
+      brandName: string;
+      requestedQuantity: number;
+      offeredQuantity: number;
+      unit: string;
+      variationType: 'over' | 'under';
+      variationPercentage: number;
+    },
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    console.log('🔔 [sendQuantityVariationNotification] START', {
+        userId,
+        supplierName: notificationData.supplierName,
+        productName: notificationData.productName,
+        brandName: notificationData.brandName,
+        requestedQty: notificationData.requestedQuantity,
+        offeredQty: notificationData.offeredQuantity,
+        variationType: notificationData.variationType,
+        buyerInfoProvided: !!buyerInfo.whatsapp,
+    });
+
+    // Se WhatsApp não foi fornecido, buscar do Firestore (server-side)
+    let buyerWhatsApp = buyerInfo.whatsapp;
+    let buyerName = buyerInfo.name || 'Comprador';
+
+    if (!buyerWhatsApp) {
+        console.log('📞 [sendQuantityVariationNotification] Fetching buyer WhatsApp from database for userId:', userId);
+
+        try {
+            const db = adminDb();
+            const settingsDoc = await db.collection('whatsapp_config').doc(userId).get();
+
+            if (!settingsDoc.exists) {
+                console.error('❌ [sendQuantityVariationNotification] WhatsApp config not found for userId:', userId);
+                return { success: false, error: `WhatsApp config not found for user ${userId}` };
+            }
+
+            const settingsData = settingsDoc.data();
+            buyerWhatsApp = settingsData?.buyer_whatsapp_number;
+            buyerName = settingsData?.buyer_name || 'Comprador';
+
+            console.log('✅ [sendQuantityVariationNotification] Buyer info fetched:', {
+                hasWhatsApp: !!buyerWhatsApp,
+                buyerName,
+                whatsAppLength: buyerWhatsApp?.length || 0,
+            });
+        } catch (fetchError: any) {
+            console.error('❌ [sendQuantityVariationNotification] Error fetching buyer config:', {
+                error: fetchError.message,
+                code: fetchError.code,
+                userId,
+            });
+            return { success: false, error: `Failed to fetch buyer config: ${fetchError.message}` };
+        }
+    }
+
+    if (!buyerWhatsApp) {
+        console.error('❌ [sendQuantityVariationNotification] No buyer WhatsApp found after fetch attempt');
+        return { success: false, error: `Buyer has no WhatsApp number configured.` };
+    }
+
+    const variationIcon = notificationData.variationType === 'over' ? '📈' : '📉';
+    const variationText = notificationData.variationType === 'over' ? 'acima' : 'abaixo';
+    const variationSign = notificationData.variationType === 'over' ? '+' : '-';
+
+    const message = `${variationIcon} *Variação de Quantidade Detectada*\n\n` +
+        `Fornecedor: *${notificationData.supplierName}*\n` +
+        `Produto: *${notificationData.productName} (${notificationData.brandName})*\n\n` +
+        `Solicitado: *${notificationData.requestedQuantity} caixas*\n` +
+        `Ofertado: *${notificationData.offeredQuantity} caixas*\n` +
+        `Variação: *${variationSign}${notificationData.variationPercentage.toFixed(1)}%* (${variationText} do pedido)\n\n` +
+        `⚠️ Por favor, revise se esta variação é aceitável para sua operação.`;
+
+    console.log('📝 [sendQuantityVariationNotification] Message prepared:', {
+        messageLength: message.length,
+        buyerWhatsApp,
+        userId,
+    });
+
+    try {
+        await queueMessageForSending(buyerWhatsApp, message, userId, notificationData.supplierName);
+        console.log('✅ [sendQuantityVariationNotification] Message queued successfully');
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ [sendQuantityVariationNotification] Error queuing message:', {
+            error: error.message,
+            code: error.code,
+            stack: error.stack,
+        });
         return { success: false, error: error.message };
     }
 }

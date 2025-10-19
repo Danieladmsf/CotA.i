@@ -1,0 +1,41 @@
+# AI Exclusion file for Gemini Code Assist
+# Exclude common files that shouldn't be used as context
+
+# Dependencies
+node_modules/
+.git/
+.next/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+.tmp/
+temp/
+.cache/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Sensitive files
+.env*
+*.key
+*.pem
+*.p12
+secrets/
+
+# Large files
+*.pdf
+*.zip
+*.tar.gz
+*.sql
+
+# Test files (if you don't want them in context)
+*.test.*
+*.spec.*
+__tests__/
+test/

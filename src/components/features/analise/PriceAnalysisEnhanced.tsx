@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,8 +49,6 @@ import {
   LineChart,
   Star,
   Filter,
-  Eye,
-  EyeOff,
   Loader2,
   RefreshCw,
   Package,
@@ -68,6 +66,8 @@ import { db } from '@/lib/config/firebase';
 import { collection, query, getDocs, orderBy, where, Timestamp } from 'firebase/firestore';
 import type { Supply, Offer, Quotation, Fornecedor } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -143,6 +143,11 @@ interface SupplierAnalysis {
 }
 
 export default function PriceAnalysisEnhanced() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const setActions = useSetHeaderActions();
+  const previousActionsRef = useRef<React.ReactNode>(null);
+
   const [analysisData, setAnalysisData] = useState<PriceAnalysisItem[]>([]);
   const [filteredData, setFilteredData] = useState<PriceAnalysisItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -150,12 +155,10 @@ export default function PriceAnalysisEnhanced() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'lastVariationPercent', direction: 'desc' });
-  const [activeTab, setActiveTab] = useState("overview");
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("products");
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const { toast } = useToast();
 
   const [filters, setFilters] = useState<FilterState>({
     dateRange: {
@@ -177,72 +180,80 @@ export default function PriceAnalysisEnhanced() {
   });
 
   const loadAnalysisData = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Buscar insumos
-      const suppliesQuery = query(collection(db, 'supplies'), orderBy('name'));
-      const suppliesSnapshot = await getDocs(suppliesQuery);
+
+      // Carregar dados em paralelo para melhor performance
+      const [suppliesSnapshot, quotationsSnapshot, suppliersSnapshot] = await Promise.all([
+        getDocs(query(
+          collection(db, 'supplies'),
+          where('userId', '==', user.uid),
+          orderBy('name')
+        )),
+        getDocs(query(
+          collection(db, 'quotations'),
+          where('userId', '==', user.uid),
+          where('createdAt', '>=', Timestamp.fromDate(filters.dateRange.start)),
+          where('createdAt', '<=', Timestamp.fromDate(filters.dateRange.end)),
+          orderBy('createdAt', 'desc')
+        )),
+        getDocs(query(
+          collection(db, 'fornecedores'),
+          where('userId', '==', user.uid),
+          where('status', '==', 'ativo'),
+          orderBy('empresa')
+        ))
+      ]);
+
       const supplies = suppliesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Supply[];
 
-      // Buscar cotações
-      const quotationsQuery = query(
-        collection(db, 'quotations'),
-        where('createdAt', '>=', Timestamp.fromDate(filters.dateRange.start)),
-        where('createdAt', '<=', Timestamp.fromDate(filters.dateRange.end)),
-        orderBy('createdAt', 'desc')
-      );
-      const quotationsSnapshot = await getDocs(quotationsQuery);
       const quotations = quotationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Quotation[];
 
-      // Buscar fornecedores
-      const suppliersQuery = query(
-        collection(db, 'fornecedores'),
-        where('status', '==', 'ativo'),
-        orderBy('empresa')
-      );
-      const suppliersSnapshot = await getDocs(suppliersQuery);
       const suppliersData = suppliersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Fornecedor[];
 
-      // Extrair categorias únicas dos insumos
+      // Extrair categorias e fornecedores únicos
       const uniqueCategories = [...new Set(supplies.map(s => s.categoryName).filter(Boolean))];
       setCategories(uniqueCategories);
 
-      // Extrair fornecedores únicos
       const uniqueSuppliers = [...new Set(suppliersData.map(s => s.empresa).filter(Boolean))];
       setSuppliers(uniqueSuppliers);
 
-      // Processar dados de análise para cada insumo
-      const analysisItems: PriceAnalysisItem[] = [];
+      // OTIMIZAÇÃO: Buscar todas as ofertas de uma vez usando Promise.all
+      const offersBySupply = new Map<string, Array<{
+        date: string;
+        price: number;
+        supplier: string;
+        quotationId: string;
+      }>>();
 
-      for (const supply of supplies) {
-        const priceHistory: Array<{
-          date: string;
-          price: number;
-          supplier: string;
-          quotationId: string;
-        }> = [];
-
-        // Buscar ofertas para este insumo em todas as cotações
-        for (const quotation of quotations) {
+      // Buscar ofertas de forma paralela para cada cotação
+      const offersPromises = quotations.map(async (quotation) => {
+        const supplyOffersPromises = supplies.map(async (supply) => {
           try {
             const offersPath = `quotations/${quotation.id}/products/${supply.id}/offers`;
-            const offersQuery = query(collection(db, offersPath));
-            const offersSnapshot = await getDocs(offersQuery);
-            
+            const offersSnapshot = await getDocs(query(collection(db, offersPath)));
+
             offersSnapshot.docs.forEach(offerDoc => {
               const offer = { id: offerDoc.id, ...offerDoc.data() } as Offer;
               if (offer.pricePerUnit && offer.supplierName) {
-                priceHistory.push({
+                if (!offersBySupply.has(supply.id)) {
+                  offersBySupply.set(supply.id, []);
+                }
+                offersBySupply.get(supply.id)!.push({
                   date: offer.updatedAt ? (offer.updatedAt as any).toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                   price: offer.pricePerUnit,
                   supplier: offer.supplierName,
@@ -251,9 +262,19 @@ export default function PriceAnalysisEnhanced() {
               }
             });
           } catch (error) {
-            // Ignorar erros para insumos sem ofertas nesta cotação
+            // Ignorar erros para insumos sem ofertas
           }
-        }
+        });
+        await Promise.all(supplyOffersPromises);
+      });
+
+      await Promise.all(offersPromises);
+
+      // Processar dados de análise para cada insumo
+      const analysisItems: PriceAnalysisItem[] = [];
+
+      for (const supply of supplies) {
+        const priceHistory = offersBySupply.get(supply.id) || [];
 
         if (priceHistory.length > 0) {
           // Ordenar histórico por data
@@ -331,7 +352,6 @@ export default function PriceAnalysisEnhanced() {
 
       setAnalysisData(analysisItems);
     } catch (error: any) {
-      console.error('Error loading analysis data:', error);
       toast({
         title: "Erro ao carregar análise",
         description: "Não foi possível carregar os dados de análise de preços.",
@@ -340,7 +360,78 @@ export default function PriceAnalysisEnhanced() {
     } finally {
       setLoading(false);
     }
+  }, [user, filters.dateRange, toast]);
+
+  // Funções de exportação
+  const exportToPDF = useCallback(() => {
+    window.print();
   }, []);
+
+  const exportToExcel = useCallback(() => {
+    const csvData = filteredData.map(item => ({
+      'Nome': item.name,
+      'Categoria': item.category || '',
+      'Preço Atual': `R$ ${item.currentPrice.toFixed(2).replace('.', ',')}`,
+      'Variação (%)': `${item.lastVariationPercent.toFixed(1)}%`,
+      'Melhor Fornecedor': item.bestSupplier,
+      'Volatilidade (%)': `${item.volatility.toFixed(1)}%`,
+      'Nível de Competição': item.competitionLevel,
+      'Total de Ofertas': item.totalOffers,
+      'Última Atualização': formatDate(item.lastUpdate)
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `analise-precos-avancada-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [filteredData]);
+
+  // Memoizar ações do header
+  const headerActions = useMemo(() => (
+    <>
+      <Button variant="outline" onClick={loadAnalysisData}>
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Atualizar
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={exportToPDF}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF (Imprimir)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportToExcel}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel (CSV)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  ), [loadAnalysisData, exportToPDF, exportToExcel]);
+
+  // Definir ações do header usando useLayoutEffect para executar antes do paint
+  useLayoutEffect(() => {
+    if (headerActions !== previousActionsRef.current) {
+      previousActionsRef.current = headerActions;
+      setActions(headerActions);
+    }
+    return () => setActions(null);
+  }, [headerActions, setActions]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -551,51 +642,6 @@ export default function PriceAnalysisEnhanced() {
       <ChevronDown className="w-4 h-4 inline ml-1" />;
   };
 
-  const toggleExpanded = (itemId: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId);
-      } else {
-        newSet.add(itemId);
-      }
-      return newSet;
-    });
-  };
-
-  const exportToPDF = () => {
-    window.print();
-  };
-
-  const exportToExcel = () => {
-    const csvData = filteredData.map(item => ({
-      'Nome': item.name,
-      'Categoria': item.category || '',
-      'Preço Atual': `R$ ${item.currentPrice.toFixed(2).replace('.', ',')}`,
-      'Variação (%)': `${item.lastVariationPercent.toFixed(1)}%`,
-      'Melhor Fornecedor': item.bestSupplier,
-      'Volatilidade (%)': `${item.volatility.toFixed(1)}%`,
-      'Nível de Competição': item.competitionLevel,
-      'Total de Ofertas': item.totalOffers,
-      'Última Atualização': formatDate(item.lastUpdate)
-    }));
-
-    const csvContent = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `analise-precos-avancada-${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // Estatísticas
   const stats = useMemo(() => {
     const total = filteredData.length;
@@ -649,44 +695,6 @@ export default function PriceAnalysisEnhanced() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <BarChart3 className="h-8 w-8 text-primary" />
-            Análise Avançada de Preços
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Análise inteligente com tendências, competitividade e volatilidade
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={loadAnalysisData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportToPDF}>
-                <FileText className="h-4 w-4 mr-2" />
-                PDF (Imprimir)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportToExcel}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Excel (CSV)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
       {/* Estatísticas Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
@@ -915,110 +923,12 @@ export default function PriceAnalysisEnhanced() {
 
       {/* Visualização com Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="products">Produtos ({filteredData.length})</TabsTrigger>
           <TabsTrigger value="suppliers">Fornecedores</TabsTrigger>
           <TabsTrigger value="charts">Gráficos</TabsTrigger>
           <TabsTrigger value="analysis">Análise Detalhada</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredData.slice(0, 8).map(item => {
-              const isExpanded = expandedItems.has(item.id);
-              const visibleHistory = isExpanded ? item.priceHistory : item.priceHistory.slice(0, 2);
-
-              return (
-                <Card key={item.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground">{item.category || 'Sem categoria'}</p>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Badge 
-                          variant={
-                            item.trend === 'up' ? 'destructive' : 
-                            item.trend === 'down' ? 'default' : 'secondary'
-                          }
-                        >
-                          {item.trend === 'up' && <TrendingUp className="h-3 w-3 mr-1" />}
-                          {item.trend === 'down' && <TrendingDown className="h-3 w-3 mr-1" />}
-                          {item.trend === 'stable' && <Minus className="h-3 w-3 mr-1" />}
-                          {item.lastVariationPercent >= 0 ? '+' : ''}{item.lastVariationPercent.toFixed(1)}%
-                        </Badge>
-                        <Badge variant={getCompetitionBadgeVariant(item.competitionLevel)}>
-                          {getCompetitionIcon(item.competitionLevel)}
-                          <span className="ml-1 capitalize">{item.competitionLevel}</span>
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Atual</p>
-                        <p className="font-semibold text-green-600">{formatCurrency(item.currentPrice)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Volatilidade</p>
-                        <p className="font-semibold">{item.volatility.toFixed(1)}%</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Ofertas</p>
-                        <p className="font-semibold">{item.totalOffers}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Melhor Fornecedor</p>
-                        <p className="text-sm font-medium text-blue-600">{item.bestSupplier}</p>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(item.bestSupplierPrice)}</p>
-                      </div>
-
-                      {item.priceHistory.length > 0 && (
-                        <div className="border-t pt-2">
-                          <div className="flex justify-between items-center mb-2">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                              Histórico Recente
-                            </p>
-                            {item.priceHistory.length > 2 && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => toggleExpanded(item.id)}
-                                className="text-xs h-6 px-2"
-                              >
-                                {isExpanded ? (
-                                  <><EyeOff className="w-3 h-3 mr-1" />Menos</>
-                                ) : (
-                                  <><Eye className="w-3 h-3 mr-1" />Mais</>
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            {visibleHistory.map((entry, index) => (
-                              <div key={index} className="flex items-center justify-between text-xs py-1 px-2 bg-muted/20 rounded">
-                                <div className="flex-1">
-                                  <p className="font-medium">{formatDate(entry.date)}</p>
-                                  <p className="text-muted-foreground text-xs truncate">{entry.supplier}</p>
-                                </div>
-                                <p className="font-semibold text-green-600">{formatCurrency(entry.price)}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
 
         <TabsContent value="products" className="space-y-4">
           <Card>

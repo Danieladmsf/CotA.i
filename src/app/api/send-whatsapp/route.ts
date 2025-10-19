@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, admin } from '@/lib/config/firebase-admin';
+import { adminDb, admin, isAdminInitialized } from '@/lib/config/firebase-admin';
 import type { IncomingMessage } from '@/types';
 
 // This API route is now a generic message queueing endpoint.
@@ -8,6 +8,15 @@ const MESSAGES_COLLECTION = 'incoming_messages';
 
 export async function POST(req: NextRequest) {
   console.log(`[API/send-whatsapp] Received a new POST request.`);
+
+  // Check if Firebase Admin is initialized
+  if (!isAdminInitialized) {
+    console.warn(`[API/send-whatsapp] Firebase Admin not initialized. Check environment variables.`);
+    return NextResponse.json({
+      error: 'WhatsApp service temporarily unavailable. Please try again later.'
+    }, { status: 503 });
+  }
+
   let requestBody;
   try {
     requestBody = await req.json();
@@ -23,12 +32,13 @@ export async function POST(req: NextRequest) {
     console.warn(`[API/send-whatsapp] Bad request: phoneNumber, message or userId missing.`);
     return NextResponse.json({ error: 'phoneNumber, message, and userId are required.' }, { status: 400 });
   }
-  
+
   const cleanedPhoneNumber = String(phoneNumber).replace(/\D/g, '');
 
   try {
     console.log(`[API/send-whatsapp] Adding message to Firestore outgoing queue for ${cleanedPhoneNumber}...`);
-    
+
+    const db = adminDb();
     const messageEntry: Omit<IncomingMessage, 'id'> = {
         isOutgoing: true,
         phoneNumber: cleanedPhoneNumber,
@@ -40,7 +50,7 @@ export async function POST(req: NextRequest) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    const docRef = await adminDb.collection(MESSAGES_COLLECTION).add(messageEntry);
+    const docRef = await db.collection(MESSAGES_COLLECTION).add(messageEntry);
     console.log(`[API/send-whatsapp] Message successfully queued with ID: ${docRef.id}`);
 
     return NextResponse.json({ success: true, message: 'Message queued successfully.' });

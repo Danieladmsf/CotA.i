@@ -8,27 +8,125 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Allow logged-in users to read and write their own documents in most collections
-    match /{collection}/{docId} {
-      allow read, write: if collection in ['supplies', 'supply_categories', 'fornecedores', 'quotations', 'shopping_list_items', 'incoming_messages', 'user_sessions', 'whatsapp_config'] && isOwner(resource.data.userId);
-    }
-    
-    // Allow any authenticated user to create documents in these collections,
-    // as long as they set themselves as the owner.
-    match /{collection}/{docId} {
-      allow create: if collection in ['supplies', 'supply_categories', 'fornecedores', 'quotations', 'shopping_list_items', 'incoming_messages', 'user_sessions', 'whatsapp_config'] && isOwner(request.resource.data.userId);
+    match /supplies/{supplyId} {
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow list: if request.auth != null && request.auth.uid != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
-    // Public access rules for supplier portal and registration
+    match /supply_categories/{categoryId} {
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow list: if request.auth != null && request.auth.uid != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /{collection}/{docId} {
+      allow read, write: if collection in ['incoming_messages', 'user_sessions', 'whatsapp_config'] && isOwner(resource.data.userId);
+    }
+
+    match /{collection}/{docId} {
+      allow create: if collection in ['incoming_messages', 'user_sessions', 'whatsapp_config'] && isOwner(request.resource.data.userId);
+    }
+
+    match /notifications/{notificationId} {
+      // Allow reading notifications if you're the owner OR if it's targeted to a supplier (anonymous access)
+      allow get: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.targetSupplierId != null
+      );
+      // Allow listing for authenticated users (they'll filter by userId or targetSupplierId in queries)
+      allow list: if true; // Allow unauthenticated supplier portal access
+      // Allow creating notifications for yourself OR for suppliers (with targetSupplierId)
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.targetSupplierId != null
+      );
+      // Allow updating notifications in these cases:
+      // 1. Supplier notifications (anonymous) - has targetSupplierId
+      // 2. User notifications (authenticated) - userId matches current user
+      // 3. Any authenticated user can mark as read (for notifications without userId)
+      allow update: if (
+        resource.data.targetSupplierId != null || // Supplier notifications (anonymous)
+        (request.auth != null && resource.data.userId == request.auth.uid) || // User notifications (authenticated owner)
+        (request.auth != null && !('userId' in resource.data)) || // Notifications without userId (authenticated)
+        request.auth != null // Fallback: any authenticated user can update
+      );
+      // Allow deleting only if you're the authenticated owner
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
     match /fornecedores/{supplierId} {
-      allow get: if true; // Allow anyone to read a supplier's public data for the portal
-      allow update: if request.resource.data.status == 'ativo'; // Allow a supplier to complete their own registration
+      allow get: if true;
+      allow list: if request.auth != null;
+      allow list: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Allow update for authenticated users (owners) OR unauthenticated suppliers completing registration
+      allow update: if (
+        (request.auth != null && resource.data.userId == request.auth.uid) || // Authenticated owner
+        true // Allow unauthenticated suppliers to complete their registration
+      );
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Quotations collection - authenticated users own their quotations, suppliers can read assigned quotations
+    match /quotations/{quotationId} {
+      allow read: if true; // Allow unauthenticated supplier portal access
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Shopping list items - authenticated users own, suppliers can read items for their quotations
+    match /shopping_list_items/{itemId} {
+      allow read: if true; // Allow unauthenticated supplier portal access
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
-    // Allow suppliers to submit offers to a specific quotation's product subcollection
+    match /{path=**}/offers/{offerId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if request.auth != null;
+    }
+
     match /quotations/{quotationId}/products/{productId}/offers/{offerId} {
-        allow create: if true; // Allow any user (including anonymous portal users) to create an offer
-        allow read, update, delete: if isOwner(get(/databases/$(database)/documents/quotations/$(quotationId)).data.userId);
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if request.auth != null;
+    }
+
+    match /pending_brand_requests/{requestId} {
+        allow read: if true; // Allow unauthenticated supplier portal access
+        allow create: if true;
+        // Allow update/delete if:
+        // 1. User is authenticated AND is the buyer (buyerUserId matches)
+        // 2. User is authenticated AND buyerUserId doesn't exist (backward compatibility)
+        allow update, delete: if request.auth != null && (
+          resource.data.buyerUserId == request.auth.uid ||
+          !('buyerUserId' in resource.data)
+        );
+    }
+
+    // WhatsApp queue - authenticated users can create and read their messages
+    match /whatsapp_queue/{messageId} {
+        allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+        allow list: if request.auth != null && request.auth.uid != null;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // WhatsApp conversations - authenticated users can read and write
+    match /whatsapp_conversations/{conversationId} {
+        allow read, write: if request.auth != null;
+    }
+
+    // Price history - authenticated users own their price history records
+    match /price_history/{historyId} {
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow list: if request.auth != null && request.auth.uid != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }

@@ -5,6 +5,9 @@ import * as React from "react";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import BrandApprovalsTab from './BrandApprovalsTab';
+import QuantityApprovalsTab from './QuantityApprovalsTab';
+import ResultadoEnvioTab from './ResultadoEnvioTab';
 import {
   Select,
   SelectContent,
@@ -24,19 +27,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KeepAliveTabsContent } from "@/components/ui/keep-alive-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  FileBarChart, 
-  Loader2, 
-  Clock, 
-  CalendarDays, 
-  ChevronLeft, 
-  ChevronRight, 
-  Info, 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  FileBarChart,
+  Loader2,
+  Clock,
+  Info,
   PauseCircle,
   TrendingUp,
   Package2,
@@ -48,20 +50,33 @@ import {
   Grid3X3,
   List,
   Eye,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   Filter,
   TrendingDown,
-  Percent
+  Percent,
+  Send
 } from "lucide-react";
 import { db } from "@/lib/config/firebase";
 import { formatCurrency, isValidImageUrl } from "@/lib/utils";
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocs, Timestamp, FieldValue, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocs, Timestamp, FieldValue, updateDoc, collectionGroup } from "firebase/firestore";
 import type { Quotation, Offer, ShoppingListItem, Fornecedor, UnitOfMeasure } from "@/types";
 import { format, startOfDay, endOfDay, intervalToDuration, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { closeQuotationAndItems } from "@/actions/quotationActions";
 
 import { FIREBASE_COLLECTIONS } from "@/lib/constants/firebase";
+import QuotationNavigator from "@/components/shared/QuotationNavigator";
+
+// Utility function to handle preferredBrands as both string and array
+const getPreferredBrandsArray = (preferredBrands: string | string[] | undefined): string[] => {
+  if (!preferredBrands) return [];
+  if (Array.isArray(preferredBrands)) return preferredBrands;
+  return preferredBrands.split(',').map(b => b.trim());
+};
 
 interface OfferByBrandDisplay {
   brandName: string;
@@ -124,6 +139,7 @@ export default function CotacaoClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
 
   // States existentes (mantidos para compatibilidade)
   const [allFetchedQuotations, setAllFetchedQuotations] = useState<Quotation[]>([]);
@@ -137,10 +153,30 @@ export default function CotacaoClient() {
   const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
 
   // Novos states para a interface melhorada
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'aprovacoes') return 'aprovacoes';
+    if (tab === 'aprovacoes-quantidade') return 'aprovacoes-quantidade';
+    return 'overview';
+  });
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [sortBy, setSortBy] = useState<"name" | "price" | "offers">("name");
   const [filterByBrand, setFilterByBrand] = useState<string>("all");
+
+  // Update activeTab when URL params change
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const quotation = searchParams.get('quotation');
+
+    if (tab === 'aprovacoes') {
+      setActiveTab('aprovacoes');
+    } else if (tab === 'aprovacoes-quantidade') {
+      setActiveTab('aprovacoes-quantidade');
+    }
+    if (quotation) {
+      setSelectedQuotationId(quotation);
+    }
+  }, [searchParams]);
 
   const supplierDataCacheRef = useRef(new Map<string, Fornecedor>());
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,22 +184,22 @@ export default function CotacaoClient() {
   
   // Lógica existente mantida (handleAutoCloseQuotation e useEffects)
   const handleAutoCloseQuotation = useCallback(async (quotationId: string) => {
+    if (!user) {
+      return;
+    }
     if (closingQuotationsRef.current.has(quotationId)) {
-        console.log(`[CotacaoClient] Auto-close for ${quotationId} already in progress. Skipping.`);
         return;
     }
-    console.log(`[CotacaoClient] Deadline passed for quotation ${quotationId}. Triggering auto-close action from cotacao page.`);
     closingQuotationsRef.current.add(quotationId);
 
-    const result = await closeQuotationAndItems(quotationId);
+    const result = await closeQuotationAndItems(quotationId, user.uid);
     
     if (result.success && (result.updatedItemsCount ?? 0) > 0) {
       toast({
         title: "Cotação Encerrada Automaticamente",
-        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como 'Encerrado'.`,
+        description: `O prazo expirou. ${result.updatedItemsCount ?? 0} item(ns) da lista de compras foram marcados como \'Encerrado\'.`,
       });
     } else if (!result.success) {
-      console.error("CotacaoClient: Failed to auto-close quotation:", result.error);
      toast({
       title: "Erro ao fechar cotação",
       description: result.error || "Não foi possível atualizar o status da cotação e dos itens.",
@@ -171,13 +207,25 @@ export default function CotacaoClient() {
     });
     }
     closingQuotationsRef.current.delete(quotationId);
-  }, [toast]);
+  }, [toast, user]);
 
   // UseEffects existentes mantidos...
   useEffect(() => {
+    if (authLoading) {
+      setIsLoadingAllQuotations(true);
+      return;
+    }
+
+    if (!user) {
+      setIsLoadingAllQuotations(false);
+      setAllFetchedQuotations([]);
+      return;
+    }
+
     setIsLoadingAllQuotations(true);
     const q = query(
       collection(db, FIREBASE_COLLECTIONS.QUOTATIONS),
+      where("userId", "==", user.uid),
       orderBy("shoppingListDate", "desc"),
       orderBy("createdAt", "desc")
     );
@@ -186,12 +234,12 @@ export default function CotacaoClient() {
       setAllFetchedQuotations(fetchedQuotations);
       setIsLoadingAllQuotations(false);
     }, (error) => {
-      console.error("Error fetching all quotations:", error);
+      console.error('🔴 [CotacaoClient] Error in quotations listener (with double orderBy):', error);
       toast({title: "Erro ao buscar cotações", description: error.message, variant: "destructive"});
       setIsLoadingAllQuotations(false);
     });
     return () => unsubscribe();
-  }, [toast]);
+  }, [user, authLoading, toast]);
 
   useEffect(() => {
     if (isLoadingAllQuotations) return;
@@ -235,7 +283,9 @@ export default function CotacaoClient() {
         router.replace('/cotacao', { scroll: false });
       }
     }
-  }, [searchParams, filteredQuotationsForSelect, isLoadingAllQuotations, router, selectedQuotationId]);
+    // selectedQuotationId removido das dependências para evitar loop - usado apenas para comparação
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, filteredQuotationsForSelect, isLoadingAllQuotations, router]);
 
   useEffect(() => {
     if (!selectedQuotationId) {
@@ -293,66 +343,70 @@ export default function CotacaoClient() {
       listenersToUnsubscribe.length = currentMainListenerIndex !== -1 ? 1 : 0; 
       if (currentMainListenerIndex === -1) listenersToUnsubscribe.push(unsubQuotationDoc);
 
-      for (const item of items) {
-        const offersPath = `quotations/${selectedQuotationId}/products/${item.id}/offers`;
-        const offersQuery = query(collection(db, offersPath));
-        
-        const unsubProductOffers = onSnapshot(offersQuery, async (offersSnapshot) => {
-          const productOffersMap = new Map<string, Offer>();
-          const supplierIdsToFetchDetails = new Set<string>();
+      const offersQuery = query(
+        collectionGroup(db, 'offers'),
+        where('quotationId', '==', selectedQuotationId)
+      );
 
-          offersSnapshot.forEach(offerDoc => {
-            const offerData = offerDoc.data();
-            const offer: Offer = {
-              id: offerDoc.id,
-              supplierId: offerData.supplierId,
-              supplierName: offerData.supplierName,
-              supplierInitials: offerData.supplierInitials,
-              pricePerUnit: offerData.pricePerUnit,
-              brandOffered: offerData.brandOffered,
-              packagingDescription: offerData.packagingDescription,
-              unitsInPackaging: offerData.unitsInPackaging,
-              totalPackagingPrice: offerData.totalPackagingPrice,
-              updatedAt: offerData.updatedAt,
-              productId: offerData.productId,
-            };
-            productOffersMap.set(offerDoc.id, offer); 
+      const unsubOffers = onSnapshot(
+        offersQuery,
+        async (offersSnapshot) => {
+          const allOffers = offersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Offer));
+          const supplierIdsToFetch = new Set<string>();
+
+          allOffers.forEach(offer => {
             if (offer.supplierId && !supplierDataCacheRef.current.has(offer.supplierId)) {
-              supplierIdsToFetchDetails.add(offer.supplierId);
+              supplierIdsToFetch.add(offer.supplierId);
             }
           });
 
-          if (supplierIdsToFetchDetails.size > 0) {
-            const supplierFetchPromises = Array.from(supplierIdsToFetchDetails).map(sid =>
-              getDoc(doc(db, FIREBASE_COLLECTIONS.FORNECEDORES, sid)).then(docSnap => {
-                if (docSnap.exists()) {
-                  supplierDataCacheRef.current.set(sid, { id: sid, ...docSnap.data() } as Fornecedor);
-                }
-              }).catch(err => console.error(`Failed to fetch supplier ${sid}:`, err))
+          if (supplierIdsToFetch.size > 0) {
+            const supplierPromises = Array.from(supplierIdsToFetch).map(id =>
+              getDoc(doc(db, FIREBASE_COLLECTIONS.FORNECEDORES, id))
             );
-            await Promise.all(supplierFetchPromises);
+            const supplierSnaps = await Promise.all(supplierPromises);
+            supplierSnaps.forEach(snap => {
+              if (snap.exists()) {
+                supplierDataCacheRef.current.set(snap.id, { id: snap.id, ...snap.data() } as Fornecedor);
+              }
+            });
+          }
+
+          const offersByProduct = new Map<string, Map<string, Offer>>();
+          for (const offer of allOffers) {
+            if (!offersByProduct.has(offer.productId)) {
+              offersByProduct.set(offer.productId, new Map());
+            }
+            offersByProduct.get(offer.productId)!.set(offer.id!, offer);
           }
 
           setActiveQuotationDetails(prev => {
-            if (!prev || prev.id !== selectedQuotationId) return prev; 
-            const newOffersByProduct = new Map(prev.offersByProduct);
-            newOffersByProduct.set(item.id, productOffersMap);
-            return { ...prev, offersByProduct: newOffersByProduct };
+            if (!prev || prev.id !== selectedQuotationId) return prev;
+            return { ...prev, offersByProduct };
           });
-        });
-        listenersToUnsubscribe.push(unsubProductOffers);
-      }
-      setIsLoadingSelectedQuotationData(false); 
+        },
+        (error) => {
+          console.error('🔴 [CotacaoClient] Error in offers collectionGroup listener:', error);
+          if (error.code === 'failed-precondition') {
+            console.warn('⚠️ Firestore index missing for offers collectionGroup. Please create the index in Firebase Console.');
+            console.warn('Query: collectionGroup("offers").where("quotationId", "==", quotationId)');
+          }
+        }
+      );
+      
+      listenersToUnsubscribe.push(unsubOffers);
+      setIsLoadingSelectedQuotationData(false);
+
     }, (error) => {
-      console.error("Error listening to quotation document:", error);
       toast({title: "Erro ao carregar dados da cotação", description: error.message, variant: "destructive"})
       setActiveQuotationDetails(null);
       setIsLoadingSelectedQuotationData(false);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       setTimeLeft(""); setIsDeadlinePassed(false);
     });
-    if (!listenersToUnsubscribe.includes(unsubQuotationDoc)) { 
-        listenersToUnsubscribe.push(unsubQuotationDoc);
+
+    if (!listenersToUnsubscribe.includes(unsubQuotationDoc)) {
+      listenersToUnsubscribe.push(unsubQuotationDoc);
     }
     
     return () => {
@@ -430,20 +484,6 @@ export default function CotacaoClient() {
     }
   };
 
-  const navigateQuotation = (direction: 'prev' | 'next') => {
-    if (filteredQuotationsForSelect.length < 2) return;
-    const currentIndex = filteredQuotationsForSelect.findIndex(q => q.id === selectedQuotationId);
-    let nextIndex = -1;
-    if (direction === 'prev') {
-      nextIndex = currentIndex > 0 ? currentIndex - 1 : filteredQuotationsForSelect.length - 1;
-    } else {
-      nextIndex = currentIndex < filteredQuotationsForSelect.length - 1 ? currentIndex + 1 : 0;
-    }
-    if (nextIndex !== -1 && filteredQuotationsForSelect[nextIndex]) {
-      handleSelectQuotationFromDropdown(filteredQuotationsForSelect[nextIndex].id);
-    }
-  };
-
   // Computed values com informações melhoradas
   const tableProducts = useMemo((): EnhancedProductRow[] => {
     if (!activeQuotationDetails || !activeQuotationDetails.shoppingListItems || activeQuotationDetails.shoppingListItems.length === 0) {
@@ -457,7 +497,7 @@ export default function CotacaoClient() {
       const validOffers = allOffersForThisProduct.filter(offer => offer.pricePerUnit > 0);
       const prices = validOffers.map(offer => offer.pricePerUnit);
       
-      const preferredBrandsArray = item.preferredBrands ? item.preferredBrands.split(',').map(b => b.trim().toLowerCase()) : [];
+      const preferredBrandsArray = item.preferredBrands ? getPreferredBrandsArray(item.preferredBrands) : [];
       
       const bestOfferForPref = allOffersForThisProduct
         .filter(offer => offer.pricePerUnit > 0 && preferredBrandsArray.length > 0 && preferredBrandsArray.includes(offer.brandOffered.toLowerCase()))
@@ -640,127 +680,40 @@ export default function CotacaoClient() {
     return filtered;
   }, [tableProducts, filterByBrand, sortBy]);
 
+  // Converter offersByProduct de Map<string, Map<string, Offer>> para Map<string, Offer[]>
+  const offersForResultTab = useMemo(() => {
+    const result = new Map<string, Offer[]>();
+
+    if (activeQuotationDetails?.offersByProduct) {
+      activeQuotationDetails.offersByProduct.forEach((offersMap, productId) => {
+        result.set(productId, Array.from(offersMap.values()));
+      });
+    }
+
+    return result;
+  }, [activeQuotationDetails?.offersByProduct]);
+
   const isLoading = isLoadingAllQuotations || (isLoadingSelectedQuotationData && !!selectedQuotationId);
   const isQuotationPaused = activeQuotationDetails?.status === 'Pausada';
 
   return (
     <main className="w-full space-y-8" role="main">
-      <header className="fade-in">
-        <h1 className="text-5xl font-heading font-bold text-gradient mb-3">
-          <FileBarChart className="inline-block mr-4 h-12 w-12 float" />
-          Central de Cotações
-        </h1>
-        <p className="text-body-large text-muted-foreground">
-          Acompanhe ofertas, compare preços e tome decisões inteligentes de compra
-        </p>
-      </header>
-
-      {/* Seleção de Cotação */}
-      <section className="card-professional modern-shadow-xl" aria-labelledby="quotation-selector">
-        <header className="p-6 border-b header-modern">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <h2 id="quotation-selector" className="text-2xl font-heading font-bold text-gradient">
-                Seleção de Cotação
-              </h2>
-              <p className="text-muted-foreground mt-2">
-                Escolha uma cotação para analisar as ofertas recebidas
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="hover-lift">
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yyyy") : "Filtrar por Data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar mode="single" selected={selectedDateForFilter} onSelect={handleDateChangeForFilter} initialFocus />
-                </PopoverContent>
-              </Popover>
-              
-              {selectedDateForFilter && (
-                <Button variant="ghost" size="sm" onClick={() => handleDateChangeForFilter(undefined)}>
-                  Limpar Filtro
-                </Button>
-              )}
-              
-              {timeLeft && selectedQuotationId && activeQuotationDetails && (
-                <Badge 
-                  variant={isDeadlinePassed ? "destructive" : isQuotationPaused ? "outline" : "secondary"} 
-                  className="text-base px-4 py-2 modern-shadow pulse-glow"
-                >
-                  <Clock className="mr-2 h-5 w-5" /> {timeLeft}
-                </Badge>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 mt-6">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => navigateQuotation('prev')} 
-              disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-              className="hover-lift"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <Select 
-              value={selectedQuotationId} 
-              onValueChange={handleSelectQuotationFromDropdown} 
-              disabled={isLoading || filteredQuotationsForSelect.length === 0}
-            >
-              <SelectTrigger className="flex-1 input-modern">
-                <SelectValue placeholder={isLoadingAllQuotations ? "Carregando..." : "Selecione uma Cotação"} />
-              </SelectTrigger>
-              <SelectContent className="card-professional">
-                {filteredQuotationsForSelect.length === 0 && !isLoadingAllQuotations && 
-                  <SelectItem value="no-quote" disabled>
-                    Nenhuma cotação para {selectedDateForFilter ? format(selectedDateForFilter, "dd/MM/yy") : "o filtro"}
-                  </SelectItem>
-                }
-                {filteredQuotationsForSelect.map((quotation) => {
-                  const quotationsOnSameDay = allFetchedQuotations.filter(q => 
-                     q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), quotation.shoppingListDate.toDate())
-                  );
-                  
-                  const sortedQuotationsOnSameDay = [...quotationsOnSameDay].sort((a,b) => {
-                    const aTime = a.createdAt && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0;
-                    const bTime = b.createdAt && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0;
-                    return aTime - bTime;
-                  });
-                  
-                  const quotationNumber = sortedQuotationsOnSameDay.findIndex(q => q.id === quotation.id) + 1;
-                      
-                  const quotationName = quotation.createdAt && quotation.shoppingListDate
-                      ? `Cotação #${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`
-                      : `Cotação de ${quotation.shoppingListDate ? format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${quotation.status})`;
-
-                  return (
-                    <SelectItem key={quotation.id} value={quotation.id}>
-                      {quotationName}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => navigateQuotation('next')} 
-              disabled={filteredQuotationsForSelect.length < 2 || isLoading}
-              className="hover-lift"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </header>
-      </section>
+      {/* Cotações - Componente Centralizado */}
+      <QuotationNavigator
+        allQuotations={allFetchedQuotations}
+        filteredQuotations={filteredQuotationsForSelect}
+        selectedDate={selectedDateForFilter}
+        selectedQuotationId={selectedQuotationId}
+        isLoading={isLoading}
+        onDateChange={handleDateChangeForFilter}
+        onQuotationSelect={handleSelectQuotationFromDropdown}
+        showBadgeInfo={false}
+        timeLeft={timeLeft}
+        isDeadlinePassed={isDeadlinePassed}
+        isQuotationPaused={isQuotationPaused}
+        enableNavigationLoop={true}
+        updateDateOnNavigate={true}
+      />
 
       {/* Conteúdo Principal */}
       {(isLoadingSelectedQuotationData && selectedQuotationId) ? (
@@ -780,7 +733,7 @@ export default function CotacaoClient() {
         <section className="space-y-6">
           {/* Estatísticas e Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 card-professional modern-shadow-lg">
+            <TabsList className="grid w-full grid-cols-5 card-professional modern-shadow-lg">
               <TabsTrigger 
                 value="overview" 
                 className="flex items-center gap-2 py-3 nav-item-modern font-heading"
@@ -802,10 +755,25 @@ export default function CotacaoClient() {
                 <Building2 className="h-5 w-5 rotate-hover" />
                 Fornecedores
               </TabsTrigger>
+              <TabsTrigger
+                value="aprovacoes"
+                className="flex items-center gap-2 py-3 nav-item-modern font-heading relative"
+              >
+                <AlertCircle className="h-5 w-5 rotate-hover text-orange-600" />
+                Aprovações
+              </TabsTrigger>
+              <TabsTrigger
+                value="aprovacoes-quantidade"
+                className="flex items-center gap-2 py-3 nav-item-modern font-heading relative"
+              >
+                <TrendingUp className="h-5 w-5 rotate-hover text-blue-600" />
+                Variações de Qtd
+              </TabsTrigger>
+
             </TabsList>
 
             {/* Tab: Visão Geral */}
-            <TabsContent value="overview" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="overview" activeTab={activeTab} className="mt-6 fade-in">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <Card className="card-professional hover-lift">
                   <CardContent className="p-6">
@@ -969,19 +937,14 @@ export default function CotacaoClient() {
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <span className="text-body">{timeLeft || "Sem prazo ativo"}</span>
                       </div>
-                      {activeQuotationDetails.deadline && (
-                        <div className="text-caption">
-                          Prazo: {format(activeQuotationDetails.deadline.toDate(), "dd/MM/yyyy 'às' HH:mm")}
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            </KeepAliveTabsContent>
 
             {/* Tab: Produtos */}
-            <TabsContent value="products" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="products" activeTab={activeTab} className="mt-6 fade-in">
               <div className="space-y-6">
                 {/* Controles de Visualização */}
                 <Card className="card-professional">
@@ -1065,7 +1028,7 @@ export default function CotacaoClient() {
                                   <p className="text-caption">Pedido: {product.requestedQuantity} {product.unit}</p>
                                   {product.preferredBrands && (
                                     <p className="text-caption">
-                                      Marcas Pref.: {product.preferredBrands.split(',').map(b => b.trim()).join(', ')}
+                                      Marcas Pref.: {getPreferredBrandsArray(product.preferredBrands).join(', ')}
                                     </p>
                                   )}
                                   {product.notes && (
@@ -1214,10 +1177,10 @@ export default function CotacaoClient() {
                   </div>
                 )}
               </div>
-            </TabsContent>
+            </KeepAliveTabsContent>
 
             {/* Tab: Fornecedores */}
-            <TabsContent value="suppliers" className="mt-6 bounce-in">
+            <KeepAliveTabsContent value="suppliers" activeTab={activeTab} className="mt-6 fade-in">
               <Card className="card-professional">
                 <CardHeader>
                   <CardTitle className="text-title text-gradient">Participação dos Fornecedores</CardTitle>
@@ -1268,7 +1231,19 @@ export default function CotacaoClient() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </KeepAliveTabsContent>
+
+            {/* Tab: Aprovações */}
+            <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 fade-in">
+              <BrandApprovalsTab quotationId={selectedQuotationId} />
+            </KeepAliveTabsContent>
+
+            {/* Tab: Variações de Quantidade */}
+            <KeepAliveTabsContent value="aprovacoes-quantidade" activeTab={activeTab} className="mt-6 fade-in">
+              <QuantityApprovalsTab quotationId={selectedQuotationId} />
+            </KeepAliveTabsContent>
+
+
           </Tabs>
         </section>
       ) : selectedQuotationId ? (

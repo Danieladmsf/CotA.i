@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, FolderPlus, Download, Edit, Trash2 as DeleteIcon, Loader2, Pencil } from 'lucide-react';
+import { PlusCircle, Upload, FolderPlus, Download, Edit, Trash2 as DeleteIcon, Loader2, Pencil, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription as DialogPrimitiveDescription } from '@/components/ui/dialog';
@@ -61,6 +61,7 @@ export default function SuppliesClientPage() {
 
   const [isLoadingSupplies, setIsLoadingSupplies] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isManageCategoriesModalOpen, setIsManageCategoriesModalOpen] = useState(false);
   const { toast } = useToast();
 
   const categoryForm = useForm<CategoryFormValues>({
@@ -98,7 +99,6 @@ export default function SuppliesClientPage() {
       setAllSupplies(fetchedSupplies);
       setIsLoadingSupplies(false);
     }, (error) => {
-      console.error("Error fetching supplies:", error);
       toast({ title: "Erro ao carregar insumos", description: error.message, variant: "destructive" });
       setIsLoadingSupplies(false);
     });
@@ -148,7 +148,6 @@ export default function SuppliesClientPage() {
       await refreshCategories();
       setActiveTab(newCategoryRef.id);
     } catch (error: any) {
-      console.error("Error adding category:", error);
       let description = "Não foi possível adicionar a categoria. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";
@@ -185,7 +184,7 @@ export default function SuppliesClientPage() {
     batch.update(categoryRef, { name: data.name.trim(), name_lowercase: newNormalizedName });
 
     try {
-        const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("categoryId", "==", editingCategory.id));
+        const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("userId", "==", user.uid), where("categoryId", "==", editingCategory.id));
         const suppliesSnapshot = await getDocs(suppliesQuery);
         
         suppliesSnapshot.forEach(supplyDoc => {
@@ -200,7 +199,6 @@ export default function SuppliesClientPage() {
         categoryForm.reset();
         await refreshCategories();
     } catch (error: any) {
-      console.error("Error updating category and supplies:", error);
       let description = "Não foi possível atualizar a categoria. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";
@@ -210,9 +208,9 @@ export default function SuppliesClientPage() {
   };
   
   const handleDeleteCategory = async () => {
-    if (!categoryToDelete) return;
+    if (!categoryToDelete || !user) return;
 
-    const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("categoryId", "==", categoryToDelete.id));
+    const suppliesQuery = query(collection(db, SUPPLIES_COLLECTION), where("userId", "==", user.uid), where("categoryId", "==", categoryToDelete.id));
     const suppliesSnapshot = await getDocs(suppliesQuery);
 
     if (!suppliesSnapshot.empty) {
@@ -228,7 +226,6 @@ export default function SuppliesClientPage() {
       await refreshCategories();
       setActiveTab("all"); 
     } catch (error: any) {
-      console.error("Error deleting category:", error);
       toast({ title: "Erro ao remover categoria", description: error.message, variant: "destructive" });
     }
   };
@@ -324,10 +321,9 @@ export default function SuppliesClientPage() {
         } else {
             toast({ title: "Nenhum Insumo Importado", description: `Verifique seu arquivo. ${skippedItemsLog.length} itens foram ignorados.`, variant: "destructive" });
         }
-        if (skippedItemsLog.length > 0) console.warn("Insumos não importados:", skippedItemsLog);
+        if (skippedItemsLog.length > 0) { /* Some items were skipped, but we won't log them to the console. */ }
 
       } catch (err: any) {
-        console.error("Error importing data:", err);
         let description = `Não foi possível processar o arquivo: ${err.message}`;
         if (err.message && (err.message.includes('network') || err.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
             description = "Falha na importação. Verifique sua conexão ou desative bloqueadores de anúncio e tente novamente.";
@@ -388,7 +384,6 @@ export default function SuppliesClientPage() {
       toast({ title: "Insumo Removido", description: `"${supplyToDelete.name}" foi removido com sucesso.` });
       setSupplyToDelete(null);
     } catch (error: any) {
-      console.error("Error deleting supply:", error);
       toast({ title: "Erro ao remover insumo", description: error.message, variant: "destructive" });
     }
   };
@@ -435,7 +430,6 @@ export default function SuppliesClientPage() {
       setIsSupplyModalOpen(false);
       setEditingSupply(null);
     } catch (error: any) {
-      console.error("Error saving supply:", error);
       let description = "Não foi possível salvar o insumo. Verifique sua conexão com a internet.";
       if (error.message && (error.message.includes('network') || error.message.includes('ERR_BLOCKED_BY_CLIENT'))) {
           description += " Se o problema persistir, tente desativar bloqueadores de anúncio (AdBlock).";
@@ -448,58 +442,87 @@ export default function SuppliesClientPage() {
 
   return (
     <div className="space-y-6">
-      <header className="fade-in">
-        <h1 className="text-5xl text-display text-gradient mb-3">
-          Gerenciar Insumos
-        </h1>
-        <p className="text-body-large text-muted-foreground">
-          Adicione, edite e organize seus insumos por categoria com eficiência e inteligência
-        </p>
-      </header>
       
       <Card className="card-professional modern-shadow-xl hover-lift">
         <CardHeader className="p-4 md:p-6 border-b header-modern">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-             <div>
-               <CardTitle className="text-2xl font-bold tracking-tight text-gradient">Central de Insumos</CardTitle>
-               <CardDescription className="text-muted-foreground mt-1">Organize e controle seu estoque de forma inteligente</CardDescription>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+             {/* Campo de Busca */}
+             <div className="relative flex-1 max-w-md">
+                <Input type="search" placeholder="Buscar insumo por nome, categoria, marca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full input-modern" />
              </div>
-             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
-                <Button variant="outline" onClick={() => document.getElementById('import-supplies-input')?.click()} disabled={isLoadingPageData} className="w-full sm:w-auto hover-lift"><Upload className="mr-2 h-4 w-4 rotate-hover" /> Importar</Button>
-                <input type="file" id="import-supplies-input" accept=".csv,.txt" onChange={handleImportSupplies} className="hidden" />
-                <Button variant="outline" onClick={handleExportSupplies} disabled={allSupplies.length === 0 || isLoadingPageData} className="w-full sm:w-auto hover-lift"><Download className="mr-2 h-4 w-4 rotate-hover" /> Exportar</Button>
-                <Button onClick={() => setIsAddCategoryModalOpen(true)} className="w-full sm:w-auto hover-lift" disabled={isLoadingPageData}><FolderPlus className="mr-2 h-4 w-4 rotate-hover" /> Nova Categoria</Button>
-                <Button onClick={handleAddNewSupplyClick} className="w-full sm:w-auto button-modern" disabled={isLoadingPageData || categories.length === 0}><PlusCircle className="mr-2 h-4 w-4 rotate-hover" /> Adicionar Insumo</Button>
+
+             {/* Separador vertical (apenas em telas grandes) */}
+             <div className="hidden lg:block h-8 w-px bg-border"></div>
+
+             {/* Botões de Ação */}
+             <div className="flex-shrink-0">
+                <div className="flex flex-wrap gap-2">
+                   <input type="file" id="import-supplies-input" accept=".csv,.txt" onChange={handleImportSupplies} className="hidden" />
+                   <Button variant="outline" onClick={() => document.getElementById('import-supplies-input')?.click()} disabled={isLoadingContextCategories} className="hover-lift">
+                      <Upload className="mr-2 h-4 w-4 rotate-hover" /> Importar
+                   </Button>
+                   <Button variant="outline" onClick={handleExportSupplies} disabled={allSupplies.length === 0} className="hover-lift">
+                      <Download className="mr-2 h-4 w-4 rotate-hover" /> Exportar
+                   </Button>
+                   <Button variant="outline" onClick={() => setIsAddCategoryModalOpen(true)} disabled={isLoadingContextCategories} className="hover-lift">
+                      <FolderPlus className="mr-2 h-4 w-4 rotate-hover" /> Nova Categoria
+                   </Button>
+                   <Button onClick={handleAddNewSupplyClick} className="button-modern" disabled={isLoadingContextCategories || categories.length === 0}>
+                      <PlusCircle className="mr-2 h-4 w-4 rotate-hover" /> Adicionar Insumo
+                   </Button>
+                </div>
              </div>
           </div>
-           <div className="mt-4">
-             <Input type="search" placeholder="Buscar insumo por nome, categoria, marca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:max-w-md input-modern" disabled={isLoadingPageData && allSupplies.length === 0} />
-           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6">
-          {isLoadingPageData && allSupplies.length === 0 ? (
-            <div className="flex flex-col justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Carregando dados...</p></div>
+          {isLoadingContextCategories && categories.length === 0 ? (
+            <div className="flex flex-col justify-center items-center h-60">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+              <p className="text-lg text-muted-foreground">Carregando categorias...</p>
+            </div>
           ) : errorCategories ? (
-            <div className="text-destructive p-4 text-center bg-destructive/10 rounded-md"><p><strong>Erro:</strong> {errorCategories}</p></div>
+            <div className="text-destructive p-4 text-center bg-destructive/10 rounded-md">
+              <p><strong>Erro:</strong> {errorCategories}</p>
+            </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="border-b pb-2 mb-4 overflow-x-auto custom-scrollbar">
-                <TabsList className="h-auto p-1 card-professional flex-nowrap">
-                  <TabsTrigger key="all-tab" value="all" className="nav-item-modern">Todos os Insumos</TabsTrigger>
-                  {categories.map(category => (
-                    <TabsTrigger key={category.id} value={category.id} className="group relative nav-item-modern">
-                      <span className="truncate max-w-[150px]">{category.name}</span>
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity bg-muted/80 rounded-sm">
-                        <Pencil className="h-3 w-3 m-1 cursor-pointer hover:text-primary rotate-hover" onClick={(e) => { e.stopPropagation(); handleEditCategoryClick(category); }}/>
-                        <DeleteIcon className="h-3 w-3 m-1 cursor-pointer hover:text-destructive rotate-hover" onClick={(e) => { e.stopPropagation(); setCategoryToDelete(category); }} />
-                      </div>
+                <div className="flex items-center gap-2">
+                  <TabsList className="h-auto p-1 card-professional flex-nowrap flex-1">
+                    <TabsTrigger
+                      key="all-tab"
+                      value="all"
+                      className="nav-item-modern data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+                    >
+                      Todos os Insumos
                     </TabsTrigger>
-                  ))}
-                </TabsList>
+                    {categories.map(category => (
+                      <TabsTrigger
+                        key={category.id}
+                        value={category.id}
+                        className="nav-item-modern data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+                      >
+                        <span className="truncate max-w-[150px]">{category.name}</span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsManageCategoriesModalOpen(true)}
+                    className="hover-lift flex-shrink-0"
+                    title="Gerenciar Categorias"
+                  >
+                    <Settings className="h-4 w-4 rotate-hover" />
+                  </Button>
+                </div>
               </div>
               <TabsContent value={activeTab} className="mt-0">
                 {isLoadingSupplies ? (
-                    <div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="ml-2 text-muted-foreground">Carregando insumos...</span></div>
+                    <div className="flex justify-center items-center h-40">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="ml-2 text-muted-foreground">Carregando insumos...</span>
+                    </div>
                 ) : (
                     <SuppliesTable supplies={filteredSupplies} onEdit={handleEditSupplyClick} onDelete={handleDeleteSupplyClick} />
                 )}
@@ -546,7 +569,61 @@ export default function SuppliesClientPage() {
             </form>
         </DialogContent>
       </Dialog>
-      
+
+      {/* Manage Categories Modal */}
+      <Dialog open={isManageCategoriesModalOpen} onOpenChange={setIsManageCategoriesModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Categorias</DialogTitle>
+            <DialogPrimitiveDescription>
+              Edite ou exclua categorias existentes
+            </DialogPrimitiveDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+            {categories.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhuma categoria cadastrada</p>
+            ) : (
+              categories.map(category => (
+                <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                  <span className="font-medium">{category.name}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsManageCategoriesModalOpen(false);
+                        handleEditCategoryClick(category);
+                      }}
+                      className="h-8 w-8 hover:bg-accent"
+                      title="Editar categoria"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsManageCategoriesModalOpen(false);
+                        setCategoryToDelete(category);
+                      }}
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Excluir categoria"
+                    >
+                      <DeleteIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setIsManageCategoriesModalOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmation and Supply Modals */}
       {categoryToDelete && (
         <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>

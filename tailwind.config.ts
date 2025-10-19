@@ -122,12 +122,7 @@ const config = {
           from: { opacity: '0', transform: 'translateX(-30px)' },
           to: { opacity: '1', transform: 'translateX(0)' },
         },
-        'bounceIn': {
-          '0%': { opacity: '0', transform: 'scale(0.3)' },
-          '50%': { opacity: '1', transform: 'scale(1.05)' },
-          '70%': { transform: 'scale(0.9)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
-        },
+
         'shimmer': {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
@@ -135,6 +130,14 @@ const config = {
         'pulseGlow': {
           '0%, 100%': { boxShadow: '0 0 20px hsl(var(--primary) / 0.3)' },
           '50%': { boxShadow: '0 0 30px hsl(var(--primary) / 0.6)' },
+        },
+        'pulseGlowGreen': {
+          '0%, 100%': { boxShadow: '0 0 20px hsl(var(--success) / 0.3)' },
+          '50%': { boxShadow: '0 0 30px hsl(var(--success) / 0.6)' },
+        },
+        'pulseGlowRed': {
+          '0%, 100%': { boxShadow: '0 0 20px hsl(var(--destructive) / 0.3)' },
+          '50%': { boxShadow: '0 0 30px hsl(var(--destructive) / 0.6)' },
         },
         'float': {
           '0%, 100%': { transform: 'translateY(0px)' },
@@ -147,9 +150,11 @@ const config = {
         'fade-in': 'fadeIn 0.6s ease-out',
         'slide-in-up': 'slideInUp 0.6s ease-out',
         'slide-in-right': 'slideInRight 0.6s ease-out',
-        'bounce-in': 'bounceIn 0.8s ease-out',
+
         'shimmer': 'shimmer 2s infinite',
         'pulse-glow': 'pulseGlow 2s infinite',
+        'pulse-glow-green': 'pulseGlowGreen 2s infinite',
+        'pulse-glow-red': 'pulseGlowRed 2s infinite',
         'float': 'float 3s ease-in-out infinite',
       },
     },
