@@ -764,11 +764,10 @@ export default function ComprasPageClient() {
         console.log('⚠️ [AUTO-SELECT] nova-cotacao removed from navigableQuotations - switching to active quotation');
 
         // Trocar para a cotação ativa mais recente
-        // IMPORTANTE: Buscar em allQuotations quando não há filtro de data
-        const quotationsToSearch = selectedDate ? filteredQuotations : allQuotations;
-        console.log('🔎 [AUTO-SELECT] Searching for active quotation in:', selectedDate ? 'filteredQuotations' : 'allQuotations', `(${quotationsToSearch.length} items)`);
+        // IMPORTANTE: SEMPRE buscar em allQuotations para encontrar cotação ativa (pode estar em qualquer data)
+        console.log('🔎 [AUTO-SELECT] Searching for active quotation in: allQuotations', `(${allQuotations.length} items)`);
 
-        const firstActive = quotationsToSearch.find(q => q.status === 'Aberta' || q.status === 'Pausada');
+        const firstActive = allQuotations.find(q => q.status === 'Aberta' || q.status === 'Pausada');
 
         if (firstActive) {
           console.log('✅ [AUTO-SELECT] Found active quotation, switching from nova-cotacao:', {
@@ -777,8 +776,8 @@ export default function ComprasPageClient() {
             date: firstActive.shoppingListDate ? format(firstActive.shoppingListDate.toDate(), 'yyyy-MM-dd HH:mm') : null
           });
           setSelectedQuotationId(firstActive.id);
-          // Se não há data selecionada, setar a data da cotação ativa
-          if (!selectedDate && firstActive.shoppingListDate) {
+          // SEMPRE setar a data da cotação ativa ao trocar de nova-cotacao
+          if (firstActive.shoppingListDate) {
             console.log('📅 [AUTO-SELECT] Setting selectedDate to quotation date');
             setSelectedDate(firstActive.shoppingListDate.toDate());
           }
