@@ -755,22 +755,39 @@ export default function ComprasPageClient() {
     // CASO 2: Se "nova-cotacao" está selecionada mas não existe mais em navigableQuotations
     // (significa que uma cotação ativa foi criada)
     if (selectedQuotationId === 'nova-cotacao') {
+      console.log('📌 [AUTO-SELECT] CASO 2: nova-cotacao is selected');
+
       const novaCotacaoStillExists = navigableQuotations.some(q => q.id === 'nova-cotacao');
+      console.log('🔍 [AUTO-SELECT] Check if nova-cotacao still exists:', { novaCotacaoStillExists, navigableCount: navigableQuotations.length });
 
       if (!novaCotacaoStillExists) {
+        console.log('⚠️ [AUTO-SELECT] nova-cotacao removed from navigableQuotations - switching to active quotation');
+
         // Trocar para a cotação ativa mais recente
         // IMPORTANTE: Buscar em allQuotations quando não há filtro de data
         const quotationsToSearch = selectedDate ? filteredQuotations : allQuotations;
+        console.log('🔎 [AUTO-SELECT] Searching for active quotation in:', selectedDate ? 'filteredQuotations' : 'allQuotations', `(${quotationsToSearch.length} items)`);
+
         const firstActive = quotationsToSearch.find(q => q.status === 'Aberta' || q.status === 'Pausada');
 
         if (firstActive) {
+          console.log('✅ [AUTO-SELECT] Found active quotation, switching from nova-cotacao:', {
+            id: firstActive.id,
+            status: firstActive.status,
+            date: firstActive.shoppingListDate ? format(firstActive.shoppingListDate.toDate(), 'yyyy-MM-dd HH:mm') : null
+          });
           setSelectedQuotationId(firstActive.id);
           // Se não há data selecionada, setar a data da cotação ativa
           if (!selectedDate && firstActive.shoppingListDate) {
+            console.log('📅 [AUTO-SELECT] Setting selectedDate to quotation date');
             setSelectedDate(firstActive.shoppingListDate.toDate());
           }
           return;
+        } else {
+          console.log('❌ [AUTO-SELECT] No active quotation found to switch to');
         }
+      } else {
+        console.log('✓ [AUTO-SELECT] nova-cotacao still exists in navigableQuotations - keeping selection');
       }
     }
   }, [selectedQuotationId, selectedDate, navigableQuotations, filteredQuotations, activeTab, listIdForQuotation, allQuotations]);
