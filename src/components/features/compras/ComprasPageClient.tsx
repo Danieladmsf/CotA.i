@@ -266,6 +266,11 @@ export default function ComprasPageClient() {
 
   // Filter quotations by selected date
   useEffect(() => {
+    console.log('🔍 [FILTERED-QUOTATIONS] useEffect triggered:', {
+      selectedDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd HH:mm') : null,
+      allQuotationsCount: allQuotations.length
+    });
+
     const today = new Date();
 
     if (selectedDate) {
@@ -273,11 +278,26 @@ export default function ComprasPageClient() {
         q.shoppingListDate && isSameDay(q.shoppingListDate.toDate(), selectedDate)
       );
 
+      console.log('📋 [FILTERED-QUOTATIONS] Filtered by date:', {
+        filteredCount: filtered.length,
+        filteredIds: filtered.map(q => ({ id: q.id, status: q.status }))
+      });
+
       // Check if there's ANY active quotation (regardless of date)
       // User should finish/close current quotation before starting a new one
       const hasAnyActiveQuotation = allQuotations.some(q =>
         q.status === 'Aberta' || q.status === 'Pausada'
       );
+
+      console.log('🔍 [FILTERED-QUOTATIONS] Active quotation check:', {
+        hasAnyActiveQuotation,
+        allQuotationsCount: allQuotations.length,
+        activeQuotations: allQuotations.filter(q => q.status === 'Aberta' || q.status === 'Pausada').map(q => ({
+          id: q.id,
+          status: q.status,
+          date: q.shoppingListDate ? format(q.shoppingListDate.toDate(), 'yyyy-MM-dd') : null
+        }))
+      });
 
       // Add virtual "new quotation" option ONLY if:
       // 1. There are NO active quotations anywhere (hasAnyActiveQuotation === false)
@@ -285,7 +305,13 @@ export default function ComprasPageClient() {
       const allClosedOnThisDate = filtered.length > 0 && filtered.every(q => q.status === 'Fechada' || q.status === 'Concluída');
       const shouldAddNewQuotation = !hasAnyActiveQuotation && (allClosedOnThisDate || filtered.length === 0);
 
+      console.log('🎯 [FILTERED-QUOTATIONS] Decision:', {
+        allClosedOnThisDate,
+        shouldAddNewQuotation
+      });
+
       if (shouldAddNewQuotation) {
+        console.log('✅ [FILTERED-QUOTATIONS] Adding nova-cotacao to filteredQuotations');
         // Create a virtual quotation entry for "new quotation" - ALWAYS for TODAY
         // Add at BEGINNING to maintain chronological reverse order
         const virtualNewQuotation = createVirtualNewQuotation(today, user?.uid || '');
@@ -293,6 +319,7 @@ export default function ComprasPageClient() {
 
         setFilteredQuotations(finalFiltered);
       } else {
+        console.log('⏭️ [FILTERED-QUOTATIONS] NOT adding nova-cotacao (active quotation exists)');
         setFilteredQuotations(filtered);
       }
     } else {
