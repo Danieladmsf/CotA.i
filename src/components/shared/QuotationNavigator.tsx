@@ -203,6 +203,22 @@ export default function QuotationNavigator({
 
                       const quotationNumber = sortedAllQuotations.findIndex(q => q.id === selected.id) + 1;
 
+                      // DEBUG: Log timestamp info
+                      if (selected.createdAt) {
+                        const createdDate = (selected.createdAt as any).toDate();
+                        console.log('[TIMESTAMP-DEBUG] Selected Quotation:', {
+                          id: selected.id,
+                          quotationNumber,
+                          createdAtRaw: selected.createdAt,
+                          createdAtDate: createdDate,
+                          createdAtISO: createdDate.toISOString(),
+                          createdAtLocal: createdDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+                          formattedTime: format(createdDate, "HH:mm"),
+                          shoppingListDate: selected.shoppingListDate ? (selected.shoppingListDate as any).toDate() : null,
+                          shoppingListDateFormatted: selected.shoppingListDate ? format((selected.shoppingListDate as any).toDate(), "dd/MM/yy") : null
+                        });
+                      }
+
                       return selected.createdAt && selected.shoppingListDate
                         ? `Cotação nº ${quotationNumber} de ${format((selected.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((selected.createdAt as any).toDate(), "HH:mm")}) - ${selected.status}`
                         : `Cotação de ${selected.shoppingListDate ? format((selected.shoppingListDate as any).toDate(), "dd/MM/yy") : "Data Inválida"} (Status: ${selected.status})`;
@@ -240,6 +256,18 @@ export default function QuotationNavigator({
                     });
 
                     const quotationNumber = sortedAllQuotations.findIndex(q => q.id === quotation.id) + 1;
+
+                    // DEBUG: Log timestamp info for list items
+                    if (quotation.createdAt) {
+                      const createdDate = (quotation.createdAt as any).toDate();
+                      console.log('[TIMESTAMP-DEBUG] List Item:', {
+                        id: quotation.id,
+                        quotationNumber,
+                        createdAtISO: createdDate.toISOString(),
+                        createdAtLocal: createdDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+                        formattedTime: format(createdDate, "HH:mm")
+                      });
+                    }
 
                     const quotationName = quotation.createdAt && quotation.shoppingListDate
                         ? `Cotação nº ${quotationNumber} de ${format((quotation.shoppingListDate as any).toDate(), "dd/MM/yy")} (${format((quotation.createdAt as any).toDate(), "HH:mm")}) - ${quotation.status}`

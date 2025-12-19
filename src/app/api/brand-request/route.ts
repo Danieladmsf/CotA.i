@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
       imageUrl,
       imageFileName,
       buyerUserId,
-      sellerUserId
+      sellerUserId,
+      hasQuantityVariation, // ✅ Nova marca com variação
+      variationData // ✅ Dados da variação
     } = body;
 
     // Validate required fields
@@ -76,7 +78,10 @@ export async function POST(request: NextRequest) {
       buyerUserId,
       sellerUserId: sellerUserId || supplierId, // Fallback to supplierId if sellerUserId not provided
       createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp.now(),
+      // ✅ Salvar informação de variação pendente
+      hasQuantityVariation: hasQuantityVariation || false,
+      variationData: variationData || null
     };
 
     // Save to Firestore using admin SDK

@@ -16,6 +16,7 @@ import { useOptimizedSuppliers } from '@/hooks/useOptimizedSuppliers';
 import type { Fornecedor, Quotation } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toLocalISOString } from '@/lib/quotation/utils';
 import { Loader2, Send, Calendar as IconCalendar, UserCheck, AlertTriangle, Timer, Bell, Lock, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { db } from '@/lib/config/firebase';
@@ -218,9 +219,9 @@ export default function SelecionarFornecedoresTab({
         result = await updateQuotation(
           existingActiveQuotation.id,
           listId,
-          shoppingListDate.toISOString(),
+          toLocalISOString(shoppingListDate),
           selectedSupplierIds,
-          finalDeadline.toISOString(),
+          toLocalISOString(finalDeadline),
           timeValue,
           reminderValue,
           formattedDeadlineForMessage,
@@ -230,9 +231,9 @@ export default function SelecionarFornecedoresTab({
         // Start new quotation
         result = await startQuotation(
           listId,
-          shoppingListDate.toISOString(),
+          toLocalISOString(shoppingListDate),
           selectedSupplierIds,
-          finalDeadline.toISOString(),
+          toLocalISOString(finalDeadline),
           timeValue,
           reminderValue,
           formattedDeadlineForMessage,

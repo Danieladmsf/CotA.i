@@ -16,7 +16,7 @@ import Image from 'next/image';
 import { notifySupplierBrandApproved, notifySupplierBrandRejected } from '@/actions/notificationService';
 import type { PendingBrandRequest } from '@/types';
 
-export default function BrandApprovalsTab({ quotationId }: { quotationId: string }) {
+export default function BrandApprovalsTab({ quotationId, onSwitchToQuantityTab }: { quotationId: string; onSwitchToQuantityTab?: () => void }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [allRequests, setAllRequests] = useState<PendingBrandRequest[]>([]);
@@ -186,9 +186,10 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
         }
 
         // 4. Create the actual offer now that the brand is approved
+        let createdOfferId: string | null = null;
         try {
           const offersCollectionRef = collection(db, 'quotations', request.quotationId, 'products', request.productId, 'offers');
-          
+
           const offerPayload = {
             quotationId: request.quotationId, // ✅ CRITICAL: Required for collectionGroup query filter
             productId: request.productId,
@@ -206,6 +207,7 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           };
 
           const newOfferRef = await addDoc(offersCollectionRef, offerPayload);
+          createdOfferId = newOfferRef.id;
 
         } catch (error) {
           console.error('❌ [handleApproval] Erro ao criar oferta:', error);
@@ -217,11 +219,57 @@ export default function BrandApprovalsTab({ quotationId }: { quotationId: string
           });
         }
 
+        // 4.5 ✅ Se houver variação de quantidade, criar notificação de variação
+        let hasQuantityVariationPending = false;
+        if ((request as any).hasQuantityVariation && (request as any).variationData && createdOfferId) {
+          hasQuantityVariationPending = true;
+          try {
+            const { notifyQuantityVariation } = await import('@/actions/notificationService');
+
+            const variationData = (request as any).variationData;
+
+            const result = await notifyQuantityVariation({
+              userId: user!.uid,
+              quotationId: request.quotationId,
+              quotationName: `Cotação #${request.quotationId.slice(-6)}`,
+              productId: request.productId,
+              productName: request.productName || 'Produto',
+              supplierName: request.supplierName,
+              supplierId: request.supplierId,
+              brandName: request.brandName,
+              requestedQuantity: variationData.requestedQuantity,
+              offeredPackages: variationData.offeredPackages,
+              unit: variationData.unit,
+              offerId: createdOfferId,
+              unitsPerPackage: request.unitsInPackaging,
+              unitWeight: request.unitWeight,
+              totalPackagingPrice: request.totalPackagingPrice,
+            });
+
+            if (result.success) {
+              console.log('✅ [BrandApproval] Notificação de variação criada com sucesso');
+            } else {
+              console.warn('⚠️ [BrandApproval] Falha ao criar notificação de variação:', result.error);
+            }
+          } catch (notifError: any) {
+            console.error('❌ [BrandApproval] Erro ao criar notificação de variação:', notifError);
+          }
+        }
+
         toast({
           title: "Marca Aprovada!",
-          description: `A marca "${request.brandName}" foi aprovada e adicionada às marcas preferenciais.`,
+          description: hasQuantityVariationPending
+            ? `A marca "${request.brandName}" foi aprovada! Agora revise a variação de quantidade na aba ao lado.`
+            : `A marca "${request.brandName}" foi aprovada e adicionada às marcas preferenciais.`,
           variant: "default"
         });
+
+        // ✅ Se houver variação pendente, redirecionar para aba de variações após 2 segundos
+        if (hasQuantityVariationPending && onSwitchToQuantityTab) {
+          setTimeout(() => {
+            onSwitchToQuantityTab();
+          }, 2000);
+        }
       } else {
         // Just reject the request
         const requestRef = doc(db, 'pending_brand_requests', request.id);

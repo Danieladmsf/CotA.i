@@ -9,6 +9,7 @@ import { ptBR } from 'date-fns/locale';
 // Import the new centralized notification actions
 import { sendQuotationInvitation, sendQuotationClosureNotice, sendBuyerQuotationClosureNotice } from './notificationActions';
 import { notifyQuotationStarted, notifyQuotationClosed } from './notificationService';
+import { generatePriceHistoryForQuotation } from './priceHistoryActions';
 
 const QUOTATIONS_COLLECTION = 'quotations';
 const SHOPPING_LIST_ITEMS_COLLECTION = 'shopping_list_items';
@@ -70,9 +71,25 @@ export async function startQuotation(
       userId: userId,
     });
 
-    // 3. Update shopping list items
+    // 3. Update shopping list items and create products subcollection
     itemsToInclude.forEach(doc => {
       mainBatch.update(doc.ref, { quotationId: newQuotationRef.id, status: 'Cotado' });
+
+      // Create product document in subcollection for each item
+      const itemData = doc.data() as ShoppingListItem;
+      const productRef = newQuotationRef.collection('products').doc(itemData.supplyId);
+      mainBatch.set(productRef, {
+        supplyId: itemData.supplyId,
+        name: itemData.name,
+        quantity: itemData.quantity,
+        unit: itemData.unit,
+        categoryId: itemData.categoryId,
+        categoryName: itemData.categoryName,
+        preferredBrands: itemData.preferredBrands,
+        notes: itemData.notes || '',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
 
     // 4. Commit main database writes for quotation and items
@@ -176,9 +193,25 @@ export async function updateQuotation(
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 3. Update new shopping list items to link them to this quotation
+    // 3. Update new shopping list items and create products subcollection
     newItemsToInclude.forEach(doc => {
       mainBatch.update(doc.ref, { quotationId: quotationId, status: 'Cotado' });
+
+      // Create product document in subcollection for each new item
+      const itemData = doc.data() as ShoppingListItem;
+      const productRef = quotationRef.collection('products').doc(itemData.supplyId);
+      mainBatch.set(productRef, {
+        supplyId: itemData.supplyId,
+        name: itemData.name,
+        quantity: itemData.quantity,
+        unit: itemData.unit,
+        categoryId: itemData.categoryId,
+        categoryName: itemData.categoryName,
+        preferredBrands: itemData.preferredBrands,
+        notes: itemData.notes || '',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
 
     // 4. Commit main database writes
@@ -275,6 +308,21 @@ export async function closeQuotationAndItems(
         });
         
         await batch.commit();
+
+        // --- Generate price history for this closed quotation ---
+        try {
+            const historyRecordsCreated = await generatePriceHistoryForQuotation(
+                quotationId,
+                userId,
+                listDate
+            );
+            if (historyRecordsCreated > 0) {
+                console.log(`📊 Created ${historyRecordsCreated} price history records for quotation ${quotationId}`);
+            }
+        } catch (historyError: any) {
+            console.error('⚠️ Error generating price history (non-blocking):', historyError);
+            // Don't throw - price history generation should not block quotation closure
+        }
 
         // --- Notify ALL invited suppliers ---
         try {

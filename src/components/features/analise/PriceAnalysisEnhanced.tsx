@@ -253,8 +253,21 @@ export default function PriceAnalysisEnhanced() {
                 if (!offersBySupply.has(supply.id)) {
                   offersBySupply.set(supply.id, []);
                 }
+
+                // Usar a data da cotação (mais precisa) ou fallback para createdAt/updatedAt da oferta
+                let offerDate: string;
+                if (quotation.createdAt) {
+                  offerDate = (quotation.createdAt as any).toDate().toISOString();
+                } else if (offer.createdAt) {
+                  offerDate = (offer.createdAt as any).toDate().toISOString();
+                } else if (offer.updatedAt) {
+                  offerDate = (offer.updatedAt as any).toDate().toISOString();
+                } else {
+                  offerDate = new Date().toISOString();
+                }
+
                 offersBySupply.get(supply.id)!.push({
-                  date: offer.updatedAt ? (offer.updatedAt as any).toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                  date: offerDate,
                   price: offer.pricePerUnit,
                   supplier: offer.supplierName,
                   quotationId: quotation.id
@@ -601,18 +614,71 @@ export default function PriceAnalysisEnhanced() {
 
   // Dados para gráficos
   const chartData = useMemo(() => {
-    if (!selectedProduct) return [];
-    
+    console.log('🔍 [CHART-DEBUG] Calculando chartData:', {
+      selectedProduct,
+      filteredDataLength: filteredData.length
+    });
+
+    if (!selectedProduct) {
+      console.log('⚠️ [CHART-DEBUG] Nenhum produto selecionado');
+      return [];
+    }
+
     const product = filteredData.find(item => item.id === selectedProduct);
-    if (!product) return [];
-    
-    return product.priceHistory
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(entry => ({
-        date: format(parseISO(entry.date), 'dd/MM'),
+    console.log('🔍 [CHART-DEBUG] Produto encontrado:', {
+      productId: selectedProduct,
+      found: !!product,
+      productName: product?.name,
+      priceHistoryLength: product?.priceHistory?.length
+    });
+
+    if (!product) {
+      console.log('❌ [CHART-DEBUG] Produto não encontrado no filteredData');
+      return [];
+    }
+
+    console.log('📊 [CHART-DEBUG] Price History RAW:', product.priceHistory);
+
+    // Agrupar ofertas por data para evitar pontos duplicados no gráfico
+    const offersByDate = new Map<string, Array<{ price: number; supplier: string }>>();
+
+    product.priceHistory.forEach(entry => {
+      const dateKey = format(parseISO(entry.date), 'dd/MM/yyyy');
+      if (!offersByDate.has(dateKey)) {
+        offersByDate.set(dateKey, []);
+      }
+      offersByDate.get(dateKey)!.push({
         price: entry.price,
         supplier: entry.supplier
-      }));
+      });
+    });
+
+    // Criar dados do gráfico com preço médio, mínimo e máximo por data
+    const chartData = Array.from(offersByDate.entries())
+      .sort((a, b) => {
+        const dateA = parseISO(a[0].split('/').reverse().join('-'));
+        const dateB = parseISO(b[0].split('/').reverse().join('-'));
+        return dateA.getTime() - dateB.getTime();
+      })
+      .map(([dateKey, offers]) => {
+        const prices = offers.map(o => o.price);
+        const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        return {
+          date: dateKey.substring(0, 5), // "dd/MM"
+          fullDate: dateKey,
+          price: Number(avgPrice.toFixed(2)),
+          minPrice: Number(minPrice.toFixed(2)),
+          maxPrice: Number(maxPrice.toFixed(2)),
+          offersCount: offers.length,
+          suppliers: offers.map(o => o.supplier).join(', ')
+        };
+      });
+
+    console.log('📊 [CHART-DEBUG] Chart Data FINAL (agrupado por data):', chartData);
+    return chartData;
   }, [selectedProduct, filteredData]);
 
   // Funções auxiliares
@@ -1092,7 +1158,20 @@ export default function PriceAnalysisEnhanced() {
                   Evolução de Preços
                 </CardTitle>
                 <div className="flex gap-3 items-center">
-                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                  <Select
+                    value={selectedProduct}
+                    onValueChange={(value) => {
+                      console.log('🎯 [SELECT-DEBUG] Produto selecionado:', value);
+                      const product = filteredData.find(item => item.id === value);
+                      console.log('🎯 [SELECT-DEBUG] Dados do produto:', {
+                        id: product?.id,
+                        name: product?.name,
+                        priceHistoryLength: product?.priceHistory?.length,
+                        priceHistory: product?.priceHistory
+                      });
+                      setSelectedProduct(value);
+                    }}
+                  >
                     <SelectTrigger className="w-[250px]">
                       <SelectValue placeholder="Selecione um produto" />
                     </SelectTrigger>
@@ -1120,24 +1199,44 @@ export default function PriceAnalysisEnhanced() {
               </div>
             </CardHeader>
             <CardContent>
+              {(() => {
+                console.log('🎨 [RENDER-DEBUG] Renderizando gráfico:', {
+                  chartDataLength: chartData.length,
+                  chartType,
+                  selectedProduct,
+                  chartData: chartData.slice(0, 3)
+                });
+                return null;
+              })()}
               {chartData.length > 0 ? (
                 <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <>
-                      {chartType === 'line' && (
+                    {chartType === 'line' && (
                       <RechartsLineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                        <Tooltip 
-                          formatter={(value) => [formatCurrency(value as number), 'Preço']}
-                          labelFormatter={(label) => `Data: ${label}`}
+                        <Tooltip
+                          formatter={(value, name) => {
+                            if (name === 'price') return [formatCurrency(value as number), 'Preço Médio'];
+                            if (name === 'minPrice') return [formatCurrency(value as number), 'Mínimo'];
+                            if (name === 'maxPrice') return [formatCurrency(value as number), 'Máximo'];
+                            return [value, name];
+                          }}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              const data = payload[0].payload;
+                              return `${data.fullDate} (${data.offersCount} ofertas)`;
+                            }
+                            return `Data: ${label}`;
+                          }}
                         />
                         <Legend />
-                        <Line 
-                          type="monotone" 
-                          dataKey="price" 
-                          stroke="#2563eb" 
+                        <Line
+                          type="monotone"
+                          dataKey="price"
+                          name="Preço Médio"
+                          stroke="#2563eb"
                           strokeWidth={2}
                           dot={{ r: 4 }}
                           activeDot={{ r: 6 }}
@@ -1149,16 +1248,28 @@ export default function PriceAnalysisEnhanced() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                        <Tooltip 
-                          formatter={(value) => [formatCurrency(value as number), 'Preço']}
-                          labelFormatter={(label) => `Data: ${label}`}
+                        <Tooltip
+                          formatter={(value, name) => {
+                            if (name === 'price') return [formatCurrency(value as number), 'Preço Médio'];
+                            if (name === 'minPrice') return [formatCurrency(value as number), 'Mínimo'];
+                            if (name === 'maxPrice') return [formatCurrency(value as number), 'Máximo'];
+                            return [value, name];
+                          }}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              const data = payload[0].payload;
+                              return `${data.fullDate} (${data.offersCount} ofertas)`;
+                            }
+                            return `Data: ${label}`;
+                          }}
                         />
                         <Legend />
-                        <Area 
-                          type="monotone" 
-                          dataKey="price" 
-                          stroke="#2563eb" 
-                          fill="#2563eb" 
+                        <Area
+                          type="monotone"
+                          dataKey="price"
+                          name="Preço Médio"
+                          stroke="#2563eb"
+                          fill="#2563eb"
                           fillOpacity={0.3}
                         />
                       </AreaChart>
@@ -1168,15 +1279,30 @@ export default function PriceAnalysisEnhanced() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                        <Tooltip 
-                          formatter={(value) => [formatCurrency(value as number), 'Preço']}
-                          labelFormatter={(label) => `Data: ${label}`}
+                        <Tooltip
+                          formatter={(value, name) => {
+                            if (name === 'price') return [formatCurrency(value as number), 'Preço Médio'];
+                            if (name === 'minPrice') return [formatCurrency(value as number), 'Mínimo'];
+                            if (name === 'maxPrice') return [formatCurrency(value as number), 'Máximo'];
+                            return [value, name];
+                          }}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              const data = payload[0].payload;
+                              return `${data.fullDate} (${data.offersCount} ofertas)`;
+                            }
+                            return `Data: ${label}`;
+                          }}
                         />
                         <Legend />
-                        <Bar dataKey="price" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="price"
+                          name="Preço Médio"
+                          fill="#2563eb"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     )}
-                    </>
                   </ResponsiveContainer>
                 </div>
               ) : (
@@ -1299,59 +1425,110 @@ export default function PriceAnalysisEnhanced() {
           </div>
 
           {/* Alertas e Insights */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                Alertas e Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-6">
                 {/* Produtos sem competição */}
                 {stats.competition.low > 0 && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <h4 className="font-semibold text-yellow-800">Baixa Competição</h4>
+                  <div className="p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                      <h3 className="text-lg font-bold text-yellow-800">Baixa Competição</h3>
                     </div>
-                    <p className="text-sm text-yellow-700">
-                      {stats.competition.low} produtos com poucas ofertas. 
+                    <p className="text-sm text-yellow-700 mb-4">
+                      {stats.competition.low} produtos com poucas ofertas.
                       Considere buscar mais fornecedores.
                     </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {filteredData
+                        .filter(item => item.competitionLevel === 'low')
+                        .slice(0, 10)
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between text-sm p-3 bg-white rounded-lg hover:bg-yellow-100 cursor-pointer transition-colors border border-yellow-200"
+                            onClick={() => setSelectedProduct(item.id)}
+                          >
+                            <span className="font-semibold text-yellow-900 truncate">{item.name}</span>
+                            <span className="text-yellow-700 font-bold ml-2 text-xs">{item.totalOffers} ofertas</span>
+                          </div>
+                        ))}
+                      {stats.competition.low > 10 && (
+                        <p className="text-xs text-yellow-600 italic pt-1">
+                          +{stats.competition.low - 10} outros produtos...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {/* Produtos com alta volatilidade */}
                 {filteredData.filter(item => item.volatility > 20).length > 0 && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-red-600" />
-                      <h4 className="font-semibold text-red-800">Alta Volatilidade</h4>
+                  <div className="p-6 bg-red-50 border-2 border-red-300 rounded-xl shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-5 w-5 text-red-600" />
+                      <h3 className="text-lg font-bold text-red-800">Alta Volatilidade</h3>
                     </div>
-                    <p className="text-sm text-red-700">
-                      {filteredData.filter(item => item.volatility > 20).length} produtos 
+                    <p className="text-sm text-red-700 mb-4">
+                      {filteredData.filter(item => item.volatility > 20).length} produtos
                       com volatilidade acima de 20%. Monitoramento recomendado.
                     </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {filteredData
+                        .filter(item => item.volatility > 20)
+                        .sort((a, b) => b.volatility - a.volatility)
+                        .slice(0, 10)
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between text-sm p-3 bg-white rounded-lg hover:bg-red-100 cursor-pointer transition-colors border border-red-200"
+                            onClick={() => setSelectedProduct(item.id)}
+                          >
+                            <span className="font-semibold text-red-900 truncate">{item.name}</span>
+                            <span className="text-red-700 font-bold ml-2 text-xs">{item.volatility.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      {filteredData.filter(item => item.volatility > 20).length > 10 && (
+                        <p className="text-xs text-red-600 italic pt-1">
+                          +{filteredData.filter(item => item.volatility > 20).length - 10} outros produtos...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {/* Produtos com tendência de alta */}
                 {stats.trending.up > 0 && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-blue-600" />
-                      <h4 className="font-semibold text-blue-800">Tendência de Alta</h4>
+                  <div className="p-6 bg-blue-50 border-2 border-blue-300 rounded-xl shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-bold text-blue-800">Tendência de Alta</h3>
                     </div>
-                    <p className="text-sm text-blue-700">
-                      {stats.trending.up} produtos em tendência de alta. 
+                    <p className="text-sm text-blue-700 mb-4">
+                      {stats.trending.up} produtos em tendência de alta.
                       Considere antecipar compras.
                     </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {filteredData
+                        .filter(item => item.trend === 'up')
+                        .slice(0, 10)
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between text-sm p-3 bg-white rounded-lg hover:bg-blue-100 cursor-pointer transition-colors border border-blue-200"
+                            onClick={() => setSelectedProduct(item.id)}
+                          >
+                            <span className="font-semibold text-blue-900 truncate">{item.name}</span>
+                            <span className="text-blue-700 font-bold ml-2 text-xs">+{item.lastVariationPercent.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      {stats.trending.up > 10 && (
+                        <p className="text-xs text-blue-600 italic pt-1">
+                          +{stats.trending.up - 10} outros produtos...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

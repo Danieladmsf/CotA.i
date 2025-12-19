@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useRef, Dispatch, SetStateAction } from 'react';
-import { doc, deleteDoc, addDoc, updateDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, deleteDoc, addDoc, updateDoc, collection, serverTimestamp, Timestamp, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/config/firebase';
 import { toast } from '@/hooks/use-toast';
 import type { Offer, UnitOfMeasure, Quotation, Fornecedor as SupplierType } from '@/types';
@@ -497,6 +497,26 @@ export function useOfferManagement({
     let savedOfferId: string | undefined = offerData.id; // Track offer ID for notifications
 
     try {
+      // FALLBACK: Ensure product document exists before saving offer
+      const productRef = doc(db, `quotations/${quotationId}/products/${productId}`);
+      const productDoc = await getDoc(productRef);
+
+      if (!productDoc.exists()) {
+        // Product document doesn't exist, create it
+        await setDoc(productRef, {
+          supplyId: productId,
+          name: product.name,
+          quantity: product.quantity,
+          unit: product.unit,
+          categoryId: product.categoryId || '',
+          categoryName: product.categoryName || '',
+          preferredBrands: product.preferredBrands || '',
+          notes: product.notes || '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
       if (offerData.id) {
         const offerRef = doc(db, `quotations/${quotationId}/products/${productId}/offers/${offerData.id}`);
         await updateDoc(offerRef, finalOfferPayload);

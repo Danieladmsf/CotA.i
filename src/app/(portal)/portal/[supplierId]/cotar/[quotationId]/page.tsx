@@ -1987,6 +1987,32 @@ export default function SellerQuotationPage() {
       // Calcular preço por unidade
       const pricePerUnit = flow.packagePrice / (flow.unitsPerPackage * finalPackageWeight);
 
+      // Calcular quantidade oferecida e detectar variação
+      const isWeightVolume = product.unit === 'Kilograma(s)' || product.unit === 'Grama(s)' || product.unit === 'Litro(s)' || product.unit === 'Mililitro(s)';
+      const quantityPerPackage = isWeightVolume ? finalPackageWeight : flow.unitsPerPackage;
+      const offeredQuantity = (flow.requiredPackages || 1) * quantityPerPackage;
+      const requestedQuantity = product.quantity;
+
+      // Detectar se há variação de quantidade
+      let hasQuantityVariation = false;
+      let variationData = null;
+
+      if (requestedQuantity > 0 && offeredQuantity !== requestedQuantity) {
+        hasQuantityVariation = true;
+        const variationAmount = offeredQuantity - requestedQuantity;
+        const variationPercentage = (variationAmount / requestedQuantity) * 100;
+
+        variationData = {
+          requestedQuantity,
+          offeredQuantity,
+          offeredPackages: flow.requiredPackages || 1,
+          variationType: variationAmount > 0 ? 'over' : 'under',
+          variationAmount: Math.abs(variationAmount),
+          variationPercentage: Math.abs(variationPercentage),
+          unit: product.unit
+        };
+      }
+
       // Criar request de nova marca usando a API
       const brandRequestData = {
         quotationId: quotationId,
@@ -2005,7 +2031,10 @@ export default function SellerQuotationPage() {
         imageUrl: imageUrl,
         imageFileName: flow.imageFile?.name || '',
         buyerUserId: quotation.userId,
-        sellerUserId: sellerUser?.uid || currentSupplierDetails.id
+        sellerUserId: sellerUser?.uid || currentSupplierDetails.id,
+        // ✅ Adicionar informação de variação pendente
+        hasQuantityVariation,
+        variationData
       };
 
 

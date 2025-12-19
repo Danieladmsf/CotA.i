@@ -1263,7 +1263,7 @@ export default function CotacaoClient() {
 
             {/* Tab: Aprovações */}
             <KeepAliveTabsContent value="aprovacoes" activeTab={activeTab} className="mt-6 fade-in">
-              <BrandApprovalsTab quotationId={selectedQuotationId} />
+              <BrandApprovalsTab quotationId={selectedQuotationId} onSwitchToQuantityTab={() => setActiveTab('aprovacoes-quantidade')} />
             </KeepAliveTabsContent>
 
             {/* Tab: Variações de Quantidade */}

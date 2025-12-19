@@ -104,6 +104,15 @@ export default function ComprasPageClient() {
   const closingQuotationsRef = React.useRef<Set<string>>(new Set());
 
   const handleTabChange = useCallback((value: string, date?: Date, listId?: string) => {
+    console.log('[TAB-CHANGE-DEBUG]', {
+      newTab: value,
+      currentActiveTab: activeTab,
+      hasActiveQuotation,
+      selectedQuotationId,
+      date,
+      listId
+    });
+
     const selectedQuotation = allQuotations.find(q => q.id === selectedQuotationId);
     const isClosed = selectedQuotation?.status === 'Fechada' || selectedQuotation?.status === 'Concluída';
 
@@ -761,7 +770,22 @@ export default function ComprasPageClient() {
     return '';
   };
 
-  const getTabTriggerTextClass = () => {
+  const getTabTriggerTextClass = (tabValue: string) => {
+    console.log('[TAB-COLOR-DEBUG]', {
+      tabValue,
+      activeTab,
+      isActive: activeTab === tabValue,
+      hasActiveQuotation,
+      quotationStatus,
+      willReturn: activeTab === tabValue ? 'EMPTY (azul)' :
+                  hasActiveQuotation ? 'text-purple-800' :
+                  selectedQuotationId && (quotationStatus === 'Fechada' || quotationStatus === 'Concluída') ? 'text-amber-600' :
+                  'EMPTY (default)'
+    });
+
+    // Não aplicar cores condicionais quando a aba está ativa
+    if (activeTab === tabValue) return '';
+
     if (hasActiveQuotation) return 'text-purple-800';
     if (selectedQuotationId && (quotationStatus === 'Fechada' || quotationStatus === 'Concluída'))
       return 'text-amber-600';
@@ -808,7 +832,11 @@ export default function ComprasPageClient() {
           <TabsList className={`grid w-full grid-cols-1 sm:grid-cols-4 h-auto modern-shadow-lg card-professional p-2 ${getTabsListBackgroundClass()}`} role="tablist" aria-label="Etapas do processo de compras">
             <TabsTrigger
               value="criar-editar"
-              className={`py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900 ${getTabTriggerTextClass()}`}
+              className={(() => {
+                const classes = `py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:!text-blue-900 ${getTabTriggerTextClass('criar-editar')}`;
+                console.log('[TAB-CLASSES] criar-editar:', classes);
+                return classes;
+              })()}
               role="tab"
               aria-selected={activeTab === "criar-editar"}
             >
@@ -825,11 +853,11 @@ export default function ComprasPageClient() {
                 <TooltipTrigger asChild>
                   <TabsTrigger
                     value="iniciar-cotacao"
-                    className={`py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900 ${
-                      hasActiveQuotation ? 'text-purple-800' :
-                      selectedQuotationId && (quotationStatus === 'Fechada' || quotationStatus === 'Concluída') ? 'text-amber-600' :
-                      ''
-                    } ${!shouldUnlockPasso2 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={(() => {
+                      const classes = `py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:!text-blue-900 ${getTabTriggerTextClass('iniciar-cotacao')} ${!shouldUnlockPasso2 ? 'opacity-50 cursor-not-allowed' : ''}`;
+                      console.log('[TAB-CLASSES] iniciar-cotacao:', classes);
+                      return classes;
+                    })()}
                     disabled={!shouldUnlockPasso2}
                     role="tab"
                     aria-selected={activeTab === "iniciar-cotacao"}
@@ -860,11 +888,11 @@ export default function ComprasPageClient() {
                 <TooltipTrigger asChild>
                   <TabsTrigger
                     value="resultado-envio"
-                    className={`py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900 ${
-                      hasActiveQuotation ? 'text-purple-800' :
-                      selectedQuotationId && (quotationStatus === 'Fechada' || quotationStatus === 'Concluída') ? 'text-amber-600' :
-                      ''
-                    } ${!shouldUnlockPasso3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={(() => {
+                      const classes = `py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:!text-blue-900 ${getTabTriggerTextClass('resultado-envio')} ${!shouldUnlockPasso3 ? 'opacity-50 cursor-not-allowed' : ''}`;
+                      console.log('[TAB-CLASSES] resultado-envio:', classes);
+                      return classes;
+                    })()}
                     disabled={!shouldUnlockPasso3}
                     role="tab"
                     aria-selected={activeTab === "resultado-envio"}
@@ -895,11 +923,11 @@ export default function ComprasPageClient() {
                 <TooltipTrigger asChild>
                   <TabsTrigger
                     value="gestao"
-                    className={`py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900 ${
-                      hasActiveQuotation ? 'text-purple-800' :
-                      selectedQuotationId && (quotationStatus === 'Fechada' || quotationStatus === 'Concluída') ? 'text-amber-600' :
-                      ''
-                    } ${!shouldUnlockGestao ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={(() => {
+                      const classes = `py-4 px-6 flex items-center justify-center gap-3 nav-item-modern font-heading font-semibold text-base data-[state=active]:bg-blue-100 data-[state=active]:!text-blue-900 ${getTabTriggerTextClass('gestao')} ${!shouldUnlockGestao ? 'opacity-50 cursor-not-allowed' : ''}`;
+                      console.log('[TAB-CLASSES] gestao:', classes);
+                      return classes;
+                    })()}
                     disabled={!shouldUnlockGestao}
                     role="tab"
                     aria-selected={activeTab === "gestao"}

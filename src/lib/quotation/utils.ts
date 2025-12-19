@@ -418,6 +418,33 @@ export const buildDynamicTitle = (
 };
 
 // ============================================================================
+// DATE/TIME UTILITIES
+// ============================================================================
+
+/**
+ * Converts Date to ISO string preserving local timezone (not UTC)
+ * This prevents date shifts when converting dates like "19/10 23:00 GMT-3"
+ * which would become "20/10 02:00 UTC" with toISOString()
+ */
+export const toLocalISOString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ms = String(date.getMilliseconds()).padStart(3, '0');
+
+  // Get timezone offset in format +HH:MM or -HH:MM
+  const tzOffset = -date.getTimezoneOffset();
+  const tzSign = tzOffset >= 0 ? '+' : '-';
+  const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+  const tzMinutes = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}${tzSign}${tzHours}:${tzMinutes}`;
+};
+
+// ============================================================================
 // VALIDATION
 // ============================================================================
 
